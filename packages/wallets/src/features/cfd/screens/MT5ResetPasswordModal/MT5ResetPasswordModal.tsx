@@ -1,16 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Field, FieldProps, Form, Formik, FormikProps } from 'formik';
 import { TSocketError } from '@deriv/api-v2/types';
-import {
-    WalletButton,
-    WalletButtonGroup,
-    WalletPasswordFieldLazy,
-    WalletText,
-    WalletTextField,
-} from '../../../../components';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Button, Text, useDevice } from '@deriv-com/ui';
+import { WalletButtonGroup, WalletPasswordFieldLazy, WalletTextField } from '../../../../components';
 import PasswordViewerIcon from '../../../../components/Base/WalletPasswordField/PasswordViewerIcon';
-import { passwordRequirements } from '../../../../constants/password';
-import useDevice from '../../../../hooks/useDevice';
+import { getPasswordRequirements } from '../../../../constants/password';
 import { validPasswordMT5 } from '../../../../utils/password-validation';
 import { PlatformDetails } from '../../constants';
 import { TPlatformPasswordChange } from '../../modals/MT5PasswordModal/MT5PasswordModal';
@@ -35,20 +30,26 @@ const MT5ResetPasswordModal: React.FC<TProps> = ({
     sendEmailVerification,
 }) => {
     const { title } = PlatformDetails.mt5;
-    const { isDesktop, isMobile } = useDevice();
+    const { isDesktop } = useDevice();
+    const { localize } = useTranslations();
     const [isCurrentPasswordVisible, setIsCurrentPasswordVisible] = useState(false);
 
+    const walletButtonSizes = isDesktop ? 'md' : 'lg';
     const initialValues: TFormInitialValues = { currentPassword: '', newPassword: '' };
     const formikRef = useRef<FormikProps<TFormInitialValues> | null>(null);
 
     useEffect(() => {
         if (formError) {
-            formikRef.current?.setErrors({ currentPassword: formError.error?.message });
+            if (formError.error.code === 'PasswordError') {
+                formikRef.current?.setErrors({ currentPassword: formError.error?.message });
+            } else {
+                formikRef.current?.setErrors({ newPassword: formError.error?.message });
+            }
         }
     }, [formError]);
 
     const validateCurrentPassword = (value: string) => {
-        if (!value) return 'The field is required';
+        if (!value) return localize('The field is required');
     };
 
     const handleOnSubmit = (values: TFormInitialValues) => {
@@ -62,9 +63,9 @@ const MT5ResetPasswordModal: React.FC<TProps> = ({
         <div className='wallets-mt5-reset'>
             {isDesktop && (
                 <div className='wallets-mt5-reset__header'>
-                    <WalletText as='h2' weight='bold'>
-                        {title} latest password requirements
-                    </WalletText>
+                    <Text as='h2' weight='bold'>
+                        <Localize i18n_default_text='{{title}} latest password requirements' values={{ title }} />
+                    </Text>
                 </div>
             )}
             <Formik initialValues={initialValues} innerRef={formikRef} onSubmit={values => handleOnSubmit(values)}>
@@ -72,11 +73,12 @@ const MT5ResetPasswordModal: React.FC<TProps> = ({
                     <Form>
                         <div className='wallets-mt5-reset__container'>
                             <div className='wallets-mt5-reset__content'>
-                                <WalletText size='sm'>
-                                    To enhance your MT5 account security we have upgraded our password policy.
-                                    <br />
-                                    Please update your password accordingly.
-                                </WalletText>
+                                <Text size='sm'>
+                                    <Localize
+                                        components={[<br key={0} />]}
+                                        i18n_default_text='To enhance your MT5 account security we have upgraded our password policy.<0 />Please update your password accordingly.'
+                                    />
+                                </Text>
                                 <div className='wallets-mt5-reset__fields'>
                                     <Field name='currentPassword' validate={validateCurrentPassword}>
                                         {({ field, form }: FieldProps) => {
@@ -85,7 +87,7 @@ const MT5ResetPasswordModal: React.FC<TProps> = ({
                                                     autoComplete='current-password'
                                                     errorMessage={form.errors[field.name]}
                                                     isInvalid={Boolean(form.errors[field.name])}
-                                                    label='Current password'
+                                                    label={localize('Current password')}
                                                     name={field.name}
                                                     onBlur={field.onBlur}
                                                     onChange={handleChange}
@@ -102,39 +104,45 @@ const MT5ResetPasswordModal: React.FC<TProps> = ({
                                         }}
                                     </Field>
                                     <WalletPasswordFieldLazy
-                                        label='New Password'
+                                        label={localize('New Password')}
                                         mt5Policy
                                         name='newPassword'
                                         onChange={handleChange}
                                         password={values.newPassword}
+                                        passwordError={!!errors?.newPassword}
+                                        serverErrorMessage={errors?.newPassword}
                                     />
                                 </div>
                                 <ul className='wallets-mt5-reset__requirements'>
-                                    {passwordRequirements.map(requirement => (
+                                    {getPasswordRequirements(localize).map(requirement => (
                                         <li key={requirement}>
-                                            <WalletText size='sm'>{requirement}</WalletText>
+                                            <Text size='sm'>{requirement}</Text>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
                         </div>
                         <div className='wallets-mt5-reset__footer'>
-                            <WalletButtonGroup isFlex isFullWidth={isMobile}>
-                                <WalletButton
+                            <WalletButtonGroup isFlex isFullWidth={!isDesktop}>
+                                <Button
+                                    borderWidth='sm'
+                                    color='black'
                                     onClick={sendEmailVerification}
-                                    size={isMobile ? 'lg' : 'md'}
+                                    size={walletButtonSizes}
+                                    textSize='sm'
                                     variant='outlined'
                                 >
-                                    Forgot password?
-                                </WalletButton>
-                                <WalletButton
+                                    <Localize i18n_default_text='Forgot password?' />
+                                </Button>
+                                <Button
                                     disabled={!!errors.currentPassword || !validPasswordMT5(values.newPassword)}
                                     isLoading={isLoading}
-                                    size={isMobile ? 'lg' : 'md'}
+                                    size={walletButtonSizes}
+                                    textSize='sm'
                                     type='submit'
                                 >
-                                    Change my password
-                                </WalletButton>
+                                    <Localize i18n_default_text='Change my password' />
+                                </Button>
                             </WalletButtonGroup>
                         </div>
                     </Form>

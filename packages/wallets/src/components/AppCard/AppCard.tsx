@@ -1,36 +1,41 @@
 import React from 'react';
+import { Text } from '@deriv-com/ui';
 import type { TGenericSizes, THooks } from '../../types';
 import { AppCardBadge } from '../AppCardBadge';
-import { WalletText } from '../Base';
 import { WalletGradientBackground } from '../WalletGradientBackground';
-import { WalletsAppLinkedWithWalletIcon } from '../WalletsAppLinkedWithWalletIcon';
+import { WalletMarketCurrencyIcon } from '../WalletMarketCurrencyIcon';
 import './AppCard.scss';
 
 type TProps = {
     activeWalletCurrency?: THooks.ActiveWalletAccount['currency'];
-    appIcon: React.ComponentProps<typeof WalletsAppLinkedWithWalletIcon>['appIcon'];
-    appName?: string;
-    balance?: string;
+    appName?: JSX.Element | string;
+    balance?: JSX.Element | string;
     cardSize: Extract<TGenericSizes, 'lg' | 'md' | 'sm'>;
     device: 'desktop' | 'mobile';
     isDemoWallet?: THooks.ActiveWalletAccount['is_virtual'];
-    walletIcon: string;
-    walletName?: string;
+    marketType?: React.ComponentProps<typeof WalletMarketCurrencyIcon>['marketType'];
+    platform?: React.ComponentProps<typeof WalletMarketCurrencyIcon>['platform'];
+    product?: React.ComponentProps<typeof WalletMarketCurrencyIcon>['product'];
+    walletName?: JSX.Element | string;
 };
 
 const AppCard: React.FC<TProps> = ({
     activeWalletCurrency,
-    appIcon,
     appName,
     balance,
     cardSize = 'md',
     device = 'desktop',
     isDemoWallet = false,
-    walletIcon,
+    marketType,
+    platform,
+    product,
     walletName,
 }) => {
     return (
-        <div className={`wallets-app-card wallets-app-card--border-radius--${cardSize}`}>
+        <div
+            className={`wallets-app-card wallets-app-card--border-radius--${cardSize}`}
+            data-testid='dt_wallets_app_card'
+        >
             <WalletGradientBackground currency='' hasShine theme='grey'>
                 {cardSize !== 'sm' && (
                     <div className='wallets-app-card__badge'>
@@ -39,23 +44,23 @@ const AppCard: React.FC<TProps> = ({
                 )}
                 <div className={`wallets-app-card__content wallets-app-card__content--${device}--${cardSize}`}>
                     <div className='wallets-app-card__top'>
-                        <WalletsAppLinkedWithWalletIcon
-                            appIcon={appIcon}
+                        <WalletMarketCurrencyIcon
                             currency={activeWalletCurrency ?? ''}
                             isDemo={isDemoWallet}
-                            size='small'
-                            walletIcon={walletIcon}
+                            marketType={marketType}
+                            platform={platform}
+                            product={product}
                         />
                     </div>
                     {cardSize !== 'sm' && (
                         <div className='wallets-app-card__bottom'>
-                            <WalletText size='2xs'>{appName}</WalletText>
-                            <WalletText color='less-prominent' size='2xs'>
+                            <Text size='2xs'>{appName}</Text>
+                            <Text color='less-prominent' size='2xs'>
                                 {walletName}
-                            </WalletText>
-                            <WalletText size='sm' weight='bold'>
+                            </Text>
+                            <Text size='sm' weight='bold'>
                                 {balance}
-                            </WalletText>
+                            </Text>
                         </div>
                     )}
                 </div>

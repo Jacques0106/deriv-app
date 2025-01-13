@@ -1,11 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Div100vhContainer, Icon, useOnClickOutside, Text } from '@deriv/components';
-import { routes, isDesktop, isMobile, getActivePlatform } from '@deriv/shared';
+import { routes, getActivePlatform, platforms } from '@deriv/shared';
 import { BinaryLink } from 'App/Components/Routes';
 import 'Sass/app/_common/components/platform-dropdown.scss';
 import { Localize } from '@deriv/translations';
 import { useHistory } from 'react-router';
+import { useDevice } from '@deriv-com/ui';
+import { useIsHubRedirectionEnabled } from '@deriv/hooks';
+import { useStore } from '@deriv/stores';
 
 const PlatformBox = ({ platform: { icon, description } }) => (
     <React.Fragment>
@@ -28,6 +31,7 @@ const PlatformDropdownContent = ({ platform, app_routing_history }) => {
                 exact={platform.link_to === routes.trade}
                 className='platform-dropdown__list-platform'
                 isActive={() => getActivePlatform(app_routing_history) === platform.name}
+                onClick={e => window.location.pathname.startsWith(platform.link_to) && e.preventDefault()}
             >
                 <PlatformBox platform={platform} />
             </BinaryLink>
@@ -35,7 +39,9 @@ const PlatformDropdownContent = ({ platform, app_routing_history }) => {
             <a
                 data-testid='dt_platform_dropdown_link'
                 href={platform.href}
-                className='platform-dropdown__list-platform'
+                className={`platform-dropdown__list-platform ${
+                    getActivePlatform(app_routing_history) === platform.name ? 'active' : ''
+                }`}
             >
                 <PlatformBox platform={platform} />
             </a>
@@ -45,13 +51,22 @@ const PlatformDropdownContent = ({ platform, app_routing_history }) => {
 
 const PlatformDropdown = ({ app_routing_history, closeDrawer, platform_config, setTogglePlatformType }) => {
     const history = useHistory();
+    const { isDesktop } = useDevice();
+    const { isHubRedirectionEnabled } = useIsHubRedirectionEnabled();
+    const { client } = useStore();
+    const { account_settings } = client;
+    const { trading_hub } = account_settings;
 
     const TradersHubRedirect = () => {
         return (
             <div className='platform-dropdown__cta'>
                 <BinaryLink
                     onClick={() => {
-                        if (isMobile()) {
+                        if (isHubRedirectionEnabled || !!trading_hub) {
+                            window.location.assign(platforms.tradershub_os.url);
+                            return;
+                        }
+                        if (!isDesktop) {
                             history.push(routes.traders_hub);
                             setTogglePlatformType('cfd');
                         }
@@ -81,11 +96,11 @@ const PlatformDropdown = ({ app_routing_history, closeDrawer, platform_config, s
         }
     };
 
-    useOnClickOutside(ref, handleClickOutside, () => isDesktop());
+    useOnClickOutside(ref, handleClickOutside, () => isDesktop);
 
     const platform_dropdown = (
         <div className='platform-dropdown'>
-            <Div100vhContainer className='platform-dropdown__list' height_offset='15rem' is_disabled={isDesktop()}>
+            <Div100vhContainer className='platform-dropdown__list' height_offset='15rem' is_disabled={isDesktop}>
                 {platform_config.map(platform => {
                     return (
                         <div key={platform.name} onClick={closeDrawer} ref={ref}>
@@ -98,11 +113,11 @@ const PlatformDropdown = ({ app_routing_history, closeDrawer, platform_config, s
         </div>
     );
 
-    if (isMobile()) {
-        return ReactDOM.createPortal(platform_dropdown, document.getElementById('mobile_platform_switcher'));
+    if (isDesktop) {
+        return ReactDOM.createPortal(platform_dropdown, document.getElementById('deriv_app'));
     }
 
-    return ReactDOM.createPortal(platform_dropdown, document.getElementById('deriv_app'));
+    return ReactDOM.createPortal(platform_dropdown, document.getElementById('mobile_platform_switcher'));
 };
 
 export { PlatformDropdown, PlatformBox };

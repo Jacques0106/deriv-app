@@ -1,154 +1,144 @@
-import React, { useEffect } from 'react';
-import classNames from 'classnames';
-import { Trans } from 'react-i18next';
+import React from 'react';
 import { useHistory } from 'react-router-dom';
-import { useActiveLinkedToTradingAccount } from '@deriv/api-v2';
-import { optionsAndMultipliersContent } from '../../constants/constants';
-import { getStaticUrl, getUrlBinaryBot, getUrlSmartTrader } from '../../helpers/urls';
-import useDevice from '../../hooks/useDevice';
+import { useActiveLinkedToTradingAccount, useIsEuRegion } from '@deriv/api-v2';
+import {
+    LabelPairedChevronLeftCaptionRegularIcon,
+    LabelPairedChevronRightCaptionRegularIcon,
+} from '@deriv/quill-icons';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
+import { getOptionsAndMultipliersContent } from '../../constants/constants';
+import useIsRtl from '../../hooks/useIsRtl';
 import { TRoute } from '../../routes/Router';
-import { WalletButton, WalletLink, WalletText } from '../Base';
+import { WalletLink } from '../Base';
 import { DerivAppsSection } from '../DerivAppsSection';
+import { TradingAppCardLoader } from '../SkeletonLoader';
 import { TradingAccountCard } from '../TradingAccountCard';
+import LinkTitle from './LinkTitle';
 import './OptionsAndMultipliersListing.scss';
+import classNames from 'classnames';
 
-type TShowButtonProps = Pick<typeof optionsAndMultipliersContent[number], 'isExternal' | 'redirect'>;
-
-type TLinkTitleProps = Pick<typeof optionsAndMultipliersContent[number], 'icon' | 'title'>;
-
-type TOptionsAndMultipliersListingProps = {
-    onOptionsAndMultipliersLoaded?: (value: boolean) => void;
-};
-
-const LinkTitle: React.FC<TLinkTitleProps> = ({ icon, title }) => {
-    const handleClick = (event: React.KeyboardEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
-        event.persist();
-        switch (title) {
-            case 'Deriv Trader':
-                window.open(getStaticUrl(`/dtrader`));
-                break;
-            case 'Deriv Bot':
-                window.open(getStaticUrl(`/dbot`));
-                break;
-            case 'SmartTrader':
-                window.open(getUrlSmartTrader());
-                break;
-            case 'Binary Bot':
-                window.open(getUrlBinaryBot());
-                break;
-            case 'Deriv GO':
-                window.open(getStaticUrl('/deriv-go'));
-                break;
-            default:
-                break;
-        }
-    };
-
+const OptionsAndMultipliersListingContentLoader = () => {
     return (
-        <div
-            className='wallets-options-and-multipliers-listing__content__icon'
-            onClick={handleClick}
-            // Fix sonarcloud issue
-            onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
-                if (event.key === 'Enter') {
-                    handleClick(event);
-                }
-            }}
-        >
-            {icon}
-        </div>
+        <>
+            {Array.from({ length: 3 }).map((_, idx) => (
+                <TradingAppCardLoader key={`wallets-carousel-loader-action-${idx}`} />
+            ))}
+        </>
     );
 };
 
-const ShowOpenButton = ({ isExternal, redirect }: TShowButtonProps) => {
+const OptionsAndMultipliersListingContent: React.FC<{ isEuRegion: boolean }> = ({ isEuRegion }) => {
+    const { localize } = useTranslations();
+    const isRtl = useIsRtl();
     const history = useHistory();
     const { data: activeLinkedToTradingAccount } = useActiveLinkedToTradingAccount();
-    if (activeLinkedToTradingAccount?.loginid) {
-        return (
-            <WalletButton
-                onClick={() => {
-                    if (isExternal) {
-                        window.open(redirect, '_blank');
-                    } else {
-                        history.push(redirect as TRoute);
-                    }
-                }}
-            >
-                Open
-            </WalletButton>
-        );
-    }
-    return null;
+
+    return (
+        <>
+            {getOptionsAndMultipliersContent(localize, isEuRegion).map(account => {
+                const { availability, description, key, redirect, title } = account;
+                if (availability === 'Non-EU' && isEuRegion) return;
+                return (
+                    <TradingAccountCard
+                        {...account}
+                        disabled={activeLinkedToTradingAccount?.is_disabled}
+                        key={`trading-account-card-${title}`}
+                        onClick={() => {
+                            if (!activeLinkedToTradingAccount?.loginid) return;
+                            account.isExternal ? window.open(redirect, '_blank') : history.push(redirect as TRoute);
+                        }}
+                    >
+                        <TradingAccountCard.Icon>
+                            <LinkTitle platform={key} />
+                        </TradingAccountCard.Icon>
+                        <TradingAccountCard.Section>
+                            <TradingAccountCard.Content>
+                                <Text align='start' size='sm'>
+                                    {title}
+                                </Text>
+                                <Text align='start' size='xs'>
+                                    {description}
+                                </Text>
+                            </TradingAccountCard.Content>
+                            {activeLinkedToTradingAccount?.loginid && (
+                                <TradingAccountCard.Button>
+                                    {isRtl ? (
+                                        <LabelPairedChevronLeftCaptionRegularIcon
+                                            data-testid='dt_label_paired_chevron'
+                                            width={16}
+                                        />
+                                    ) : (
+                                        <LabelPairedChevronRightCaptionRegularIcon
+                                            data-testid='dt_label_paired_chevron'
+                                            width={16}
+                                        />
+                                    )}
+                                </TradingAccountCard.Button>
+                            )}
+                        </TradingAccountCard.Section>
+                    </TradingAccountCard>
+                );
+            })}
+        </>
+    );
 };
 
-const OptionsAndMultipliersListing: React.FC<TOptionsAndMultipliersListingProps> = ({
-    onOptionsAndMultipliersLoaded,
-}) => {
-    const { isMobile } = useDevice();
-    const { data: activeLinkedToTradingAccount } = useActiveLinkedToTradingAccount();
+const OptionsAndMultipliersListing = () => {
+    const { isDesktop } = useDevice();
+    const { data: isEuRegion, isLoading: isEuRegionLoading } = useIsEuRegion();
+    const isLoading = isEuRegionLoading;
 
-    useEffect(() => {
-        onOptionsAndMultipliersLoaded?.(true);
-        return () => onOptionsAndMultipliersLoaded?.(false);
-    }, [onOptionsAndMultipliersLoaded]);
+    const title = isEuRegion ? <Localize i18n_default_text='Multipliers' /> : <Localize i18n_default_text='Options' />;
+    const subtitle = isEuRegion ? (
+        <>
+            <Localize i18n_default_text='Leverage your trading; risk only what you put in.' />{' '}
+            <WalletLink staticUrl='/trade-types/options/digital-options/up-and-down/'>
+                <Localize i18n_default_text='Learn more' />
+            </WalletLink>
+        </>
+    ) : (
+        <>
+            <Localize i18n_default_text='Predict the market, profit if you’re right, risk only what you put in.' />{' '}
+            <WalletLink staticUrl='/trade-types/options/digital-options/up-and-down/'>
+                <Localize i18n_default_text='Learn more' />
+            </WalletLink>
+        </>
+    );
 
     return (
         <div className='wallets-options-and-multipliers-listing'>
             <section className='wallets-options-and-multipliers-listing__header'>
                 <div className='wallets-options-and-multipliers-listing__header-title'>
-                    {!isMobile && (
-                        <WalletText align='center' size='xl' weight='bold'>
-                            <Trans defaults='Options' />
-                        </WalletText>
+                    {isDesktop && (
+                        <Text align='center' size='xl' weight='bold'>
+                            {isLoading ? (
+                                <div className='wallets-skeleton wallets-options-and-multipliers-listing__header-title__loader' />
+                            ) : (
+                                title
+                            )}
+                        </Text>
                     )}
-                    <WalletText size={isMobile ? 'sm' : 'md'}>
-                        <Trans
-                            components={[
-                                <WalletLink key={0} staticUrl='/trade-types/options/digital-options/up-and-down/' />,
-                            ]}
-                            defaults='Buy or sell at a specific time for a specific price. <0>Learn more</0>'
-                        />
-                    </WalletText>
+                    <Text align='start' size={isDesktop ? 'md' : 'sm'}>
+                        {isLoading ? (
+                            <div className='wallets-skeleton wallets-options-and-multipliers-listing__header-subtitle__loader' />
+                        ) : (
+                            subtitle
+                        )}
+                    </Text>
                 </div>
-                <DerivAppsSection />
+                {isLoading ? <TradingAppCardLoader /> : <DerivAppsSection />}
             </section>
             <div
                 className={classNames('wallets-options-and-multipliers-listing__content', {
-                    'wallets-options-and-multipliers-listing__content--without-trading-account':
-                        !activeLinkedToTradingAccount?.loginid,
+                    'wallets-options-and-multipliers-listing__content--eu': isEuRegion,
                 })}
             >
-                {optionsAndMultipliersContent.map(account => {
-                    const title = account.title;
-
-                    return (
-                        <TradingAccountCard
-                            {...account}
-                            key={`trading-account-card-${title}`}
-                            leading={
-                                <LinkTitle
-                                    icon={
-                                        activeLinkedToTradingAccount?.loginid || !isMobile
-                                            ? account.icon
-                                            : account.smallIcon
-                                    }
-                                    title={title}
-                                />
-                            }
-                            trailing={<ShowOpenButton isExternal={account.isExternal} redirect={account.redirect} />}
-                        >
-                            <div className='wallets-options-and-multipliers-listing__content__details'>
-                                <WalletText size='sm' weight='bold'>
-                                    <Trans defaults={title} />
-                                </WalletText>
-
-                                <WalletText size='xs'>
-                                    <Trans defaults={account.description} />
-                                </WalletText>
-                            </div>
-                        </TradingAccountCard>
-                    );
-                })}
+                {isLoading ? (
+                    <OptionsAndMultipliersListingContentLoader />
+                ) : (
+                    <OptionsAndMultipliersListingContent isEuRegion={isEuRegion} />
+                )}
             </div>
         </div>
     );

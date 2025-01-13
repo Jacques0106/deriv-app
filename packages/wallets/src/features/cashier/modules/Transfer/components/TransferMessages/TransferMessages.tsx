@@ -1,17 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useFormikContext } from 'formik';
-import { Trans } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { FadedAnimatedList, WalletAlertMessage, WalletButton } from '../../../../../../components';
-import { useTransferMessages } from '../../hooks';
+import { getInitialLanguage } from '@deriv-com/translations';
+import { Button } from '@deriv-com/ui';
+import { FadedAnimatedList, WalletAlertMessage } from '../../../../../../components';
+import useTransferMessages from '../../hooks/useTransferMessages';
 import { useTransfer } from '../../provider';
 import { TInitialTransferFormValues } from '../../types';
 import './TransferMessages.scss';
 
 const TransferMessages: React.FC = () => {
-    const { values } = useFormikContext<TInitialTransferFormValues>();
+    const { setFieldValue, values } = useFormikContext<TInitialTransferFormValues>();
 
     const { USDExchangeRates, accountLimits, activeWalletExchangeRates } = useTransfer();
+    const language = getInitialLanguage();
 
     const messages = useTransferMessages({
         accountLimits,
@@ -22,27 +24,34 @@ const TransferMessages: React.FC = () => {
         USDExchangeRates,
     });
 
+    useEffect(() => {
+        const hasErrorMessage = messages.some(message => message.type === 'error');
+        setFieldValue('isError', hasErrorMessage);
+    }, [messages, setFieldValue]);
+
     return (
         <FadedAnimatedList className='wallets-transfer-messages'>
-            {messages.map(({ action, message: { text, values }, type }) => {
-                const message = <Trans defaults={text} values={values} />;
-
+            {messages.map(({ action, message, type }, idx) => {
                 return (
-                    <WalletAlertMessage key={text} message={message} type={type}>
+                    <WalletAlertMessage key={`${idx}-${type}`} message={message} type={type}>
                         {action?.buttonLabel && action?.navigateTo && (
                             <div className='wallets-transfer-messages__action-button'>
-                                <WalletButton size='sm' type='button' variant='contained'>
+                                <Button borderWidth='sm' isFullWidth size='sm' type='button' variant='contained'>
                                     <Link
                                         className='wallets-transfer-messages__link'
-                                        to={action.navigateTo}
+                                        to={
+                                            language === 'EN'
+                                                ? action.navigateTo
+                                                : `${action.navigateTo}?lang=${language}`
+                                        }
                                         {...(action?.shouldOpenInNewTab && {
                                             rel: 'noopener noreferrer',
                                             target: '_blank',
                                         })}
                                     >
-                                        <Trans defaults={action.buttonLabel} />
+                                        {action.buttonLabel}
                                     </Link>
-                                </WalletButton>
+                                </Button>
                             </div>
                         )}
                     </WalletAlertMessage>

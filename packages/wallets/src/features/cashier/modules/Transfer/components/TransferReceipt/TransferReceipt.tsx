@@ -1,41 +1,37 @@
 import React from 'react';
 import classNames from 'classnames';
-import { AppCard, WalletButton, WalletCard, WalletText } from '../../../../../../components';
-import useDevice from '../../../../../../hooks/useDevice';
-import Arrow from '../../../../../../public/images/ic-back-arrow.svg';
-import type { TWalletLandingCompanyName } from '../../../../../../types';
-import { getTradingAppIcon, getWalletIcon } from '../../../../helpers';
+import { LegacyArrowLeft2pxIcon, LegacyArrowRight2pxIcon } from '@deriv/quill-icons';
+import { Localize } from '@deriv-com/translations';
+import { Button, Text, useDevice } from '@deriv-com/ui';
+import { AppCard, WalletCard, WalletMoney } from '../../../../../../components';
+import useIsRtl from '../../../../../../hooks/useIsRtl';
+import { TPlatforms } from '../../../../../../types';
 import { useTransfer } from '../../provider';
 import './TransferReceipt.scss';
 
 type TReceiptCardProps = {
     account: NonNullable<ReturnType<typeof useTransfer>['receipt']>['fromAccount'];
     activeWallet: ReturnType<typeof useTransfer>['activeWallet'];
-    balance: string;
+    balance: JSX.Element | string;
 };
 
 const ReceiptCard: React.FC<TReceiptCardProps> = ({ account, activeWallet, balance }) => {
-    const { isMobile } = useDevice();
+    const { isDesktop } = useDevice();
     const isTradingApp = account?.account_category === 'trading';
     const isWallet = account?.account_category === 'wallet';
-    const appIcon = getTradingAppIcon(
-        account?.account_type ?? '',
-        activeWallet?.landingCompanyName as TWalletLandingCompanyName,
-        account?.mt5_group
-    );
-    const walletIcon = getWalletIcon(activeWallet?.currency ?? '', Boolean(activeWallet?.demo_account));
 
     if (isTradingApp)
         return (
             <AppCard
                 activeWalletCurrency={activeWallet?.currency}
-                appIcon={appIcon}
-                appName={account.accountName}
+                appName={account?.accountName}
                 balance={balance}
                 cardSize='md'
-                device={isMobile ? 'mobile' : 'desktop'}
+                device={isDesktop ? 'desktop' : 'mobile'}
                 isDemoWallet={Boolean(activeWallet?.demo_account)}
-                walletIcon={walletIcon}
+                marketType={account?.market_type}
+                platform={account?.account_type as TPlatforms.All}
+                product={account?.product}
                 walletName={activeWallet?.accountName}
             />
         );
@@ -47,7 +43,6 @@ const ReceiptCard: React.FC<TReceiptCardProps> = ({ account, activeWallet, balan
                 currency={account.currency ?? ''}
                 iconSize='md'
                 isDemo={Boolean(account?.demo_account)}
-                landingCompanyName={account?.landingCompanyName}
             />
         );
 
@@ -56,23 +51,26 @@ const ReceiptCard: React.FC<TReceiptCardProps> = ({ account, activeWallet, balan
 
 const TransferReceipt = () => {
     const { activeWallet, receipt, resetTransfer } = useTransfer();
-    const { isMobile } = useDevice();
+    const { isDesktop } = useDevice();
+    const isRtl = useIsRtl();
 
     if (!receipt) return null;
 
     const { feeAmount, fromAccount, fromAmount, toAccount, toAmount } = receipt;
 
     const isSameCurrency = fromAccount?.currency === toAccount?.currency;
-    const displayTransferredFromAmount = `${fromAmount.toFixed(fromAccount?.currencyConfig?.fractional_digits)} ${
-        fromAccount?.currencyConfig?.display_code
-    }`;
-    const displayTransferredToAmount = `${toAmount.toFixed(toAccount?.currencyConfig?.fractional_digits)} ${
-        toAccount?.currencyConfig?.display_code
-    }`;
-    const transferredAmountMessage = isSameCurrency
-        ? displayTransferredFromAmount
-        : `${displayTransferredFromAmount} (${displayTransferredToAmount})`;
-    const feeMessage = feeAmount ? `Transfer fees: ${feeAmount} ${fromAccount?.currencyConfig?.display_code}` : '';
+
+    const feeMessage = feeAmount ? (
+        <Localize
+            i18n_default_text='Transfer fees: {{feeAmount}} {{displayCode}}'
+            values={{
+                displayCode: fromAccount?.currencyConfig?.display_code,
+                feeAmount,
+            }}
+        />
+    ) : (
+        ''
+    );
 
     return (
         <div className='wallets-transfer-receipt'>
@@ -80,15 +78,15 @@ const TransferReceipt = () => {
                 <ReceiptCard
                     account={fromAccount}
                     activeWallet={activeWallet}
-                    balance={`-${displayTransferredFromAmount}`}
+                    balance={<WalletMoney amount={-fromAmount} currency={fromAccount?.currency} hasSign />}
                 />
                 <div className='wallets-transfer-receipt__arrow-icon'>
-                    <Arrow />
+                    {isRtl ? <LegacyArrowLeft2pxIcon iconSize='xs' /> : <LegacyArrowRight2pxIcon iconSize='xs' />}
                 </div>
                 <ReceiptCard
                     account={toAccount}
                     activeWallet={activeWallet}
-                    balance={`+${displayTransferredToAmount}`}
+                    balance={<WalletMoney amount={toAmount} currency={toAccount?.currency} hasSign />}
                 />
             </div>
             <div
@@ -97,27 +95,43 @@ const TransferReceipt = () => {
                 })}
             >
                 <div className='wallets-transfer-receipt__amount'>
-                    <WalletText size='xl' weight='bold'>
-                        {transferredAmountMessage}
-                    </WalletText>
+                    {isSameCurrency && (
+                        <Text size='xl' weight='bold'>
+                            <WalletMoney amount={fromAmount} currency={fromAccount?.currency} />
+                        </Text>
+                    )}
+                    {!isSameCurrency && (
+                        <div className='wallets-transfer-receipt__amount-conversion'>
+                            <Text as='div' size='xl' weight='bold'>
+                                <WalletMoney amount={fromAmount} currency={fromAccount?.currency} />
+                                {'\u00A0'}
+                            </Text>
+                            <Text as='div' size='xl' weight='bold'>
+                                {'('}
+                                <WalletMoney amount={toAmount} currency={toAccount?.currency} />
+                                {')'}
+                            </Text>
+                        </div>
+                    )}
                     {Boolean(feeMessage) && (
-                        <WalletText color='less-prominent' size='md'>
+                        <Text color='less-prominent' size='md'>
                             {feeMessage}
-                        </WalletText>
+                        </Text>
                     )}
                 </div>
-                <WalletText align='center' size='lg' weight='bold'>
-                    Your transfer is successful!
-                </WalletText>
+                <Text align='center' size='lg' weight='bold'>
+                    <Localize i18n_default_text='Your transfer is successful!' />
+                </Text>
             </div>
             <div className='wallets-transfer-receipt__button'>
-                <WalletButton
+                <Button
+                    borderWidth='sm'
                     onClick={() => resetTransfer()}
-                    size={isMobile ? 'md' : 'lg'}
-                    textSize={isMobile ? 'md' : 'sm'}
+                    size={isDesktop ? 'lg' : 'md'}
+                    textSize={isDesktop ? 'sm' : 'md'}
                 >
-                    Make a new transfer
-                </WalletButton>
+                    <Localize i18n_default_text='Make a new transfer' />
+                </Button>
             </div>
         </div>
     );

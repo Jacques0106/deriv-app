@@ -1,51 +1,73 @@
-import React from 'react';
-import {
-    DerivProductDerivBotBrandLightLogoHorizontalIcon,
-    DerivProductDerivGoBrandLightLogoHorizontalIcon,
-    DerivProductDerivTraderBrandLightLogoHorizontalIcon,
-    PartnersProductBinaryBotBrandLightLogoHorizontalIcon,
-    PartnersProductSmarttraderBrandLightLogoIcon,
-} from '@deriv/quill-icons';
-import { getStaticUrl, getUrlBinaryBot, getUrlSmartTrader } from '../helpers/urls';
-import i18n from '../translations/i18n';
+import { useTranslations } from '@deriv-com/translations';
+import { getStaticUrl, getUrlSmartTrader } from '../helpers/urls';
 
-export const optionsAndMultipliersContent = [
+type TOptionsAndMultipliersContent = {
+    availability: 'All' | 'EU' | 'Non-EU';
+    description: string;
+    isExternal?: boolean;
+    key: string;
+    redirect: string;
+    title: string;
+};
+
+export const getOptionsAndMultipliersContent = (
+    localize: ReturnType<typeof useTranslations>['localize'],
+    isEU?: boolean
+): TOptionsAndMultipliersContent[] => [
     {
-        description: i18n.t('Options and multipliers trading platform.'),
-        icon: <DerivProductDerivTraderBrandLightLogoHorizontalIcon height='48' width='48' />,
-        redirect: '/',
-        smallIcon: <DerivProductDerivTraderBrandLightLogoHorizontalIcon height='32' width='32' />,
-        title: i18n.t('Deriv Trader'),
+        availability: 'All',
+        description: isEU
+            ? localize('Custom charts, low-entry costs.')
+            : localize('The options and multipliers trading platform.'),
+        key: 'trader',
+        redirect: '/dtrader',
+        title: 'Deriv Trader',
     },
     {
-        description: i18n.t('Automate your trading, no coding needed.'),
-        icon: <DerivProductDerivBotBrandLightLogoHorizontalIcon height='48' width='48' />,
+        availability: 'Non-EU',
+        description: localize('The ultimate bot trading platform.'),
+        isExternal: true,
+        key: 'bot',
         redirect: '/bot',
-        smallIcon: <DerivProductDerivBotBrandLightLogoHorizontalIcon height='32' width='32' />,
-        title: i18n.t('Deriv Bot'),
+        title: 'Deriv Bot',
     },
     {
-        description: i18n.t('Our legacy options trading platform.'),
-        icon: <PartnersProductSmarttraderBrandLightLogoIcon height='48' width='48' />,
+        availability: 'Non-EU',
+        description: localize('The legacy options trading platform.'),
         isExternal: true,
+        key: 'smarttrader',
         redirect: getUrlSmartTrader(),
-        smallIcon: <PartnersProductSmarttraderBrandLightLogoIcon height='32' width='32' />,
-        title: i18n.t('SmartTrader'),
+        title: 'SmartTrader',
     },
     {
-        description: i18n.t('Our legacy automated trading platform.'),
-        icon: <PartnersProductBinaryBotBrandLightLogoHorizontalIcon height='48' width='48' />,
+        availability: 'Non-EU',
+        description: localize('The mobile app for trading multipliers and accumulators.'),
         isExternal: true,
-        redirect: getUrlBinaryBot(),
-        smallIcon: <PartnersProductBinaryBotBrandLightLogoHorizontalIcon height='32' width='32' />,
-        title: i18n.t('Binary Bot'),
-    },
-    {
-        description: i18n.t('Trade on the go with our mobile app.'),
-        icon: <DerivProductDerivGoBrandLightLogoHorizontalIcon height='48' width='48' />,
-        isExternal: true,
+        key: 'derivgo',
         redirect: getStaticUrl('/deriv-go'),
-        smallIcon: <DerivProductDerivGoBrandLightLogoHorizontalIcon height='32' width='32' />,
-        title: i18n.t('Deriv GO'),
+        title: 'Deriv GO',
     },
 ];
+
+export const ACCOUNT_VERIFICATION_STATUSES = {
+    EXPIRED: 'expired',
+    NONE: 'none',
+    PENDING: 'pending',
+    REJECTED: 'rejected',
+    SUSPECTED: 'suspected',
+    VERIFIED: 'verified',
+} as const;
+
+export const ACCOUNT_VERIFICATION_BADGE_STATUS = {
+    FAILED: 'failed',
+    IN_REVIEW: 'in_review',
+    NEEDS_VERIFICATION: 'needs_verification',
+} as const;
+
+export const LANDING_COMPANIES = Object.freeze({
+    BVI: 'bvi',
+    LABUAN: 'labuan',
+    MALTAINVEST: 'maltainvest',
+    SVG: 'svg',
+    VANUATU: 'vanuatu',
+});

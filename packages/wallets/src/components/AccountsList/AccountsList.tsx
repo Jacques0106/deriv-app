@@ -1,57 +1,64 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, { FC, useCallback } from 'react';
+import { useIsEuRegion } from '@deriv/api-v2';
+import { useTranslations } from '@deriv-com/translations';
+import { Divider, Tab, Tabs, useDevice } from '@deriv-com/ui';
 import { CFDPlatformsList } from '../../features';
-import useDevice from '../../hooks/useDevice';
 import { OptionsAndMultipliersListing } from '../OptionsAndMultipliersListing';
-import {
-    WalletsPrimaryTabList,
-    WalletsPrimaryTabPanel,
-    WalletsPrimaryTabPanels,
-    WalletsPrimaryTabs,
-} from '../WalletsPrimaryTabs';
-import { WalletMobileTourGuide } from '../WalletTourGuide';
+import { WalletsTabsLoader } from '../SkeletonLoader';
 import './AccountsList.scss';
 
 type TProps = {
-    isWalletSettled?: boolean;
+    accountsActiveTabIndex?: number;
+    onTabClickHandler?: React.Dispatch<React.SetStateAction<number>>;
 };
 
-const AccountsList = ({ isWalletSettled }: TProps) => {
-    const { isMobile } = useDevice();
-    const [isMT5PlatformListLoaded, setIsMT5PlatformListLoaded] = useState(false);
-    const [isOptionsAndMultipliersLoaded, setIsOptionsAndMultipliersLoaded] = useState(false);
-    const { t } = useTranslation();
+const AccountsList: FC<TProps> = ({ accountsActiveTabIndex, onTabClickHandler }) => {
+    const { isDesktop } = useDevice();
+    const { localize } = useTranslations();
+    const { data: isEuRegion, isLoading: isEuRegionLoading } = useIsEuRegion();
 
-    if (isMobile) {
+    const optionsAndMultipliersTabTitle = isEuRegion ? localize('Multipliers') : localize('Options');
+
+    const tabs = [localize('CFDs'), optionsAndMultipliersTabTitle];
+
+    const onChangeTabHandler = useCallback((activeTab: number) => onTabClickHandler?.(activeTab), [onTabClickHandler]);
+
+    if (isDesktop)
         return (
-            <WalletsPrimaryTabs className='wallets-accounts-list'>
-                <WalletsPrimaryTabList list={[t('CFDs'), t('Options')]} />
-                <WalletsPrimaryTabPanels>
-                    <WalletsPrimaryTabPanel>
-                        <CFDPlatformsList onMT5PlatformListLoaded={setIsMT5PlatformListLoaded} />
-                    </WalletsPrimaryTabPanel>
-                    <WalletsPrimaryTabPanel>
-                        <OptionsAndMultipliersListing
-                            onOptionsAndMultipliersLoaded={setIsOptionsAndMultipliersLoaded}
-                        />
-                    </WalletsPrimaryTabPanel>
-                </WalletsPrimaryTabPanels>
-                <WalletMobileTourGuide
-                    isMT5PlatformListLoaded={isMT5PlatformListLoaded}
-                    isOptionsAndMultipliersLoaded={isOptionsAndMultipliersLoaded}
-                    isWalletSettled={isWalletSettled}
-                />
-            </WalletsPrimaryTabs>
+            <div className='wallets-accounts-list' data-testid='dt_desktop_accounts_list'>
+                <div className='wallets-accounts-list__content'>
+                    <Divider color='var(--border-divider)' height={2} />
+                    <CFDPlatformsList />
+                    <Divider color='var(--border-divider)' height={2} />
+                    <OptionsAndMultipliersListing />
+                </div>
+            </div>
+        );
+
+    if (isEuRegionLoading && !isDesktop) {
+        return (
+            <div className='wallets-accounts-list'>
+                <WalletsTabsLoader />
+            </div>
         );
     }
 
     return (
-        <div className='wallets-accounts-list' data-testid='dt_desktop_accounts_list'>
-            <div className='wallets-accounts-list__content'>
+        <Tabs
+            activeTab={tabs[accountsActiveTabIndex ?? 0]}
+            className='wallets-accounts-list__tabs'
+            onChange={onChangeTabHandler}
+            wrapperClassName='wallets-accounts-list'
+        >
+            <Tab className='wallets-accounts-list__tab' title={localize('CFDs')}>
                 <CFDPlatformsList />
+                <Divider className='wallets-accounts-list__divider' color='var(--wallets-banner-border-color)' />
+            </Tab>
+            <Tab className='wallets-accounts-list__tab' title={optionsAndMultipliersTabTitle}>
                 <OptionsAndMultipliersListing />
-            </div>
-        </div>
+                <Divider className='wallets-accounts-list__divider' color='var(--wallets-banner-border-color)' />
+            </Tab>
+        </Tabs>
     );
 };
 

@@ -3,8 +3,12 @@ import ReactDOM from 'react-dom';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PoiConfirmWithExampleFormContainer from '../poi-confirm-with-example-form-container';
+import { APIProvider } from '@deriv/api';
 
-jest.mock('Assets/ic-poi-name-dob-example.svg', () => jest.fn(() => 'PoiNameDobExampleImage'));
+jest.mock('@deriv/quill-icons', () => ({
+    ...jest.requireActual('@deriv/quill-icons'),
+    DerivLightNameDobPoiIcon: () => 'DerivLightNameDobPoiIcon',
+}));
 
 jest.mock('@deriv/shared', () => ({
     ...jest.requireActual('@deriv/shared'),
@@ -52,16 +56,20 @@ describe('<PoiConfirmWithExampleFormContainer/>', () => {
         getChangeableFields: jest.fn(() => ['first_name', 'last_name', 'date_of_birth']),
         onFormConfirm: jest.fn(),
     };
+
+    const renderComponent = ({ props = mock_props }) =>
+        render(
+            <APIProvider>
+                <PoiConfirmWithExampleFormContainer {...props} />
+            </APIProvider>
+        );
+
     const clarification_message = /To avoid delays, enter your/;
-    const checkbox_label =
-        'I confirm that the name and date of birth above match my chosen identity document (see below)';
-
     it('should render PersonalDetailsForm with image and checkbox', async () => {
-        render(<PoiConfirmWithExampleFormContainer {...mock_props} />);
+        renderComponent({});
 
-        expect(await screen.findByText('PoiNameDobExampleImage')).toBeInTheDocument();
+        expect(await screen.findByText('DerivLightNameDobPoiIcon')).toBeInTheDocument();
         expect(screen.getByText(clarification_message)).toBeInTheDocument();
-        expect(screen.getByText(checkbox_label)).toBeInTheDocument();
         const checkbox_el: HTMLInputElement = screen.getByRole('checkbox');
         expect(checkbox_el.checked).toBeFalsy();
 
@@ -73,7 +81,7 @@ describe('<PoiConfirmWithExampleFormContainer/>', () => {
     });
     it('should change fields and trigger submit', async () => {
         jest.useFakeTimers();
-        render(<PoiConfirmWithExampleFormContainer {...mock_props} />);
+        renderComponent({});
 
         const checkbox_el: HTMLInputElement = await screen.findByRole('checkbox');
         expect(checkbox_el.checked).toBeFalsy();

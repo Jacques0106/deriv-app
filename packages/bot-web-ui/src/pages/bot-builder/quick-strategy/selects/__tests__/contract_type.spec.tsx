@@ -1,6 +1,7 @@
 import React from 'react';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import { ApiHelpers } from '@deriv/bot-skeleton';
 import { mockStore, StoreProvider } from '@deriv/stores';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -79,7 +80,7 @@ describe('<ContractType /> Responsive', () => {
     beforeEach(() => {
         const mock_store = mockStore({
             ui: {
-                is_mobile: true,
+                is_desktop: false,
             },
         });
         mock_DBot_store = mockDBotStore(mock_store, mock_ws);
@@ -139,7 +140,7 @@ describe('<ContractType /> Desktop', () => {
     beforeEach(() => {
         const mock_store = mockStore({
             ui: {
-                is_mobile: false,
+                is_desktop: true,
             },
         });
         mock_DBot_store = mockDBotStore(mock_store, mock_ws);
@@ -180,12 +181,32 @@ describe('<ContractType /> Desktop', () => {
         render(<ContractType name='type' />, {
             wrapper,
         });
-        const autocomplete_element = screen.getByTestId('dt_qs_autocomplete_contract_type');
+        const autocomplete_element = screen.getByTestId('dt_qs_contract_type');
         userEvent.click(autocomplete_element);
         await waitFor(() => {
             const option_element = screen.getByText('RISE');
             userEvent.click(option_element);
         });
         expect(autocomplete_element).toHaveDisplayValue('RISE');
+    });
+
+    it('should be empty list if value not found', async () => {
+        const mockAPI = ApiHelpers.instance as unknown as {
+            contracts_for: {
+                getContractTypes: jest.Mock<string, string[]>;
+            };
+        };
+        mockAPI.contracts_for.getContractTypes = jest.fn().mockReturnValue([]);
+
+        render(<ContractType name='type' />, {
+            wrapper,
+        });
+        const autocomplete_element = screen.getByTestId('dt_qs_contract_type');
+        userEvent.click(autocomplete_element);
+        await waitFor(() => {
+            const option_element = screen.getByText('No results found');
+            userEvent.click(option_element);
+        });
+        expect(autocomplete_element).toHaveDisplayValue('');
     });
 });

@@ -1,4 +1,4 @@
-.wallets-compare-accounts-title-icon {
+.wallets-compare-accounts-title {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -8,21 +8,16 @@
     &__separator {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 0.8em;
     }
 
     &__tooltip {
-        transform: translateX(-80%);
+        width: 19rem;
+        z-index: 9999;
 
-        .wallets-tooltip__arrow {
-            &--bottom {
-                margin-left: 60%;
-            }
+        @include mobile-or-tablet-screen {
+            width: 16rem;
         }
     }
-}
-
-.wallets-compare-accounts-underline {
-    border-top: 0.5rem solid var(--less-prominent);
-    width: 21.3rem;
 }

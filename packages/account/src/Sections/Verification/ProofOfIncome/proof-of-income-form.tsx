@@ -1,16 +1,9 @@
 import React from 'react';
 import { Field, Formik, Form, FormikErrors, FormikHelpers, FormikValues } from 'formik';
 import { AccountStatusResponse, DocumentUploadRequest } from '@deriv/api-types';
-import {
-    Autocomplete,
-    Button,
-    DesktopWrapper,
-    FormSubmitErrorMessage,
-    MobileWrapper,
-    SelectNative,
-} from '@deriv/components';
+import { Autocomplete, Button, FormSubmitErrorMessage, SelectNative } from '@deriv/components';
 import { useFileUploader } from '@deriv/hooks';
-import { localize, Localize } from '@deriv/translations';
+import { useTranslations, Localize } from '@deriv-com/translations';
 import { isEqualArray, WS } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
 import FilesDescription from 'Components/file-uploader-container/files-descriptions';
@@ -21,6 +14,7 @@ import FileUploaderContainer from '../../../Components/file-uploader-container';
 import { getFileUploaderDescriptions } from '../../../Constants/file-uploader';
 import { isServerError } from 'Helpers/utils';
 import { income_status_codes, getPoincDocumentsList } from 'Sections/Verification/ProofOfIncome/proof-of-income-utils';
+import { useDevice } from '@deriv-com/ui';
 
 type TProofOfIncomeForm = {
     onSubmit: (status: typeof income_status_codes[keyof typeof income_status_codes]) => void;
@@ -33,15 +27,15 @@ type TInitialValues = {
 const ProofOfIncomeForm = observer(({ onSubmit }: TProofOfIncomeForm) => {
     const [document_file, setDocumentFile] = React.useState<File[]>([]);
     const [file_selection_error, setFileSelectionError] = React.useState<string | null>(null);
+    const { localize } = useTranslations();
+    const { notifications } = useStore();
+    const { addNotificationMessageByKey, removeNotificationMessage, removeNotificationByKey } = notifications;
+    const { isMobile, isDesktop } = useDevice();
+
+    const { upload } = useFileUploader();
 
     const poinc_documents_list = React.useMemo(() => getPoincDocumentsList(), []);
     const poinc_uploader_files_descriptions = React.useMemo(() => getFileUploaderDescriptions('poinc'), []);
-
-    const { notifications, ui } = useStore();
-    const { addNotificationMessageByKey, removeNotificationMessage, removeNotificationByKey } = notifications;
-    const { is_mobile, is_desktop } = ui;
-
-    const { upload } = useFileUploader();
 
     const initial_form_values: TInitialValues = {
         document_type: '',
@@ -116,16 +110,16 @@ const ProofOfIncomeForm = observer(({ onSubmit }: TProofOfIncomeForm) => {
                 values,
             }) => (
                 <Form noValidate className='proof-of-income__form' onSubmit={handleSubmit}>
-                    <FormBody scroll_offset={is_desktop ? '0' : '20rem'}>
+                    <FormBody scroll_offset={isDesktop ? '0' : '20rem'}>
                         <fieldset className='proof-of-income__form-field'>
                             <FormSubHeader
                                 title={localize('Select document')}
-                                title_text_size={is_mobile ? 'xs' : 's'}
+                                title_text_size={isMobile ? 'xs' : 's'}
                             />
                             <Field name='document_type'>
                                 {({ field }: FormikValues) => (
                                     <React.Fragment>
-                                        <DesktopWrapper>
+                                        {isDesktop ? (
                                             <Autocomplete
                                                 {...field}
                                                 name='document_type'
@@ -147,13 +141,13 @@ const ProofOfIncomeForm = observer(({ onSubmit }: TProofOfIncomeForm) => {
                                                 }}
                                                 required
                                             />
-                                        </DesktopWrapper>
-                                        <MobileWrapper>
+                                        ) : (
                                             <SelectNative
                                                 name='document_type'
                                                 placeholder={localize('Select your document*')}
                                                 label={localize('Select your document*')}
                                                 value={values.document_type}
+                                                // @ts-expect-error [TODO]:Fix types for SelectNative
                                                 list_items={poinc_documents_list}
                                                 error={touched.document_type ? errors.document_type : undefined}
                                                 use_text
@@ -164,7 +158,7 @@ const ProofOfIncomeForm = observer(({ onSubmit }: TProofOfIncomeForm) => {
                                                 required
                                                 hide_top_placeholder
                                             />
-                                        </MobileWrapper>
+                                        )}
                                     </React.Fragment>
                                 )}
                             </Field>
@@ -172,7 +166,7 @@ const ProofOfIncomeForm = observer(({ onSubmit }: TProofOfIncomeForm) => {
                         <div className='proof-of-income__form-field'>
                             <FormSubHeader
                                 title={localize('Document submission')}
-                                title_text_size={is_mobile ? 'xs' : 's'}
+                                title_text_size={isMobile ? 'xs' : 's'}
                             />
                             <FileUploaderContainer
                                 onFileDrop={files => {

@@ -4,7 +4,7 @@ import CFDTopUpDemoModal from '../cfd-top-up-demo-modal.tsx';
 import CFDProviders from '../../cfd-providers';
 import { mockStore } from '@deriv/stores';
 
-jest.mock('../../Components/success-dialog.jsx', () => () => <div>Success Dialog</div>);
+jest.mock('../../Components/success-dialog', () => () => <div>Success Dialog</div>);
 
 describe('CFDTopUpDemoModal', () => {
     let modal_root_el;
@@ -21,7 +21,7 @@ describe('CFDTopUpDemoModal', () => {
     const synthetic_config = {
         account_type: 'synthetic',
         leverage: 500,
-        short_title: 'Derived',
+        short_title: 'Standard',
     };
 
     const financial_config = {
@@ -39,7 +39,7 @@ describe('CFDTopUpDemoModal', () => {
                         synthetic: {
                             mt5_account_type: synthetic_config.account_type,
                             leverage: synthetic_config.leverage,
-                            title: 'Demo Derived',
+                            title: 'Demo Standard',
                             short_title: synthetic_config.short_title,
                         },
                         financial: {
@@ -53,7 +53,7 @@ describe('CFDTopUpDemoModal', () => {
                         synthetic: {
                             mt5_account_type: synthetic_config.account_type,
                             leverage: synthetic_config.leverage,
-                            title: 'Derived',
+                            title: 'Standard',
                             short_title: synthetic_config.short_title,
                         },
                         financial: {

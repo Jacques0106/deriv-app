@@ -1,62 +1,63 @@
 import React from 'react';
 import { Field, FieldProps, useFormikContext } from 'formik';
-import debounce from 'lodash.debounce';
 import { ApiHelpers } from '@deriv/bot-skeleton';
 import { Autocomplete, IconTradeTypes, Text } from '@deriv/components';
 import { TItem } from '@deriv/components/src/components/dropdown-list';
 import { useDBotStore } from 'Stores/useDBotStore';
 import { TApiHelpersInstance, TFormData, TTradeType } from '../types';
+import { V2_QS_STRATEGIES } from '../utils';
 
 type TTradeTypeOption = {
     trade_type: TTradeType;
 };
 
-const TradeTypeOption: React.FC<TTradeTypeOption> = ({ trade_type }: TTradeTypeOption) => (
-    <div key={trade_type.value} className='qs__select__option'>
-        <IconTradeTypes type={trade_type.icon[0]} className='qs__select__option__icon' />
-        <IconTradeTypes type={trade_type.icon[1]} className='qs__select__option__icon' />
-        <Text className='qs__select__option__text' size='xs' color='prominent'>
-            {trade_type.text}
-        </Text>
-    </div>
-);
+const TradeTypeOption: React.FC<TTradeTypeOption> = ({ trade_type: { value, icon, text } }: TTradeTypeOption) => {
+    return (
+        <div key={value} className='qs__select__option'>
+            {icon?.length
+                ? icon.map((ic, idx) => (
+                      <IconTradeTypes type={ic} className='qs__select__option__icon' key={`${ic}id-${idx}`} />
+                  ))
+                : null}
+            <Text className='qs__select__option__text' size='xs' color='prominent'>
+                {text}
+            </Text>
+        </div>
+    );
+};
 
 const TradeTypeSelect: React.FC = () => {
     const [trade_types, setTradeTypes] = React.useState<TTradeType[]>([]);
     const { setFieldValue, values, validateForm } = useFormikContext<TFormData>();
     const { quick_strategy } = useDBotStore();
-    const { setValue } = quick_strategy;
-    const selected = values?.tradetype;
+    const { setValue, selected_strategy } = quick_strategy;
+    const is_strategy_accumulator = V2_QS_STRATEGIES.includes(selected_strategy);
 
     React.useEffect(() => {
-        const first_time_user_data = !(JSON.parse(localStorage?.getItem('qs-fields') as string) as TFormData);
-        if (first_time_user_data) {
-            setFieldValue?.('tradetype', trade_types?.[0]?.value);
-            validateForm();
-            setValue('tradetype', trade_types?.[0]?.value);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        if (values?.symbol) {
+            const selected = values?.tradetype;
+            const is_symbol_accumulator = is_strategy_accumulator ? 'ACCU' : '';
 
-    React.useEffect(() => {
-        if (values?.symbol && selected !== '') {
             const { contracts_for } = ApiHelpers.instance as unknown as TApiHelpersInstance;
             const getTradeTypes = async () => {
-                const trade_types = await contracts_for.getTradeTypesForQuickStrategy(values?.symbol);
-                setTradeTypes(trade_types);
+                const trade_types = await contracts_for.getTradeTypesForQuickStrategy(
+                    values?.symbol,
+                    is_symbol_accumulator
+                );
+
                 const has_selected = trade_types?.some(trade_type => trade_type.value === selected);
                 if (!has_selected && trade_types?.[0]?.value !== selected) {
-                    await setFieldValue?.('tradetype', trade_types?.[0].value || '');
-                    await validateForm();
+                    setFieldValue?.('tradetype', trade_types?.[0].value || '');
                     setValue('tradetype', trade_types?.[0].value);
                 }
+                setTradeTypes(trade_types);
             };
-            debounce(async () => {
-                getTradeTypes();
-            }, 100)();
+
+            getTradeTypes();
+            validateForm();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [values?.symbol, selected]);
+    }, [values?.symbol]);
 
     const trade_type_dropdown_options = React.useMemo(
         () =>
@@ -74,15 +75,18 @@ const TradeTypeSelect: React.FC = () => {
                     const selected_trade_type = trade_type_dropdown_options?.find(
                         trade_type => trade_type.value === field.value
                     );
+
+                    const is_accumulator = is_strategy_accumulator ? 'Buy' : selected_trade_type?.text;
+
                     return (
                         <Autocomplete
                             {...field}
                             readOnly
                             inputMode='none'
-                            data-testid='qs_autocomplete_tradetype'
+                            data-testid='dt_qs_tradetype'
                             autoComplete='off'
                             className='qs__autocomplete'
-                            value={selected_trade_type?.text || ''}
+                            value={is_accumulator || ''}
                             list_items={trade_type_dropdown_options}
                             onItemSelection={(item: TItem) => {
                                 const value = (item as TTradeType)?.value;

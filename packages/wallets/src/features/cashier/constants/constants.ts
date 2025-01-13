@@ -1,61 +1,31 @@
-import { TMarketTypes, TMT5LandingCompanyName, TWalletLandingCompanyName } from '../../../types';
-
-export const walletIconMapper = {
-    AUD: {
-        dark: 'IcWalletCurrencyAud',
-        light: 'IcWalletCurrencyAud',
-    },
-    BTC: {
-        dark: 'IcWalletBitcoinDark',
-        light: 'IcWalletBitcoinLight',
-    },
-    Demo: {
-        dark: 'IcWalletDerivDemoDark',
-        light: 'IcWalletDerivDemoLight',
-    },
-    ETH: {
-        dark: 'IcWalletEthereumDark',
-        light: 'IcWalletEthereumLight',
-    },
-    EUR: {
-        dark: 'IcWalletCurrencyEur',
-        light: 'IcWalletCurrencyEur',
-    },
-    eUST: {
-        dark: 'IcWalletTetherDark',
-        light: 'IcWalletTetherLight',
-    },
-    GBP: {
-        dark: 'IcWalletCurrencyGbp',
-        light: 'IcWalletCurrencyGbp',
-    },
-    LTC: {
-        dark: 'IcWalletLiteCoinDark',
-        light: 'IcWalletLiteCoinLight',
-    },
-    tUST: {
-        dark: 'IcWalletTetherDark',
-        light: 'IcWalletTetherLight',
-    },
-    USD: {
-        dark: 'IcWalletCurrencyUsd',
-        light: 'IcWalletCurrencyUsd',
-    },
-    USDC: {
-        dark: 'IcWalletUsdCoinDark',
-        light: 'IcWalletUsdCoinLight',
-    },
-    UST: {
-        dark: 'IcWalletTetherDark',
-        light: 'IcWalletTetherLight',
-    },
-} as const;
+import { localize } from '@deriv-com/translations';
+import {
+    TMarketTypes,
+    TMT5LandingCompanyName,
+    TProductForMarketDetails,
+    TWalletLandingCompanyName,
+} from '../../../types';
 
 type TDefinedMT5LandingCompanyName = Exclude<TMT5LandingCompanyName, 'malta' | 'seychelles' | undefined>;
 
 interface TDefinedMT5LandingCompanyDetails {
     name: TDefinedMT5LandingCompanyName;
     shortcode: string;
+}
+
+interface TMT5MarketTypeDetails extends TMT5MarketTypeDetailsCommon {
+    landingCompany?: Record<TWalletLandingCompanyName, TWalletLandingCompanyDetails>;
+    product?: Partial<Record<TProductForMarketDetails, TMT5MarketTypeDetailsCommon>>;
+}
+
+interface TMT5MarketTypeDetailsCommon {
+    name: TMarketTypes.All;
+    title: string;
+}
+
+interface TWalletLandingCompanyDetails {
+    name: TWalletLandingCompanyName;
+    title: string;
 }
 
 export const LandingCompanyDetails: Record<TDefinedMT5LandingCompanyName, TDefinedMT5LandingCompanyDetails> = {
@@ -81,104 +51,65 @@ export const LandingCompanyDetails: Record<TDefinedMT5LandingCompanyName, TDefin
     },
 } as const;
 
-interface TMT5MarketTypeDetails {
-    icon?: {
-        dark: string;
-        light: string;
-    };
-    landingCompany?: Record<TWalletLandingCompanyName, TWalletLandingCompanyDetails>;
-    name: TMarketTypes.All;
-    title: string;
-}
-
-interface TWalletLandingCompanyDetails {
-    icon: {
-        dark: string;
-        light: string;
-    };
-    name: TWalletLandingCompanyName;
-    title: string;
-}
-
 export const MT5MarketTypeDetails: Record<TMarketTypes.All, TMT5MarketTypeDetails> = {
     all: {
-        icon: {
-            dark: 'IcWalletMt5All',
-            light: 'IcWalletMt5All',
-        },
         name: 'all',
+        product: {
+            swap_free: {
+                name: 'all',
+                title: 'MT5 Swap-Free',
+            },
+            zero_spread: {
+                name: 'all',
+                title: 'MT5 Zero Spread',
+            },
+        },
         title: 'MT5 Swap-Free',
     },
     financial: {
         landingCompany: {
             malta: {
-                icon: {
-                    dark: 'IcWalletMt5CFDs',
-                    light: 'IcWalletMt5CFDs',
-                },
                 name: 'malta',
                 title: 'MT5 CFDs',
             },
             svg: {
-                icon: {
-                    dark: 'IcWalletMt5Financial',
-                    light: 'IcWalletMt5Financial',
-                },
                 name: 'svg',
                 title: 'MT5 Financial',
             },
             virtual: {
-                icon: {
-                    dark: 'IcWalletMt5Financial',
-                    light: 'IcWalletMt5Financial',
-                },
                 name: 'virtual',
                 title: 'MT5 CFDs',
             },
         },
         name: 'financial',
+        product: {
+            gold: {
+                name: 'financial',
+                title: 'MT5 Gold',
+            },
+            stp: {
+                name: 'financial',
+                title: 'MT5 Financial STP',
+            },
+        },
         title: 'MT5 Financial',
     },
     synthetic: {
-        icon: {
-            dark: 'IcWalletMt5Derived',
-            light: 'IcWalletMt5Derived',
-        },
         name: 'synthetic',
-        title: 'MT5 Derived',
+        title: 'MT5 Standard',
     },
 } as const;
 
 export const PlatformDetails = {
-    binary: {
-        icon: {
-            dark: 'IcWalletOptionsDark',
-            light: 'IcWalletOptionsLight',
-        },
-        name: 'binary',
-        title: 'BinaryBot',
-    },
     ctrader: {
-        icon: {
-            dark: 'IcWalletCTrader',
-            light: 'IcWalletCTrader',
-        },
         name: 'ctrader',
         title: 'Deriv cTrader',
     },
     derivez: {
-        icon: {
-            dark: 'IcWalletDerivEZ',
-            light: 'IcWalletDerivEZ',
-        },
         name: 'derivez',
         title: 'DerivEZ',
     },
     dxtrade: {
-        icon: {
-            dark: 'IcWalletDerivX',
-            light: 'IcWalletDerivX',
-        },
         name: 'dxtrade',
         title: 'Deriv X',
     },
@@ -188,11 +119,7 @@ export const PlatformDetails = {
         title: 'Deriv MT5',
     },
     standard: {
-        icon: {
-            dark: 'IcWalletOptionsDark',
-            light: 'IcWalletOptionsLight',
-        },
         name: 'standard',
-        title: 'Options',
+        title: localize('Options'),
     },
 } as const;

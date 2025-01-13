@@ -1,6 +1,12 @@
 import React from 'react';
 
 export const Modals = {
+    AdCancelModal: React.lazy(
+        () => import(/* webpackChunkName: "ad-cancel-modal" */ 'Components/modal-manager/modals/ad-cancel-modal')
+    ),
+    AdCreatedModal: React.lazy(
+        () => import(/* webpackChunkName: "ad-created-modal" */ 'Components/modal-manager/modals/ad-created-modal')
+    ),
     AdCreateEditErrorModal: React.lazy(
         () =>
             import(
@@ -37,6 +43,10 @@ export const Modals = {
     BlockUserModal: React.lazy(
         () => import(/* webpackChunkName: "block-user-modal" */ 'Components/modal-manager/modals/block-user-modal')
     ),
+    BusinessHourModal: React.lazy(
+        () =>
+            import(/* webpackChunkName: "business-hour-modal" */ 'Components/modal-manager/modals/business-hour-modal')
+    ),
     CancelAddPaymentMethodModal: React.lazy(
         () =>
             import(
@@ -54,6 +64,9 @@ export const Modals = {
             import(
                 /* webpackChunkName: "confirm-delete-payment-method-modal" */ 'Components/modal-manager/modals/confirm-delete-payment-method-modal'
             )
+    ),
+    CopyAdvertModal: React.lazy(
+        () => import(/* webpackChunkName: "copy-advert-modal" */ 'Components/modal-manager/modals/copy-advert-modal')
     ),
     CreateAdAddPaymentMethodModal: React.lazy(
         () =>
@@ -80,15 +93,6 @@ export const Modals = {
         () =>
             import(
                 /* webpackChunkName: "delete-payment-method-error-modal" */ 'Components/modal-manager/modals/delete-payment-method-error-modal'
-            )
-    ),
-    DisclaimerModal: React.lazy(
-        () => import(/* webpackChunkName: "disclaimer-modal" */ 'Components/modal-manager/modals/disclaimer-modal')
-    ),
-    EditAdCancelModal: React.lazy(
-        () =>
-            import(
-                /* webpackChunkName: "edit-ad-cancel-modal" */ 'Components/modal-manager/modals/edit-ad-cancel-modal'
             )
     ),
     EmailLinkBlockedModal: React.lazy(
@@ -182,14 +186,17 @@ export const Modals = {
                 /* webpackChunkName: "order-time-tooltip-modal" */ 'Components/modal-manager/modals/order-time-tooltip-modal'
             )
     ),
+    PreferredCountriesModal: React.lazy(
+        () =>
+            import(
+                /* webpackChunkName: "preferred-countries-modal" */ 'Components/modal-manager/modals/preferred-countries-modal'
+            )
+    ),
     QuickAddModal: React.lazy(
         () => import(/* webpackChunkName: "quick-add-modal" */ 'Components/modal-manager/modals/quick-add-modal')
     ),
     RatingModal: React.lazy(
         () => import(/* webpackChunkName: "rating-modal" */ 'Components/modal-manager/modals/rating-modal')
-    ),
-    RateChangeModal: React.lazy(
-        () => import(/* webpackChunkName: "rate-change-modal" */ 'Components/modal-manager/modals/rate-change-modal')
     ),
     RecommendedModal: React.lazy(
         () => import(/* webpackChunkName: "recommended-modal" */ 'Components/modal-manager/modals/recommended-modal')
@@ -202,6 +209,7 @@ export const Modals = {
 export type TModals = typeof Modals;
 export type TModalKeys = keyof TModals;
 export type TModalProps = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [T in TModalKeys]: Parameters<TModals[T]>[0] extends { [key: string]: any }
         ? Parameters<TModals[T]>[0]
         : Record<string, never>;

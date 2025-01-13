@@ -19,7 +19,7 @@ import Verified from '../../../Components/poi/status/verified';
 import { populateVerificationStatus } from '../Helpers/verification';
 
 const ProofOfIdentityContainer = observer(
-    ({ height, is_from_external, onStateChange, setIsCfdPoiCompleted, getChangeableFields, updateAccountStatus }) => {
+    ({ height, is_from_external, onStateChange, getChangeableFields, updateAccountStatus }) => {
         const history = useHistory();
         const [api_error, setAPIError] = React.useState();
         const [has_require_submission, setHasRequireSubmission] = React.useState(false);
@@ -100,6 +100,7 @@ const ProofOfIdentityContainer = observer(
 
         const verification_status = populateVerificationStatus(account_status);
         const {
+            identity,
             idv,
             allow_poi_resubmission,
             identity_last_attempt,
@@ -109,13 +110,13 @@ const ProofOfIdentityContainer = observer(
             manual,
             needs_poa,
             onfido,
+            poi_expiring_soon,
         } = verification_status;
         const should_ignore_idv = is_high_risk && is_withdrawal_lock;
 
-        if (!should_allow_authentication && !is_age_verified) {
+        if (!should_allow_authentication && !is_age_verified && !poi_expiring_soon) {
             return <NotRequired />;
         }
-
         const onClickRedirectButton = () => {
             const platform = platforms[from_platform.ref];
             const { is_hard_redirect = false, url = '' } = platform ?? {};
@@ -141,11 +142,13 @@ const ProofOfIdentityContainer = observer(
             [identity_status_codes.rejected, identity_status_codes.suspected, identity_status_codes.expired].includes(
                 idv.status
             );
+
         if (
             identity_status === identity_status_codes.none ||
             has_require_submission ||
             allow_poi_resubmission ||
-            should_show_mismatch_form
+            should_show_mismatch_form ||
+            poi_expiring_soon
         ) {
             return (
                 <POISubmission
@@ -165,7 +168,6 @@ const ProofOfIdentityContainer = observer(
                     redirect_button={redirect_button}
                     refreshNotifications={refreshNotifications}
                     residence_list={residence_list}
-                    setIsCfdPoiCompleted={setIsCfdPoiCompleted}
                     updateAccountStatus={updateAccountStatus}
                     should_show_mismatch_form={should_show_mismatch_form}
                 />
@@ -173,7 +175,9 @@ const ProofOfIdentityContainer = observer(
         } else if (
             !identity_last_attempt ||
             // Prioritise verified status from back office. How we know this is if there is mismatch between current statuses (Should be refactored)
-            (identity_status === identity_status_codes.verified && identity_status !== identity_last_attempt.status)
+
+            (identity_status === identity_status_codes.verified &&
+                identity_status !== identity?.services[identity_last_attempt?.service].status)
         ) {
             switch (identity_status) {
                 case identity_status_codes.pending:
@@ -191,6 +195,7 @@ const ProofOfIdentityContainer = observer(
                             is_from_external={!!is_from_external}
                             needs_poa={needs_poa}
                             redirect_button={redirect_button}
+                            service={identity_last_attempt?.service}
                         />
                     );
                 case identity_status_codes.expired:
@@ -231,7 +236,6 @@ const ProofOfIdentityContainer = observer(
                         needs_poa={needs_poa}
                         onfido={onfido}
                         manual={manual}
-                        setIsCfdPoiCompleted={setIsCfdPoiCompleted}
                         redirect_button={redirect_button}
                         country_code={country_code}
                         handleViewComplete={handleManualSubmit}
@@ -243,7 +247,6 @@ const ProofOfIdentityContainer = observer(
                         manual={manual}
                         country_code={country_code}
                         is_from_external={is_from_external}
-                        setIsCfdPoiCompleted={setIsCfdPoiCompleted}
                         needs_poa={needs_poa}
                         redirect_button={redirect_button}
                         handleRequireSubmission={handleRequireSubmission}

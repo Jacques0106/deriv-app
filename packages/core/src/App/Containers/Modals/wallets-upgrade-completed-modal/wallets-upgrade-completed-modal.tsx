@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useHistory } from 'react-router-dom';
+import Cookies from 'js-cookie';
 import { Button, Icon, MobileDialog, Modal, Text } from '@deriv/components';
+import { routes } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
 import { Localize } from '@deriv/translations';
 import './wallets-upgrade-completed-modal.scss';
 
 const WalletsUpgradeCompletedModal = observer(() => {
-    const { ui } = useStore();
+    const history = useHistory();
+    const { client, ui } = useStore();
     const { is_mobile } = ui;
+    const { setPreventRedirectToHub } = client;
     const [isOpen, setIsOpen] = useState(true);
+
+    useEffect(() => {
+        setPreventRedirectToHub(true);
+    }, []);
 
     const handleClose = () => {
         setIsOpen(false);
-        localStorage.removeItem('should_show_wallets_upgrade_completed_modal');
+        Cookies.remove('recent_wallets_migration');
+        setPreventRedirectToHub(false);
+        history.push(routes.traders_hub);
     };
 
     const Wrapper = ({ children, footer }: React.PropsWithChildren & { footer: React.ReactNode }) =>

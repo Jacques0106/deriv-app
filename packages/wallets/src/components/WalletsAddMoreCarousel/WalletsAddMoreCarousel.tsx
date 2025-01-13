@@ -1,40 +1,53 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import useEmblaCarousel, { EmblaCarouselType } from 'embla-carousel-react';
-import { useHover } from 'usehooks-ts';
+import { useHover, useIsMounted } from 'usehooks-ts';
 import { useAllWalletAccounts, useAuthorize } from '@deriv/api-v2';
 import { LabelPairedChevronLeftLgFillIcon, LabelPairedChevronRightLgFillIcon } from '@deriv/quill-icons';
-import useDevice from '../../hooks/useDevice';
-import { IconButton, WalletText } from '../Base';
+import { Localize } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
+import useIsRtl from '../../hooks/useIsRtl';
+import { IconButton } from '../Base';
 import { WalletsAddMoreLoader } from '../SkeletonLoader';
 import WalletsAddMoreCard from '../WalletsAddMoreCard';
 import './WalletsAddMoreCarousel.scss';
 
 const WalletsAddMoreCarousel: React.FC = () => {
-    const { isDesktop, isMobile } = useDevice();
+    const { isDesktop } = useDevice();
     const { data: wallets, isLoading } = useAllWalletAccounts();
-    const { isLoading: isAuthorizeLoading } = useAuthorize();
+    const { isInitializing } = useAuthorize();
+    const isRtl = useIsRtl();
+
+    const showLoader = isInitializing || isLoading;
+
     const [walletsAddMoreEmblaRef, walletsAddMoreEmblaAPI] = useEmblaCarousel({
         align: 0,
         containScroll: 'trimSnaps',
+        direction: isRtl ? 'rtl' : 'ltr',
     });
     const hoverRef = useRef<HTMLDivElement>(null);
     const isHover = useHover(hoverRef);
+    const isMounted = useIsMounted();
     const [prevBtnEnabled, setPrevBtnEnabled] = useState(false);
     const [nextBtnEnabled, setNextBtnEnabled] = useState(false);
 
     const scrollPrev = useCallback(() => walletsAddMoreEmblaAPI?.scrollPrev(), [walletsAddMoreEmblaAPI]);
     const scrollNext = useCallback(() => walletsAddMoreEmblaAPI?.scrollNext(), [walletsAddMoreEmblaAPI]);
 
-    const onSelect = useCallback((emblaApi: EmblaCarouselType) => {
-        setPrevBtnEnabled(emblaApi.canScrollPrev());
-        setNextBtnEnabled(emblaApi.canScrollNext());
-    }, []);
+    const onSelect = useCallback(
+        (emblaApi: EmblaCarouselType) => {
+            if (isMounted()) {
+                setPrevBtnEnabled(emblaApi.canScrollPrev());
+                setNextBtnEnabled(emblaApi.canScrollNext());
+            }
+        },
+        [isMounted]
+    );
 
     useEffect(() => {
         if (!walletsAddMoreEmblaAPI) return;
 
-        walletsAddMoreEmblaAPI.reInit({ watchDrag: isMobile });
-    }, [walletsAddMoreEmblaAPI, isMobile]);
+        walletsAddMoreEmblaAPI.reInit({ watchDrag: !isDesktop });
+    }, [walletsAddMoreEmblaAPI, isDesktop]);
 
     useEffect(() => {
         if (!walletsAddMoreEmblaAPI) return;
@@ -47,17 +60,17 @@ const WalletsAddMoreCarousel: React.FC = () => {
     return (
         <div className='wallets-add-more' ref={hoverRef}>
             <div className='wallets-add-more__header'>
-                <WalletText size='2xl' weight='bold'>
-                    Add more Wallets
-                </WalletText>
+                <Text size='xl' weight='bold'>
+                    <Localize i18n_default_text='Add more Wallets' />
+                </Text>
             </div>
             <div className='wallets-add-more__carousel' data-testid='dt-wallets-add-more' ref={walletsAddMoreEmblaRef}>
                 <div className='wallets-add-more__carousel-wrapper' id='wallets_add_more_carousel_wrapper'>
-                    {(isLoading || isAuthorizeLoading) &&
+                    {showLoader &&
                         Array.from({ length: 8 }).map((_, idx) => (
                             <WalletsAddMoreLoader key={`wallets-add-more-loader-${idx}`} />
                         ))}
-                    {!(isLoading || isAuthorizeLoading) &&
+                    {!showLoader &&
                         wallets?.map(wallet => (
                             <WalletsAddMoreCard
                                 currency={wallet.currency}
@@ -73,7 +86,13 @@ const WalletsAddMoreCarousel: React.FC = () => {
                             className='wallets-add-more__carousel-btn wallets-add-more__carousel-btn--prev'
                             color='white'
                             disabled={!prevBtnEnabled}
-                            icon={<LabelPairedChevronLeftLgFillIcon fill='#333333' />}
+                            icon={
+                                isRtl ? (
+                                    <LabelPairedChevronRightLgFillIcon fill='#333333' />
+                                ) : (
+                                    <LabelPairedChevronLeftLgFillIcon fill='#333333' />
+                                )
+                            }
                             isRound
                             onClick={scrollPrev}
                             size='lg'
@@ -82,7 +101,13 @@ const WalletsAddMoreCarousel: React.FC = () => {
                             className='wallets-add-more__carousel-btn wallets-add-more__carousel-btn--next'
                             color='white'
                             disabled={!nextBtnEnabled}
-                            icon={<LabelPairedChevronRightLgFillIcon fill='#333333' />}
+                            icon={
+                                isRtl ? (
+                                    <LabelPairedChevronLeftLgFillIcon fill='#333333' />
+                                ) : (
+                                    <LabelPairedChevronRightLgFillIcon fill='#333333' />
+                                )
+                            }
                             isRound
                             onClick={scrollNext}
                             size='lg'

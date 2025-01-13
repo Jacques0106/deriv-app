@@ -1,11 +1,15 @@
-import classNames from 'classnames';
-import PropTypes from 'prop-types';
 import React from 'react';
 import { useLocation, withRouter } from 'react-router';
+import classNames from 'classnames';
+import PropTypes from 'prop-types';
+
+import { ThemedScrollbars } from '@deriv/components';
+import { useGrowthbookGetFeatureValue } from '@deriv/hooks';
+import { CookieStorage, platforms, routes, TRACKING_STATUS_KEY, WS } from '@deriv/shared';
+import { observer, useStore } from '@deriv/stores';
 import { Analytics } from '@deriv-com/analytics';
-import { DesktopWrapper, MobileWrapper, ThemedScrollbars } from '@deriv/components';
-import { CookieStorage, isMobile, TRACKING_STATUS_KEY, PlatformContext, platforms, routes, WS } from '@deriv/shared';
-import { useStore, observer } from '@deriv/stores';
+import { useDevice } from '@deriv-com/ui';
+
 import CookieBanner from '../../Components/Elements/CookieBanner/cookie-banner.jsx';
 
 const tracking_status_cookie = new CookieStorage(TRACKING_STATUS_KEY);
@@ -13,13 +17,14 @@ const tracking_status_cookie = new CookieStorage(TRACKING_STATUS_KEY);
 const AppContents = observer(({ children }) => {
     const [show_cookie_banner, setShowCookieBanner] = React.useState(false);
     const [is_gtm_tracking, setIsGtmTracking] = React.useState(false);
-    const { is_appstore } = React.useContext(PlatformContext);
     const {
         client,
-        common: { platform },
+        common: { platform, is_from_tradershub_os },
         gtm: { pushDataLayer },
         ui,
     } = useStore();
+    const { isDesktop, isMobile } = useDevice();
+    const location = useLocation();
 
     const { is_eu_country, is_logged_in, is_logging_in } = client;
     const {
@@ -38,7 +43,12 @@ const AppContents = observer(({ children }) => {
     const scroll_ref = React.useRef(null);
     const child_ref = React.useRef(null);
 
-    const location = useLocation();
+    const [dtrader_v2_enabled_mobile] = useGrowthbookGetFeatureValue({
+        featureFlag: 'dtrader_v2_enabled',
+    });
+    const [dtrader_v2_enabled_desktop] = useGrowthbookGetFeatureValue({
+        featureFlag: 'dtrader_v2_enabled_desktop',
+    });
 
     React.useEffect(() => {
         if (scroll_ref.current) setAppContentsScrollRef(scroll_ref);
@@ -46,7 +56,13 @@ const AppContents = observer(({ children }) => {
     }, []);
 
     React.useEffect(() => {
-        Analytics.pageView(window.location.href);
+        Analytics.pageView(window.location.href, {
+            loggedIn: is_logged_in,
+            device_type: isMobile ? 'mobile' : 'desktop',
+            network_rtt: navigator?.connection?.rtt,
+            network_type: navigator?.connection?.effectiveType,
+            network_downlink: navigator?.connection?.downlink,
+        });
         // react-hooks/exhaustive-deps
     }, [window.location.href]);
 
@@ -105,28 +121,31 @@ const AppContents = observer(({ children }) => {
             className={classNames('app-contents', {
                 'app-contents--show-positions-drawer': is_positions_drawer_on,
                 'app-contents--is-disabled': is_app_disabled,
-                'app-contents--is-mobile': isMobile(),
+                'app-contents--is-mobile': isMobile,
                 'app-contents--is-route-modal': is_route_modal_on,
                 'app-contents--is-scrollable': is_cfd_page || is_cashier_visible,
-                'app-contents--is-dashboard': is_appstore,
-                'app-contents--is-hidden': platforms[platform],
+                'app-contents--is-hidden': platforms[platform] && !(is_from_tradershub_os && isMobile),
                 'app-contents--is-onboarding': window.location.pathname === routes.onboarding,
+                'app-contents--is-dtrader-v2': dtrader_v2_enabled_mobile || dtrader_v2_enabled_desktop,
             })}
             ref={scroll_ref}
         >
-            <MobileWrapper>{children}</MobileWrapper>
-            <DesktopWrapper>
-                {/* Calculate height of user screen and offset height of header and footer */}
-                {window.location.pathname === routes.onboarding ? (
+            {isMobile && children}
+            {!isMobile &&
+                /* Calculate height of user screen and offset height of header and footer */
+                (window.location.pathname === routes.onboarding ? (
                     <ThemedScrollbars style={{ maxHeight: '', height: '100%' }} refSetter={child_ref}>
                         {children}
                     </ThemedScrollbars>
                 ) : (
-                    <ThemedScrollbars height='calc(100vh - 84px)' has_horizontal refSetter={child_ref}>
+                    <ThemedScrollbars
+                        height={isDesktop ? 'calc(100vh - 84px)' : undefined}
+                        has_horizontal
+                        refSetter={child_ref}
+                    >
                         {children}
                     </ThemedScrollbars>
-                )}
-            </DesktopWrapper>
+                ))}
             {show_cookie_banner && (
                 <CookieBanner
                     onAccept={onAccept}

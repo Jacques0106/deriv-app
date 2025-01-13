@@ -1,19 +1,18 @@
-import React from 'react';
+import React, { ComponentProps } from 'react';
 import classNames from 'classnames';
-import { useBalance } from '@deriv/api-v2';
-import { WalletText } from '../Base';
-import { WalletCardIcon } from '../WalletCardIcon';
+import { Localize } from '@deriv-com/translations';
+import { Text } from '@deriv-com/ui';
+import useAllBalanceSubscription from '../../hooks/useAllBalanceSubscription';
+import { WalletCurrencyIcon } from '../WalletCurrencyIcon';
 import { WalletGradientBackground } from '../WalletGradientBackground';
-import { WalletListCardBadge } from '../WalletListCardBadge';
 import './WalletCard.scss';
 
 type TProps = {
-    balance: string;
+    balance: JSX.Element | string;
     currency: string;
-    iconSize?: React.ComponentProps<typeof WalletCardIcon>['size'];
+    iconSize?: ComponentProps<typeof WalletCurrencyIcon>['size'];
     isCarouselContent?: boolean;
     isDemo?: boolean;
-    landingCompanyName?: string;
     onClick?: () => void;
 };
 
@@ -23,14 +22,15 @@ const WalletCard: React.FC<TProps> = ({
     iconSize = 'lg',
     isCarouselContent = false,
     isDemo,
-    landingCompanyName,
     onClick,
 }) => {
-    const { isLoading } = useBalance();
+    const { isLoading: isBalanceLoading } = useAllBalanceSubscription();
+    const isDemoCarouselContent = isDemo && isCarouselContent;
 
     return (
         <button
             className={classNames('wallets-card', { 'wallets-card__carousel-content': isCarouselContent })}
+            data-testid='dt_wallets_wallet_card'
             onClick={onClick}
         >
             <div className='wallets-card__container'>
@@ -53,32 +53,29 @@ const WalletCard: React.FC<TProps> = ({
                                 'wallets-card__carousel-content-details-top': isCarouselContent,
                             })}
                         >
-                            <WalletCardIcon size={iconSize} type={isDemo ? 'Demo' : currency} />
-                            {!isCarouselContent && (
-                                <div className='wallets-card__details-landing-company'>
-                                    {landingCompanyName && (
-                                        <WalletListCardBadge isDemo={isDemo} label={landingCompanyName} />
-                                    )}
-                                </div>
-                            )}
+                            <WalletCurrencyIcon currency={isDemo ? 'DEMO' : currency} size={iconSize} />
                         </div>
                         <div className='wallets-card__details-bottom'>
-                            <WalletText color={isDemo ? 'white' : 'general'} size={isCarouselContent ? 'md' : '2xs'}>
-                                {currency} Wallet
-                            </WalletText>
-                            {isLoading ? (
+                            <Text color={isDemo ? 'white' : 'general'} size={isCarouselContent ? 'md' : '2xs'}>
+                                {isDemoCarouselContent ? (
+                                    <Localize i18n_default_text='{{currency}} Demo Wallet' values={{ currency }} />
+                                ) : (
+                                    <Localize i18n_default_text='{{currency}} Wallet' values={{ currency }} />
+                                )}
+                            </Text>
+                            {isBalanceLoading ? (
                                 <div
                                     className='wallets-skeleton wallets-card__balance-loader'
                                     data-testid='dt_wallet_card_balance_loader'
                                 />
                             ) : (
-                                <WalletText
+                                <Text
                                     color={isDemo ? 'white' : 'general'}
-                                    size={isCarouselContent ? 'xl' : 'sm'}
+                                    size={isCarouselContent ? 'lg' : 'sm'}
                                     weight='bold'
                                 >
                                     {balance}
-                                </WalletText>
+                                </Text>
                             )}
                         </div>
                     </div>

@@ -8,6 +8,14 @@ import AddedCTraderAccountsList from '../AddedCTraderAccountsList';
 
 jest.mock('@deriv/api-v2', () => ({
     useCtraderAccountsList: jest.fn(),
+    useIsHubRedirectionEnabled: jest.fn(() => ({
+        isHubRedirectionEnabled: false,
+    })),
+    useSettings: jest.fn(() => ({
+        data: {
+            trading_hub: 0,
+        },
+    })),
 }));
 
 jest.mock('../../../../modals', () => ({
@@ -18,8 +26,8 @@ describe('AddedCTraderAccountsList', () => {
     let $modalContainer: HTMLDivElement;
     const history = createMemoryHistory();
     const mockAccounts = [
-        { formatted_balance: '1000', login: '123' },
-        { formatted_balance: '2000', login: '456' },
+        { display_balance: '1000', login: '123' },
+        { display_balance: '2000', login: '456' },
     ];
 
     beforeEach(() => {
@@ -47,7 +55,7 @@ describe('AddedCTraderAccountsList', () => {
 
         mockAccounts.forEach(account => {
             expect(screen.getByText(account.login)).toBeInTheDocument();
-            expect(screen.getByText(account.formatted_balance)).toBeInTheDocument();
+            expect(screen.getByText(account.display_balance)).toBeInTheDocument();
         });
     });
 

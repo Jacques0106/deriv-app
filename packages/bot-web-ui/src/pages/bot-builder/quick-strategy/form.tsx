@@ -8,32 +8,49 @@ import TradeTypeSelect from './selects/trade-type';
 import ContractTypeSelect from './selects/contract-type';
 import DurationTypeSelect from './selects/duration-type';
 import QSInput from './inputs/qs-input';
-import QSCheckbox from './inputs/qs-checkbox';
+import QSCheckbox from './inputs/qs-toggle-switch';
 import QSInputLabel from './inputs/qs-input-label';
 import { STRATEGIES } from './config';
 import { TConfigItem, TFormData, TShouldHave } from './types';
 import { useFormikContext } from 'formik';
+import GrowthRateSelect from './selects/growth-rate-type';
+import SellConditions from './selects/sell-conditions-type';
 
 const QuickStrategyForm = observer(() => {
     const { ui } = useStore();
     const { quick_strategy } = useDBotStore();
     const { selected_strategy, setValue, form_data } = quick_strategy;
     const config: TConfigItem[][] = STRATEGIES[selected_strategy]?.fields;
-    const { is_mobile } = ui;
+    const { is_desktop } = ui;
     const { values, setFieldTouched, setFieldValue } = useFormikContext<TFormData>();
-    const { current_duration_min_max } = quick_strategy;
+    const { current_duration_min_max, additional_data } = quick_strategy;
+    const [isEnabledToggleSwitch, setIsEnabledToggleSwitch] = React.useState(values?.boolean_max_stake ?? false);
 
     React.useEffect(() => {
         window.addEventListener('keydown', handleEnter);
+        let data: TFormData | null = null;
+        try {
+            data = JSON.parse(localStorage.getItem('qs-fields') ?? '{}');
+        } catch {
+            data = null;
+        }
+        setIsEnabledToggleSwitch(!!data?.boolean_max_stake);
+
         return () => {
             window.removeEventListener('keydown', handleEnter);
         };
     }, []);
 
+    React.useEffect(() => {
+        if (!isEnabledToggleSwitch && values?.max_stake) {
+            setFieldValue('max_stake', 0);
+        }
+    }, [isEnabledToggleSwitch, values?.max_stake]);
+
     const onChange = async (key: string, value: string | number | boolean) => {
         setValue(key, value);
         await setFieldTouched(key, true, true);
-        await setFieldValue(key, value);
+        await setFieldValue(key, value, true);
     };
 
     const handleEnter = (event: KeyboardEvent) => {
@@ -50,6 +67,10 @@ const QuickStrategyForm = observer(() => {
             return values[item.key as keyof TFormData] === item.value;
         });
 
+    const toggleSwitch = () => {
+        setIsEnabledToggleSwitch(prev => !prev);
+    };
+
     const renderForm = () => {
         return config.map((group, group_index) => {
             if (!group?.length) return null;
@@ -59,8 +80,8 @@ const QuickStrategyForm = observer(() => {
                         const key = `${field.name || field.type} + ${field_index}`;
 
                         if (
-                            (is_mobile && field.hide?.includes('mobile')) ||
-                            (!is_mobile && field.hide?.includes('desktop'))
+                            (!is_desktop && field.hide?.includes('mobile')) ||
+                            (is_desktop && field.hide?.includes('desktop'))
                         ) {
                             return null;
                         }
@@ -69,7 +90,11 @@ const QuickStrategyForm = observer(() => {
                             // Generic or common fields
                             case 'number': {
                                 if (!field.name) return null;
-                                const { should_have = [], hide_without_should_have = false } = field;
+                                const {
+                                    should_have = [],
+                                    hide_without_should_have = false,
+                                    has_currency_unit = false,
+                                } = field;
                                 const should_enable = shouldEnable(should_have);
                                 const initial_stake = 1;
                                 let min = 1;
@@ -98,7 +123,7 @@ const QuickStrategyForm = observer(() => {
                                     max = 9;
                                 }
                                 if (should_have?.length) {
-                                    if (!should_enable && (is_mobile || hide_without_should_have)) {
+                                    if (!should_enable && (!is_desktop || hide_without_should_have)) {
                                         return null;
                                     }
                                     return (
@@ -110,6 +135,7 @@ const QuickStrategyForm = observer(() => {
                                             onChange={onChange}
                                             min={min}
                                             max={max}
+                                            has_currency_unit={has_currency_unit}
                                         />
                                     );
                                 }
@@ -121,6 +147,7 @@ const QuickStrategyForm = observer(() => {
                                         name={field.name as string}
                                         min={min}
                                         max={max}
+                                        has_currency_unit={has_currency_unit}
                                     />
                                 );
                             }
@@ -132,7 +159,12 @@ const QuickStrategyForm = observer(() => {
                                     return null;
                                 }
                                 return (
-                                    <QSInputLabel key={key} label={field.label} description={field.description || ''} />
+                                    <QSInputLabel
+                                        key={key}
+                                        label={field.label}
+                                        description={field.description ?? ''}
+                                        additional_data={additional_data}
+                                    />
                                 );
                             }
                             case 'checkbox':
@@ -142,6 +174,8 @@ const QuickStrategyForm = observer(() => {
                                         key={key}
                                         name={field.name as string}
                                         label={field.label as string}
+                                        isEnabledToggleSwitch={!!isEnabledToggleSwitch}
+                                        setIsEnabledToggleSwitch={toggleSwitch}
                                     />
                                 );
                             // Dedicated components only for Quick-Strategy
@@ -153,6 +187,10 @@ const QuickStrategyForm = observer(() => {
                                 return <DurationTypeSelect {...field} key={key} />;
                             case 'contract_type':
                                 return <ContractTypeSelect {...field} key={key} name={field.name as string} />;
+                            case 'growth_rate':
+                                return <GrowthRateSelect {...field} name={field.name as string} />;
+                            case 'sell_conditions':
+                                return <SellConditions {...field} key={key} />;
                             default:
                                 return null;
                         }

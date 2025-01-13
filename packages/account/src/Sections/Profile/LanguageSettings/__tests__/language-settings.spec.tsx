@@ -1,13 +1,17 @@
 import React from 'react';
-import { screen, render } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { isMobile, routes } from '@deriv/shared';
-import LanguageSettings from '../language-settings';
-import { mockStore, StoreProvider } from '@deriv/stores';
 
-jest.mock('@deriv/shared', () => ({
-    ...jest.requireActual('@deriv/shared'),
-    isMobile: jest.fn(() => false),
+import { routes } from '@deriv/shared';
+import { mockStore, StoreProvider } from '@deriv/stores';
+import { useTranslations } from '@deriv-com/translations';
+import { useDevice } from '@deriv-com/ui';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import LanguageSettings from '../language-settings';
+
+jest.mock('@deriv-com/ui', () => ({
+    ...jest.requireActual('@deriv-com/ui'),
+    useDevice: jest.fn(() => ({ isDesktop: true })),
 }));
 
 jest.mock('@deriv/translations', () => ({
@@ -20,9 +24,11 @@ jest.mock('@deriv/components', () => ({
     Icon: jest.fn(() => <div>Flag Icon</div>),
 }));
 
-jest.mock('react-i18next', () => ({
-    ...jest.requireActual('react-i18next'),
-    useTranslation: jest.fn(() => ({ i18n: { changeLanguage: jest.fn() } })),
+jest.mock('@deriv-com/translations');
+
+jest.mock('@deriv/shared', () => ({
+    ...jest.requireActual('@deriv/shared'),
+    TranslationFlag: { EN: () => <div>Language 1 Flag</div>, VI: () => <div>Language 2 Flag</div> },
 }));
 
 jest.mock('react-router-dom', () => ({
@@ -31,10 +37,19 @@ jest.mock('react-router-dom', () => ({
 }));
 
 describe('LanguageSettings', () => {
-    const mockRootStore = mockStore({
-        common: {
-            current_language: 'lang_1',
-        },
+    let mockRootStore: ReturnType<typeof mockStore>;
+
+    beforeEach(() => {
+        mockRootStore = mockStore({
+            common: {
+                current_language: 'lang_1',
+            },
+        });
+        (useTranslations as jest.Mock).mockReturnValue({
+            currentLang: 'EN',
+            localize: jest.fn().mockImplementation(key => key),
+            switchLanguage: jest.fn(),
+        });
     });
 
     const renderLanguageSettings = () => {
@@ -43,33 +58,31 @@ describe('LanguageSettings', () => {
         });
     };
 
-    it('should render LanguageSettings', () => {
+    it('should render LanguageSettings with all allowed languages', () => {
         renderLanguageSettings();
 
-        expect(screen.getByText('Select Language')).toBeInTheDocument();
+        expect(screen.getByText('Select language')).toBeInTheDocument();
 
-        const flags_icons = screen.getAllByText('Flag Icon');
-        const lang_1 = screen.getByText('Test Lang 1');
-        const lang_2 = screen.getByText('Test Lang 2');
+        const lang_1 = screen.getByText('English');
+        const lang_2 = screen.getByText('Tiếng Việt');
 
-        expect(flags_icons).toHaveLength(2);
+        expect(screen.getByText(/Language 1 Flag/)).toBeInTheDocument();
+        expect(screen.getByText(/Language 2 Flag/)).toBeInTheDocument();
         expect(lang_1).toBeInTheDocument();
-        expect(/(active)/i.test(lang_1.className)).toBeTruthy();
         expect(lang_2).toBeInTheDocument();
-        expect(/(active)/i.test(lang_2.className)).toBeFalsy();
     });
 
-    it('should trigger language change', () => {
+    it('should trigger language change', async () => {
         renderLanguageSettings();
 
-        const lang_2 = screen.getByText('Test Lang 2');
-        userEvent.click(lang_2);
+        const lang_2 = screen.getByText('Tiếng Việt');
+        await userEvent.click(lang_2);
 
         expect(mockRootStore.common.changeSelectedLanguage).toHaveBeenCalled();
     });
 
-    it('should redirect for mobile', () => {
-        (isMobile as jest.Mock).mockReturnValue(true);
+    it('should redirect in responsive view when the user tries to reach `/account/languages` route', () => {
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: false });
         Object.defineProperty(window, 'location', {
             configurable: true,
             value: { pathname: routes.languages },
@@ -77,7 +90,7 @@ describe('LanguageSettings', () => {
 
         renderLanguageSettings();
 
-        expect(screen.queryByText('Select Language')).not.toBeInTheDocument();
+        expect(screen.queryByText('Select language')).not.toBeInTheDocument();
         expect(screen.getByText('Redirect')).toBeInTheDocument();
     });
 });

@@ -1,72 +1,43 @@
-import React, { useMemo } from 'react';
-import { useActiveWalletAccount, useCFDAccountsList, useCFDCompareAccounts } from '@deriv/api-v2';
+import React from 'react';
+import { useActiveWalletAccount, useCFDCompareAccounts, useIsEuRegion } from '@deriv/api-v2';
+import useIsRtl from '../../../../hooks/useIsRtl';
 import { CompareAccountsCarousel } from '../../components';
-import CFDCompareAccountsCard from './CompareAccountsCard';
-import { isCTraderAccountAdded, isDxtradeAccountAdded } from './compareAccountsConfig';
+import CompareAccountsCard from './CompareAccountsCard';
 import CompareAccountsHeader from './CompareAccountsHeader';
 import './CompareAccountsScreen.scss';
 
 const CompareAccountsScreen = () => {
     const { data: activeWallet } = useActiveWalletAccount();
-    // Temporary false until we have useIsEuRegion() ready
-    const isEuRegion = false;
-    const { is_malta_wallet: isEuUser = false, is_virtual: isDemo = false } = activeWallet || {};
+    const isRtl = useIsRtl();
+    const { data: isEuRegion, isLoading: isEuRegionLoading } = useIsEuRegion();
+    const { is_virtual: isDemo = false } = activeWallet || {};
 
     const { data: compareAccounts, hasCTraderAccountAvailable, hasDxtradeAccountAvailable } = useCFDCompareAccounts();
-    const { data: cfdAccounts } = useCFDAccountsList();
 
+    // Remove the hardcoded cTrader and Deriv X values and use the values from the API once it's ready
     const { ctraderAccount, dxtradeAccount, mt5Accounts } = compareAccounts;
-
-    const isDxtradeAdded = useMemo(
-        () => !!cfdAccounts && isDxtradeAccountAdded(cfdAccounts.dxtrade, isDemo),
-        [cfdAccounts, isDemo]
-    );
-
-    const isCtraderAdded = useMemo(
-        () => !!cfdAccounts && isCTraderAccountAdded(cfdAccounts.ctrader, isDemo),
-        [cfdAccounts, isDemo]
-    );
 
     return (
         <div className='wallets-compare-accounts'>
-            <CompareAccountsHeader isDemo={isDemo} isEuRegion={isEuRegion} />
+            <CompareAccountsHeader isDemo={isDemo} isLoading={isEuRegionLoading} />
             <div className='wallets-compare-accounts__card-list'>
-                <CompareAccountsCarousel>
-                    {mt5Accounts?.map(item => (
-                        <CFDCompareAccountsCard
-                            isAccountAdded={item?.is_added}
+                <CompareAccountsCarousel isRtl={isRtl}>
+                    {/* Renders MT5 data */}
+                    {mt5Accounts?.map((item, index) => (
+                        <CompareAccountsCard
+                            account={item}
                             isDemo={isDemo}
                             isEuRegion={isEuRegion}
-                            isEuUser={isEuUser}
-                            key={`${item?.market_type} ${item?.shortcode}`}
-                            marketType={item?.market_type}
-                            platform={item?.platform}
-                            shortCode={item?.shortcode}
+                            key={`compare-accounts-${item?.product}-${index}`}
                         />
                     ))}
                     {/* Renders cTrader data */}
                     {mt5Accounts?.length && hasCTraderAccountAvailable && ctraderAccount && (
-                        <CFDCompareAccountsCard
-                            isAccountAdded={isCtraderAdded}
-                            isDemo={isDemo}
-                            isEuRegion={isEuRegion}
-                            isEuUser={isEuUser}
-                            marketType={ctraderAccount.market_type}
-                            platform={ctraderAccount.platform}
-                            shortCode={ctraderAccount.shortcode}
-                        />
+                        <CompareAccountsCard account={ctraderAccount} isDemo={isDemo} isEuRegion={isEuRegion} />
                     )}
                     {/* Renders Deriv X data */}
                     {mt5Accounts?.length && hasDxtradeAccountAvailable && dxtradeAccount && (
-                        <CFDCompareAccountsCard
-                            isAccountAdded={isDxtradeAdded}
-                            isDemo={isDemo}
-                            isEuRegion={isEuRegion}
-                            isEuUser={isEuUser}
-                            marketType={dxtradeAccount.market_type}
-                            platform={dxtradeAccount.platform}
-                            shortCode={dxtradeAccount.shortcode}
-                        />
+                        <CompareAccountsCard account={dxtradeAccount} isDemo={isDemo} isEuRegion={isEuRegion} />
                     )}
                 </CompareAccountsCarousel>
             </div>

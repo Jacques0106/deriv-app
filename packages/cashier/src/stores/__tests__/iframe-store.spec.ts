@@ -8,6 +8,11 @@ configure({ safeDescriptors: false });
 let iframe_store: IframeStore, root_store: TRootStore;
 
 beforeEach(() => {
+    jest.useFakeTimers({ legacyFakeTimers: true });
+    jest.spyOn(global, 'setInterval');
+    jest.spyOn(global, 'clearInterval');
+    jest.spyOn(global, 'setTimeout');
+    jest.spyOn(global, 'clearTimeout');
     root_store = mockStore({
         client: {
             setVerificationCode: jest.fn(),
@@ -22,7 +27,6 @@ beforeEach(() => {
         },
         ui: {
             is_dark_mode_on: true,
-            is_mobile: false,
         },
     }) as TRootStore;
     iframe_store = new IframeStore(root_store);
@@ -47,7 +51,7 @@ describe('IframeStore', () => {
     });
 
     it('should clear timeout cashier url', () => {
-        jest.useFakeTimers();
+        jest.useFakeTimers({ legacyFakeTimers: true });
 
         iframe_store.timeout_session = 999;
         iframe_store.clearTimeoutCashierUrl();
@@ -57,7 +61,7 @@ describe('IframeStore', () => {
     });
 
     it('should set timeout cashier url', () => {
-        jest.useFakeTimers();
+        jest.useFakeTimers({ legacyFakeTimers: true });
 
         const spyClearTimeoutCashierUrl = jest.spyOn(iframe_store, 'clearTimeoutCashierUrl');
         const spySetSessionTimeout = jest.spyOn(iframe_store, 'setSessionTimeout');
@@ -109,25 +113,32 @@ describe('IframeStore', () => {
         expect(spyAddEventListener).toHaveBeenCalledWith('message', iframe_store.onIframeLoaded, false);
     });
 
-    it('should set proper iframe_height for desktop and mobile view', async () => {
+    it('should set proper iframe_height for desktop view', async () => {
         const spyRemoveOnIframeLoaded = jest.spyOn(iframe_store, 'removeOnIframeLoaded');
 
         expect(iframe_store.onIframeLoaded).toBe(null);
 
         await iframe_store.checkIframeLoaded();
-
         expect(spyRemoveOnIframeLoaded).toHaveBeenCalledTimes(1);
 
         const spyOnIframeLoaded = jest.spyOn(iframe_store, 'onIframeLoaded');
 
-        spyOnIframeLoaded({ origin: 'cashier' });
-
+        spyOnIframeLoaded({ origin: 'https://cashier.deriv.com' });
         expect(iframe_store.iframe_height).toBe(window.innerHeight - 190);
+    });
 
-        iframe_store.root_store.ui.is_mobile = true;
+    it('should set proper iframe_height for mobile view', async () => {
+        root_store.ui.is_mobile = true;
+        const spyRemoveOnIframeLoaded = jest.spyOn(iframe_store, 'removeOnIframeLoaded');
 
-        spyOnIframeLoaded({ origin: 'cashier' });
+        expect(iframe_store.onIframeLoaded).toBe(null);
 
+        await iframe_store.checkIframeLoaded();
+        expect(spyRemoveOnIframeLoaded).toHaveBeenCalledTimes(1);
+
+        const spyOnIframeLoaded = jest.spyOn(iframe_store, 'onIframeLoaded');
+
+        spyOnIframeLoaded({ origin: 'https://cashier.deriv.com' });
         expect(iframe_store.iframe_height).toBe(window.innerHeight - 100);
     });
 });

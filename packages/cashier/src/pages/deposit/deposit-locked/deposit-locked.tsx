@@ -1,6 +1,7 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
 import { Icon, Checklist, StaticUrl, Text } from '@deriv/components';
+import { useIsTNCNeeded } from '@deriv/hooks';
 import { Localize, localize } from '@deriv/translations';
 import { routes, WS } from '@deriv/shared';
 import { useStore, observer } from '@deriv/stores';
@@ -20,9 +21,7 @@ const DepositLocked = observer(() => {
         account_status,
         is_financial_account,
         is_financial_information_incomplete,
-        is_tnc_needed,
         is_trading_experience_incomplete,
-        standpoint,
         is_virtual,
         updateAccountStatus,
     } = client;
@@ -35,12 +34,8 @@ const DepositLocked = observer(() => {
     const is_poa_needed = needs_verification?.includes('document');
     const has_poi_submitted = identity?.status !== 'none';
     const has_poa_submitted = document?.status !== 'none';
-    const deposit_desc = standpoint.iom
-        ? localize(
-              'We were unable to verify your information automatically. To enable this function, you must complete the following:'
-          )
-        : localize('To enable this feature you must complete the following:');
     const history = useHistory();
+    const is_tnc_needed = useIsTNCNeeded();
 
     // handle TnC
     const acceptTnc = async () => {
@@ -114,7 +109,7 @@ const DepositLocked = observer(() => {
                     </Text>
 
                     <Text as='p' align='center' size='xs' className='cashier-locked__desc'>
-                        {deposit_desc}
+                        {localize('To enable this feature you must complete the following:')}
                     </Text>
                     <Checklist className='cashier-locked__checklist' items={items} />
                 </div>

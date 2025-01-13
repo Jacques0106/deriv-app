@@ -54,6 +54,10 @@ const currency_to_icon_mapper: Record<string, Record<'light' | 'dark', string>> 
         dark: 'IcWalletUsdCoinDark',
         light: 'IcWalletUsdCoinLight',
     },
+    XRP: {
+        dark: 'IcWalletXrpDark',
+        light: 'IcWalletXrpLight',
+    },
 };
 
 /** A custom hook to get the list of wallets for the current user. */
@@ -79,6 +83,7 @@ const useStoreWalletAccountsList = () => {
                 const is_malta_wallet = landing_company_name === 'malta';
                 const dtrade_loginid = wallet?.linked_to?.find(account => account?.platform === 'dtrade')?.loginid;
                 const dtrade_balance = accounts?.[dtrade_loginid ?? '']?.balance;
+                const is_dtrader_account_disabled = Boolean(accounts?.[dtrade_loginid ?? '']?.is_disabled);
 
                 const wallet_currency_type = is_virtual ? 'Demo' : currency || '';
                 const icons = currency_to_icon_mapper[wallet_currency_type];
@@ -108,6 +113,7 @@ const useStoreWalletAccountsList = () => {
                     landing_company_name,
                     loginid,
                     gradients,
+                    is_dtrader_account_disabled,
                 } as const;
             });
     }, [accounts, is_crypto]);

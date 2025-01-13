@@ -1,7 +1,7 @@
 import React from 'react';
 import { getInitialLanguage } from '@deriv/translations';
 import i18n from 'i18next';
-import { initMoment } from '../date';
+import { setLocale, initMoment } from '../date';
 import { routes } from '../routes';
 
 type TPlatform = {
@@ -12,7 +12,11 @@ type TPlatform = {
     url?: string;
 };
 
-type TPlatforms = Record<'p2p' | 'derivgo', TPlatform>;
+type TPlatforms = Record<'p2p' | 'p2p_v2' | 'derivgo' | 'tradershub_os', TPlatform>;
+export const tradershub_os_url =
+    process.env.NODE_ENV === 'production'
+        ? 'https://hub.deriv.com/tradershub/cfds'
+        : 'https://staging-hub.deriv.com/tradershub/cfds';
 
 // TODO: This should be moved to PlatformContext
 export const platforms: TPlatforms = {
@@ -30,6 +34,20 @@ export const platforms: TPlatforms = {
         route_to_path: '',
         url: 'https://app.deriv.com/redirect/derivgo',
     },
+    p2p_v2: {
+        icon_text: undefined,
+        is_hard_redirect: true,
+        platform_name: 'Deriv P2P',
+        route_to_path: '',
+        url: process.env.NODE_ENV === 'production' ? 'https://p2p.deriv.com' : 'https://staging-p2p.deriv.com',
+    },
+    tradershub_os: {
+        icon_text: undefined,
+        is_hard_redirect: true,
+        platform_name: 'TradersHub',
+        route_to_path: '',
+        url: tradershub_os_url,
+    },
 };
 
 export const useOnLoadTranslation = () => {
@@ -41,6 +59,7 @@ export const useOnLoadTranslation = () => {
         }
         (async () => {
             await initMoment(i18n.language);
+            await setLocale(i18n.language);
         })();
         const is_english = i18n.language === 'EN';
         if (is_english) {

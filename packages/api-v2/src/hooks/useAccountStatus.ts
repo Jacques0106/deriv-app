@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+
 import useGetAccountStatus from './useGetAccountStatus';
 
 /** A custom hook to check the account status for the current user. */
@@ -12,6 +13,8 @@ const useAccountStatus = () => {
         const status = new Set(get_account_status_data?.status);
 
         return {
+            /** Authentication*/
+            authentication: get_account_status_data?.authentication,
             /** Account status. */
             status: get_account_status_data?.status,
             /** client's address is verified by third party services. */
@@ -70,8 +73,6 @@ const useAccountStatus = () => {
             is_social_signup: status.has('social_signup'),
             /** client has not completed the trading experience questionnaire. */
             is_trading_experience_not_complete: status.has('trading_experience_not_complete'),
-            /** client has acknowledged UKGC funds protection notice. */
-            is_ukgc_funds_protection: status.has('ukgc_funds_protection'),
             /** client cannot deposit or buy contracts, but can withdraw or sell contracts. */
             is_unwelcome: status.has('unwelcome'),
             /** deposits allowed but withdrawals are not allowed. */
@@ -97,7 +98,7 @@ const useAccountStatus = () => {
             /** the client used to be fully authenticated by IDV but it was taken away due to compliance criteria. */
             is_idv_revoked: status.has('idv_revoked'),
         };
-    }, [get_account_status_data?.status]);
+    }, [get_account_status_data?.authentication, get_account_status_data?.status]);
 
     return {
         /** The account status response. */

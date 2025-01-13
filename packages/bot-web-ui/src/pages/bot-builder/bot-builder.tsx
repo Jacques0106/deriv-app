@@ -1,15 +1,13 @@
 import React from 'react';
 import classNames from 'classnames';
-import { useRemoteConfig } from '@deriv/api';
 import { observer, useStore } from '@deriv/stores';
 import { localize } from '@deriv/translations';
 import { botNotification } from 'Components/bot-notification/bot-notification';
 import { notification_message } from 'Components/bot-notification/bot-notification-utils';
-import initDatadogLogs from 'Utils/datadog-logs';
 import { TBlocklyEvents } from 'Types';
 import LoadModal from '../../components/load-modal';
 import { useDBotStore } from '../../stores/useDBotStore';
-import SaveModal from '../dashboard/load-bot-preview/save-modal';
+import SaveModal from '../dashboard/bot-list/save-modal/save-modal';
 import BotBuilderTourHandler from '../tutorials/dbot-tours/bot-builder-tour';
 import QuickStrategy1 from './quick-strategy';
 import WorkspaceWrapper from './workspace-wrapper';
@@ -23,17 +21,10 @@ const BotBuilder = observer(() => {
     const { is_loading } = blockly_store;
     const is_blockly_listener_registered = React.useRef(false);
     const is_blockly_delete_listener_registered = React.useRef(false);
-    const { is_mobile } = ui;
+    const { is_desktop } = ui;
     const { onMount, onUnmount } = app;
     const el_ref = React.useRef<HTMLInputElement | null>(null);
-    const { data: remote_config_data } = useRemoteConfig();
-    let end_drag_id: null | string = null;
-    let selection_id: null | string = null;
-
-    React.useEffect(() => {
-        initDatadogLogs(remote_config_data.tracking_datadog);
-        window.is_datadog_logging_enabled = remote_config_data.tracking_datadog; // This will be used in the middleware inside of bot-skeleton to check if datadog is enabled before logging
-    }, [remote_config_data.tracking_datadog]);
+    let deleted_block_id: null | string = null;
 
     React.useEffect(() => {
         onMount();
@@ -59,7 +50,7 @@ const BotBuilder = observer(() => {
 
     const handleBlockChangeOnBotRun = (e: Event) => {
         const { is_reset_button_clicked } = toolbar;
-        if (e.type !== 'ui' && !is_reset_button_clicked) {
+        if (e.type !== 'selected' && !is_reset_button_clicked) {
             botNotification(notification_message.workspace_change);
             removeBlockChangeListener();
         } else if (is_reset_button_clicked) {
@@ -83,15 +74,20 @@ const BotBuilder = observer(() => {
     }, [is_loading]);
 
     const handleBlockDelete = (e: TBlocklyEvents) => {
-        if (e.type === 'ui' && e.element === 'selected' && !e.group?.includes('dbot-')) {
-            selection_id = e.oldValue;
+        const { is_reset_button_clicked, setResetButtonState } = toolbar;
+        if (e.type === 'delete' && !is_reset_button_clicked) {
+            deleted_block_id = e.blockId;
         }
-        if (e.type === 'endDrag' && !e.group?.includes('dbot-')) {
-            end_drag_id = e.group;
-        }
-        if (e.type === 'delete' && (end_drag_id === e.group || selection_id === e.blockId)) {
+        if (e.type === 'selected' && deleted_block_id === e.oldElementId) {
             handleBlockDeleteNotification();
-            end_drag_id = null;
+        }
+        if (
+            e.type === 'change' &&
+            e.name === 'AMOUNT_LIMITS' &&
+            e.newValue === '(min: 0.35 - max: 50000)' &&
+            is_reset_button_clicked
+        ) {
+            setResetButtonState(false);
         }
     };
 
@@ -120,7 +116,7 @@ const BotBuilder = observer(() => {
                     </div>
                 )}
             </div>
-            {active_tab === 1 && <BotBuilderTourHandler is_mobile={is_mobile} />}
+            {active_tab === 1 && <BotBuilderTourHandler is_mobile={!is_desktop} />}
             {/* removed this outside from toolbar becuase it needs to loaded seperately without dependency */}
             <LoadModal />
             <SaveModal />

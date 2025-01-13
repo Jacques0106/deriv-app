@@ -4,7 +4,6 @@ import { withRouter } from 'react-router';
 import NetworkStatus, {
     AccountLimits as AccountLimitsFooter,
     EndpointNote,
-    GoToDeriv,
     HelpCentre,
     RegulatoryInformation,
     ResponsibleTrading,
@@ -47,9 +46,10 @@ const Footer = observer(() => {
         toggleSettingsModal,
         toggleLanguageSettingsModal,
     } = ui;
-    const { data } = useRemoteConfig();
+    const { data } = useRemoteConfig(true);
     const { cs_chat_livechat, cs_chat_whatsapp } = data;
     const { show_eu_related_content } = traders_hub;
+
     let footer_extensions_left = [];
     let footer_extensions_right = [];
     if (footer_extensions.filter) {
@@ -76,7 +76,6 @@ const Footer = observer(() => {
                 {cs_chat_whatsapp && <WhatsApp />}
                 {cs_chat_livechat && <LiveChat />}
                 <FooterIconSeparator />
-                <GoToDeriv />
                 <ResponsibleTrading />
                 {is_logged_in && <AccountLimitsFooter />}
                 {is_logged_in && !is_virtual && (

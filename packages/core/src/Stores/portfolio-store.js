@@ -1,32 +1,39 @@
 import throttle from 'lodash.throttle';
-import { action, computed, observable, reaction, makeObservable, override } from 'mobx';
+import { action, computed, makeObservable, observable, override, reaction } from 'mobx';
 import { computedFn } from 'mobx-utils';
+
+import { Money } from '@deriv/components';
 import {
-    isAccumulatorContract,
-    isEmptyObject,
-    isEnded,
-    isUserSold,
-    isValidToSell,
-    isMultiplierContract,
-    getCurrentTick,
-    getDisplayStatus,
-    WS,
-    filterDisabledPositions,
-    formatPortfolioPosition,
+    ChartBarrierStore,
     contractCancelled,
     contractSold,
+    filterDisabledPositions,
+    formatMoney,
+    formatPortfolioPosition,
+    getContractPath,
+    getCurrentTick,
+    getDisplayStatus,
     getDurationPeriod,
     getDurationTime,
     getDurationUnitText,
     getEndTime,
-    TRADE_TYPES,
+    getTotalProfit,
+    getTradeNotificationMessage,
+    isAccumulatorContract,
+    isDtraderV2DesktopEnabled,
+    isDtraderV2MobileEnabled,
+    isEmptyObject,
+    isEnded,
+    isMultiplierContract,
+    isValidToSell,
     removeBarrier,
     routes,
+    setLimitOrderBarriers,
+    TRADE_TYPES,
+    WS,
 } from '@deriv/shared';
-import { Money } from '@deriv/components';
+import { localize } from '@deriv/translations';
 import { Analytics } from '@deriv-com/analytics';
-import { ChartBarrierStore } from './chart-barrier-store';
-import { setLimitOrderBarriers } from './Helpers/limit-orders';
 
 import BaseStore from './base-store';
 
@@ -34,8 +41,10 @@ export default class PortfolioStore extends BaseStore {
     positions = [];
     all_positions = [];
     positions_map = {};
-    is_loading = false;
+    is_loading = true;
     error = '';
+    addNotificationBannerCallback;
+    sell_notifications = [];
 
     //accumulators
     open_accu_contract = null;
@@ -45,11 +54,11 @@ export default class PortfolioStore extends BaseStore {
     main_barrier = null;
     contract_type = '';
 
-    getPositionById = computedFn(id => this.positions.find(position => +position.id === +id));
-
     responseQueue = [];
 
     active_positions = [];
+
+    getPositionById = computedFn(id => this.positions.find(position => +position.id === +id));
 
     constructor(root_store) {
         // TODO: [mobx-undecorate] verify the constructor arguments and the arguments of this automatically generated super call
@@ -86,6 +95,8 @@ export default class PortfolioStore extends BaseStore {
             onUnmount: override,
             totals: computed,
             setActivePositions: action.bound,
+            setAddNotificationBannerCallback: action.bound,
+            sell_notifications: observable,
             is_active_empty: computed,
             active_positions_count: computed,
             is_empty: computed,
@@ -122,6 +133,10 @@ export default class PortfolioStore extends BaseStore {
             WS.forgetAll('proposal_open_contract', 'transaction');
         }
         this.has_subscribed_to_poc_and_transaction = false;
+    }
+
+    setAddNotificationBannerCallback(callback) {
+        this.addNotificationBannerCallback = callback;
     }
 
     portfolioHandler(response) {
@@ -302,10 +317,15 @@ export default class PortfolioStore extends BaseStore {
         if (contract_id) {
             WS.cancelContract(contract_id).then(response => {
                 if (response.error) {
-                    this.root_store.common.setServicesError({
-                        type: response.msg_type,
-                        ...response.error,
-                    });
+                    this.root_store.common.setServicesError(
+                        {
+                            type: response.msg_type,
+                            ...response.error,
+                        },
+                        // Temporary switching off old snackbar for DTrader-V2
+                        isDtraderV2MobileEnabled(this.root_store.ui.is_mobile) ||
+                            isDtraderV2DesktopEnabled(this.root_store.ui.is_desktop)
+                    );
                 } else if (window.location.pathname !== routes.trade || !this.root_store.ui.is_mobile) {
                     this.root_store.notifications.addNotificationMessage(contractCancelled());
                 }
@@ -332,10 +352,15 @@ export default class PortfolioStore extends BaseStore {
 
             // invalidToken error will handle in socket-general.js
             if (response.error.code !== 'InvalidToken') {
-                this.root_store.common.setServicesError({
-                    type: response.msg_type,
-                    ...response.error,
-                });
+                this.root_store.common.setServicesError(
+                    {
+                        type: response.msg_type,
+                        ...response.error,
+                    },
+                    // Temporary switching off old snackbar for dTrader-V2
+                    isDtraderV2MobileEnabled(this.root_store.ui.is_mobile) ||
+                        isDtraderV2DesktopEnabled(this.root_store.ui.is_desktop)
+                );
             }
         } else if (!response.error && response.sell) {
             // update contract store sell info after sell
@@ -407,17 +432,37 @@ export default class PortfolioStore extends BaseStore {
             this.positions[i].contract_info.entry_spot = this.positions[i].entry_spot;
         }
 
-        // remove exit_spot for manually sold contracts
-        if (isUserSold(contract_response)) this.positions[i].exit_spot = '-';
-
         this.positions[i].is_loading = false;
 
-        if (
-            this.root_store.ui.is_mobile &&
-            getEndTime(contract_response) &&
-            window.location.pathname === routes.trade
-        ) {
-            this.root_store.notifications.addTradeNotification(this.positions[i].contract_info);
+        if (this.root_store.ui.is_mobile && getEndTime(contract_response)) {
+            const contract_info = this.positions[i].contract_info;
+
+            if (window.location.pathname === routes.trade)
+                this.root_store.notifications.addTradeNotification(contract_info);
+
+            const { contract_id, contract_type: trade_type, currency, profit, shortcode, status } = contract_info;
+
+            const new_notification_id = `${contract_id}_${status}`;
+            if (this.sell_notifications.some(({ id }) => id === new_notification_id)) return;
+
+            this.sell_notifications.push({ id: new_notification_id });
+
+            const calculated_profit =
+                isMultiplierContract(trade_type) && !isNaN(profit) ? getTotalProfit(contract_info) : profit;
+            const is_won = status === 'won' || calculated_profit >= 0;
+            const formatted_profit = `${is_won ? localize('Profit') : localize('Loss')}: ${
+                is_won ? '+' : ''
+            }${formatMoney(currency, calculated_profit, true, 0, 0)} ${currency}`;
+
+            this.addNotificationBannerCallback?.(
+                {
+                    message: getTradeNotificationMessage(shortcode),
+                    redirectTo: getContractPath(contract_id),
+                    title: formatted_profit,
+                    type: is_won ? 'success' : 'error',
+                },
+                is_won ? 'success' : 'error'
+            );
         }
     };
 
@@ -476,7 +521,7 @@ export default class PortfolioStore extends BaseStore {
     }
 
     networkStatusChangeListener(is_online) {
-        this.is_loading = !is_online;
+        this.is_loading = this.is_loading || !is_online;
     }
 
     onMount() {

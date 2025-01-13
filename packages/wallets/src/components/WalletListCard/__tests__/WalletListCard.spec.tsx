@@ -1,7 +1,6 @@
 import React from 'react';
 import { useActiveWalletAccount } from '@deriv/api-v2';
 import { render, screen } from '@testing-library/react';
-import useDevice from '../../../hooks/useDevice';
 import WalletListCard from '../WalletListCard';
 
 jest.mock('@deriv/api-v2', () => ({
@@ -12,23 +11,21 @@ jest.mock('@deriv/api-v2', () => ({
     })),
 }));
 
-jest.mock('../../../hooks/useDevice');
-const mockedUseDevice = useDevice as jest.MockedFunction<typeof useDevice>;
+jest.mock('@deriv-com/ui', () => ({
+    ...jest.requireActual('@deriv-com/ui'),
+    useDevice: jest.fn(() => ({ isDesktop: true })),
+}));
 
 jest.mock('../../WalletListCardDetails/WalletListCardDetails', () => ({
     __esModule: true,
     default: jest.fn(() => <div>Mocked WalletListCardDetails</div>),
 }));
 
-jest.mock('../../WalletCardIcon', () => ({
-    WalletCardIcon: jest.fn(() => <div>Mocked WalletCardIcon</div>),
+jest.mock('../../WalletCurrencyCard', () => ({
+    WalletCurrencyCard: jest.fn(() => <div>Mocked WalletCurrencyCard</div>),
 }));
 
 describe('WalletListCard', () => {
-    beforeEach(() => {
-        mockedUseDevice.mockReturnValue({ isDesktop: true, isMobile: false, isTablet: false });
-    });
-
     afterEach(() => {
         jest.clearAllMocks();
     });
@@ -36,7 +33,7 @@ describe('WalletListCard', () => {
     it('should render with components correctly', () => {
         render(<WalletListCard />);
 
-        expect(screen.getByText('Mocked WalletCardIcon')).toBeInTheDocument();
+        expect(screen.getByText('Mocked WalletCurrencyCard')).toBeInTheDocument();
         expect(screen.getByText('Mocked WalletListCardDetails')).toBeInTheDocument();
     });
 
@@ -48,7 +45,7 @@ describe('WalletListCard', () => {
         });
         render(<WalletListCard />);
 
-        expect(screen.getByText('Mocked WalletCardIcon')).toBeInTheDocument();
+        expect(screen.getByText('Mocked WalletCurrencyCard')).toBeInTheDocument();
         expect(screen.getByText('Mocked WalletListCardDetails')).toBeInTheDocument();
     });
 });

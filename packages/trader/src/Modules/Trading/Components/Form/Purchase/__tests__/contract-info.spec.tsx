@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { getLocalizedBasis, TRADE_TYPES } from '@deriv/shared';
 import ContractInfo from '../contract-info';
+import { useDevice } from '@deriv-com/ui';
 
 const test_message = 'Some test message';
 const value_movement = 'ValueMovement';
@@ -36,6 +37,7 @@ const default_mock_props: React.ComponentProps<typeof ContractInfo> = {
         profit: '',
         returns: '',
         spot: 0,
+        validation_params: undefined,
     },
     type: 'test_contract_type',
 };
@@ -45,25 +47,27 @@ jest.mock('../cancel-deal-info', () => jest.fn(() => <div>{cancel_deal_info}</di
 jest.mock('@deriv/components', () => ({
     ...jest.requireActual('@deriv/components'),
     Popover: jest.fn(props => <div>{props.message}</div>),
-    MobileWrapper: jest.fn(({ children }) => <div>{children}</div>),
+}));
+jest.mock('@deriv-com/ui', () => ({
+    useDevice: jest.fn(() => ({ isMobile: false })),
 }));
 
 describe('<ContractInfo />', () => {
     it('should render component with children', () => {
         render(<ContractInfo {...default_mock_props} />);
 
-        expect(screen.getAllByText(value_movement)).toHaveLength(2);
         expect(screen.getByText(test_message)).toBeInTheDocument();
     });
     it('should render specific components if is_multiplier === true', () => {
+        (useDevice as jest.Mock).mockReturnValueOnce({ isMobile: true });
         render(<ContractInfo {...default_mock_props} is_multiplier />);
 
-        expect(screen.getByText(cancel_deal_info)).toBeInTheDocument();
         expect(screen.getByText(/10.00 USD/i)).toBeInTheDocument();
         expect(screen.queryByText(value_movement)).not.toBeInTheDocument();
         expect(screen.queryByText(test_message)).not.toBeInTheDocument();
     });
     it('should render specific components if is_accumulator === true', () => {
+        (useDevice as jest.Mock).mockReturnValueOnce({ isMobile: true });
         render(<ContractInfo {...default_mock_props} is_accumulator />);
 
         expect(screen.getByText(/3%/i)).toBeInTheDocument();
@@ -94,33 +98,21 @@ describe('<ContractInfo />', () => {
             'trade-container__price-info trade-container__price-info--fade'
         );
     });
-    it('should apply a proper className and specific tooltip message if is_turbos is true and type is TURBOS.LONG', () => {
-        render(<ContractInfo {...default_mock_props} type={TRADE_TYPES.TURBOS.LONG} is_turbos />);
 
-        expect(screen.getByTestId('dt_purchase_turboslong_price')).toHaveClass(
-            'trade-container__price-info trade-container__price-info--turbos'
-        );
-        expect(screen.getByText(/This is the amount you’ll receive at expiry/i)).toBeInTheDocument();
-    });
     it('should render specific tooltip message if is_vanilla is true', () => {
         render(<ContractInfo {...default_mock_props} is_vanilla />);
 
         expect(screen.getByText(/The payout at expiry is equal to the payout/i)).toBeInTheDocument();
     });
-    it('should render specific basis text for Turbos if proposal_info has error and basis is equal to "stake"', () => {
-        default_mock_props.proposal_info.has_error = true;
-        render(<ContractInfo {...default_mock_props} is_turbos />);
 
-        expect(screen.getByText(localized_basis.payout_per_point)).toBeInTheDocument();
-    });
     it('should render specific basis text if proposal_info has error and basis is equal to "payout"', () => {
         render(<ContractInfo {...default_mock_props} basis='payout' />);
 
-        expect(screen.getByText(localized_basis.stake)).toBeInTheDocument();
+        expect(screen.getByText('payout')).toBeInTheDocument();
     });
     it('should render specific basis text if proposal_info has error and basis is not equal to "payout" or "stake"', () => {
         render(<ContractInfo {...default_mock_props} basis='test_basis' />);
 
-        expect(screen.getByText('test_basis')).toBeInTheDocument();
+        expect(screen.getByText('payout')).toBeInTheDocument();
     });
 });

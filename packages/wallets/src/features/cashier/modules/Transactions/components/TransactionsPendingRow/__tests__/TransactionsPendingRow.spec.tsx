@@ -1,9 +1,20 @@
 import React from 'react';
 import { useCancelCryptoTransaction } from '@deriv/api-v2';
+import { useDevice } from '@deriv-com/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ModalProvider } from '../../../../../../../components/ModalProvider';
-import useDevice from '../../../../../../../hooks/useDevice';
-import TransactionsCryptoRow from '../TransactionsPendingRow';
+import TransactionsPendingRow from '../TransactionsPendingRow';
+
+const mockCurrencyConfig = {
+    BTC: {
+        display_code: 'BTC',
+        fractional_digits: 8,
+    },
+    USD: {
+        display_code: 'USD',
+        fractional_digits: 2,
+    },
+};
 
 jest.mock('@deriv/api-v2', () => ({
     useActiveWalletAccount: jest.fn(() => ({
@@ -12,14 +23,16 @@ jest.mock('@deriv/api-v2', () => ({
         },
     })),
     useCancelCryptoTransaction: jest.fn(() => ({ mutate: jest.fn() })),
-}));
-
-jest.mock('moment', () => ({
-    unix: jest.fn(() => ({
-        format: jest.fn(),
-        utc: jest.fn(() => ({
-            format: jest.fn(),
-        })),
+    useCurrencyConfig: jest.fn(() => ({
+        getConfig: (currency: 'BTC' | 'USD') => mockCurrencyConfig[currency],
+    })),
+    useIsHubRedirectionEnabled: jest.fn(() => ({
+        isHubRedirectionEnabled: false,
+    })),
+    useSettings: jest.fn(() => ({
+        data: {
+            trading_hub: 0,
+        },
     })),
 }));
 
@@ -30,17 +43,17 @@ jest.mock('react-router-dom', () => ({
     }),
 }));
 
-jest.mock('../../../../../../../hooks/useDevice', () => jest.fn());
+jest.mock('@deriv-com/ui', () => ({
+    ...jest.requireActual('@deriv-com/ui'),
+    useDevice: jest.fn(() => ({})),
+}));
 
 const mockWithdrawal = {
     address_hash: '',
     address_url: '',
-    amount: 0.0002,
+    amount: 0.02,
     description: '',
-    formatted_address_hash: '',
     formatted_amount: '',
-    formatted_confirmations: 'Pending',
-    formatted_transaction_hash: 'Pending',
     id: '0123',
     is_deposit: false,
     is_valid_to_cancel: 1 as const,
@@ -70,6 +83,7 @@ describe('TransactionsPendingRow', () => {
         $modalContainer.id = 'wallets_modal_root';
         document.body.appendChild($root);
         document.body.appendChild($modalContainer);
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: true });
     });
 
     afterEach(() => {
@@ -77,39 +91,43 @@ describe('TransactionsPendingRow', () => {
         document.body.removeChild($modalContainer);
     });
 
+    afterAll(() => {
+        jest.clearAllMocks();
+    });
+
     it('should render component with correct contents for withdrawal on desktop', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: false });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>
         );
 
         expect(screen.getByText('Transaction hash')).toBeInTheDocument();
         expect(screen.getByText('USD Wallet')).toBeInTheDocument();
         expect(screen.getAllByText('Pending')[0]).toBeInTheDocument();
-        expect(screen.getByText('-')).toBeInTheDocument();
+        expect(screen.getByText('-0.02')).toBeInTheDocument();
     });
 
     it('should render component with correct contents for deposit on desktop', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: false });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockDeposit} />
+                <TransactionsPendingRow transaction={mockDeposit} />
             </ModalProvider>
         );
 
         expect(screen.getByText('Transaction hash')).toBeInTheDocument();
         expect(screen.getByText('USD Wallet')).toBeInTheDocument();
         expect(screen.getAllByText('Pending')[0]).toBeInTheDocument();
-        expect(screen.getByText('+')).toBeInTheDocument();
+        expect(screen.getByText('+0.02')).toBeInTheDocument();
     });
 
     it('should render component with correct contents for withdrawal for mobile/responsive', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>
         );
 
@@ -117,14 +135,14 @@ describe('TransactionsPendingRow', () => {
         expect(screen.getByText('USD Wallet')).toBeInTheDocument();
         expect(screen.getAllByText('Pending')[0]).toBeInTheDocument();
         expect(screen.getByText('Cancel transaction')).toBeInTheDocument();
-        expect(screen.getByText('-')).toBeInTheDocument();
+        expect(screen.getByText('-0.02')).toBeInTheDocument();
     });
 
     it('should render component with correct contents for deposit on mobile/responsive', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockDeposit} />
+                <TransactionsPendingRow transaction={mockDeposit} />
             </ModalProvider>
         );
 
@@ -132,14 +150,14 @@ describe('TransactionsPendingRow', () => {
         expect(screen.getByText('USD Wallet')).toBeInTheDocument();
         expect(screen.getAllByText('Pending')[0]).toBeInTheDocument();
         expect(screen.getByText('Cancel transaction')).toBeInTheDocument();
-        expect(screen.getByText('+')).toBeInTheDocument();
+        expect(screen.getByText('+0.02')).toBeInTheDocument();
     });
 
     it('should show modal on click of cancel button in mobile', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>,
             { container: $root }
         );
@@ -157,7 +175,7 @@ describe('TransactionsPendingRow', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>,
             { container: $root }
         );
@@ -179,7 +197,7 @@ describe('TransactionsPendingRow', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>,
             { container: $root }
         );
@@ -197,7 +215,7 @@ describe('TransactionsPendingRow', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>,
             { container: $root }
         );
@@ -211,7 +229,7 @@ describe('TransactionsPendingRow', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>,
             { container: $root }
         );
@@ -228,7 +246,7 @@ describe('TransactionsPendingRow', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: false });
         render(
             <ModalProvider>
-                <TransactionsCryptoRow transaction={mockWithdrawal} />
+                <TransactionsPendingRow transaction={mockWithdrawal} />
             </ModalProvider>
         );
 

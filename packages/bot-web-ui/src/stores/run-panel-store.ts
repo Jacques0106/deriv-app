@@ -1,4 +1,4 @@
-import { computed, makeObservable, observable, reaction, runInAction } from 'mobx';
+import { action, computed, makeObservable, observable, reaction, runInAction } from 'mobx';
 import { Buy, ProposalOpenContract } from '@deriv/api-types';
 import { ErrorTypes, MessageTypes, observer, unrecoverable_errors } from '@deriv/bot-skeleton';
 import { isSafari, mobileOSDetect, routes } from '@deriv/shared';
@@ -13,6 +13,7 @@ import GTM from 'Utils/gtm';
 import { helpers } from 'Utils/store-helpers';
 import { TDbot } from 'Types';
 import RootStore from './root-store';
+import { getSelectedTradeType } from '@deriv/bot-skeleton/src/scratch/utils';
 
 export type TContractState = {
     buy?: Buy;
@@ -21,67 +22,7 @@ export type TContractState = {
     id: string;
 };
 
-export interface IRunPanelStore {
-    active_index: number;
-    contract_stage: TContractStage;
-    dialog_options: object;
-    has_open_contract: boolean;
-    is_running: boolean;
-    is_statistics_info_modal_open: boolean;
-    is_drawer_open: boolean;
-    is_dialog_open: boolean;
-    is_sell_requested: boolean;
-    run_id: string;
-    error_type: string | undefined;
-    show_bot_stop_message: boolean;
-    is_stop_button_visible: boolean;
-    is_stop_button_disabled: boolean;
-    is_clear_stat_disabled: boolean;
-    onStopButtonClick: () => void;
-    onStopBotClick: () => void;
-    stopBot: () => void;
-    onClearStatClick: () => void;
-    clearStat: () => void;
-    toggleStatisticsInfoModal: () => void;
-    toggleDrawer: (is_open: boolean) => void;
-    setActiveTabIndex: (index: number) => void;
-    onCloseDialog: () => void;
-    performSelfExclusionCheck: () => void;
-    showStopMultiplierContractDialog: () => void;
-    showLoginDialog: () => void;
-    showRealAccountDialog: () => void;
-    showClearStatDialog: () => void;
-    showIncompatibleStrategyDialog: () => void;
-    showContractUpdateErrorDialog: (message: string) => void;
-    onBotSellEvent: () => void;
-    onBotStopEvent: () => void;
-    onBotReadyEvent: () => void;
-    onBotTradeAgain: (is_trade_again: boolean) => void;
-    onContractStatusEvent: (contract_status: TContractState) => void;
-    onClickSell: () => void;
-    onBotContractEvent: (data: object) => void;
-    onError: (data: { error: any }) => void;
-    showErrorMessage: (data: string | Error) => void;
-    switchToJournal: () => void;
-    setContractStage: (contract_stage: TContractStage) => void;
-    setHasOpenContract: (has_open_contract: boolean) => void;
-    setIsRunning: (is_running: boolean) => void;
-    onMount: () => void;
-    onUnmount: () => void;
-    handleInvalidToken: () => void;
-    onRunButtonClick: () => void;
-    registerBotListeners: () => void;
-    registerReactions: () => () => void;
-    onBotRunningEvent: () => void;
-    unregisterBotListeners: () => void;
-    clear: () => void;
-    preloadAudio: () => void;
-    stopMyBot: () => void;
-    closeMultiplierContract: () => void;
-    setShowBotStopMessage: (show_bot_stop_message: boolean) => void;
-}
-
-export default class RunPanelStore implements IRunPanelStore {
+export default class RunPanelStore {
     root_store: RootStore;
     dbot: TDbot;
     core: TStores;
@@ -105,6 +46,46 @@ export default class RunPanelStore implements IRunPanelStore {
             is_stop_button_visible: computed,
             is_stop_button_disabled: computed,
             is_clear_stat_disabled: computed,
+            toggleDrawer: action,
+            onBotSellEvent: action,
+            setContractStage: action,
+            setHasOpenContract: action,
+            setIsRunning: action,
+            onRunButtonClick: action,
+            is_contracy_buying_in_progress: observable,
+            OpenPositionLimitExceededEvent: action,
+            onStopButtonClick: action,
+            onClearStatClick: action,
+            clearStat: action,
+            toggleStatisticsInfoModal: action,
+            setActiveTabIndex: action,
+            onCloseDialog: action,
+            stopMyBot: action,
+            closeMultiplierContract: action,
+            showStopMultiplierContractDialog: action,
+            showLoginDialog: action,
+            showRealAccountDialog: action,
+            showClearStatDialog: action,
+            showIncompatibleStrategyDialog: action,
+            showContractUpdateErrorDialog: action,
+            registerBotListeners: action,
+            registerReactions: action,
+            onBotRunningEvent: action,
+            onBotStopEvent: action,
+            onBotReadyEvent: action,
+            onBotTradeAgain: action,
+            onContractStatusEvent: action,
+            onClickSell: action,
+            clear: action,
+            onBotContractEvent: action,
+            onError: action,
+            showErrorMessage: action,
+            switchToJournal: action,
+            unregisterBotListeners: action,
+            handleInvalidToken: action,
+            preloadAudio: action,
+            onMount: action,
+            onUnmount: action,
         });
 
         this.root_store = root_store;
@@ -124,6 +105,7 @@ export default class RunPanelStore implements IRunPanelStore {
     is_dialog_open = false;
     is_sell_requested = false;
     show_bot_stop_message = false;
+    is_contracy_buying_in_progress = false;
 
     run_id = '';
     onOkButtonClick: (() => void) | null = null;
@@ -139,6 +121,9 @@ export default class RunPanelStore implements IRunPanelStore {
     }
 
     get is_stop_button_disabled() {
+        if (this.is_contracy_buying_in_progress) {
+            return false;
+        }
         return [contract_stages.PURCHASE_SENT as number, contract_stages.IS_STOPPING as number].includes(
             this.contract_stage
         );
@@ -159,7 +144,14 @@ export default class RunPanelStore implements IRunPanelStore {
         if (show_bot_stop_message)
             botNotification(notification_message.bot_stop, {
                 label: localize('Reports'),
-                onClick: () => (window.location.href = routes.reports),
+                onClick: () => {
+                    const contract_type = getSelectedTradeType();
+
+                    const url = new URL(routes.positions, window.location.origin);
+                    url.searchParams.set('contract_type_bots', contract_type);
+
+                    window.location.href = url.toString();
+                },
             });
     };
 
@@ -232,6 +224,7 @@ export default class RunPanelStore implements IRunPanelStore {
     };
 
     onStopButtonClick = () => {
+        this.is_contracy_buying_in_progress = false;
         const { is_multiplier } = this.root_store.summary_card;
 
         if (is_multiplier) {
@@ -316,10 +309,6 @@ export default class RunPanelStore implements IRunPanelStore {
 
     setActiveTabIndex = (index: number) => {
         this.active_index = index;
-
-        if (this.active_index !== 1) {
-            this.root_store.transactions.setActiveTransactionId(null);
-        }
     };
 
     onCloseDialog = () => {
@@ -455,7 +444,10 @@ export default class RunPanelStore implements IRunPanelStore {
         observer.register('bot.contract', summary_card.onBotContractEvent);
         observer.register('bot.contract', transactions.onBotContractEvent);
         observer.register('Error', this.onError);
+        observer.register('bot.recoverOpenPositionLimitExceeded', this.OpenPositionLimitExceededEvent);
     };
+
+    OpenPositionLimitExceededEvent = () => (this.is_contracy_buying_in_progress = true);
 
     registerReactions = () => {
         const { client, common, notifications } = this.core;
@@ -540,15 +532,18 @@ export default class RunPanelStore implements IRunPanelStore {
         if (this.error_type === ErrorTypes.RECOVERABLE_ERRORS) {
             // Bot should indicate it started in below cases:
             // - When error happens it's a recoverable error
-            const { shouldRestartOnError, timeMachineEnabled } = this.dbot.interpreter.bot.tradeEngine.options;
-            const is_bot_recoverable = shouldRestartOnError || timeMachineEnabled;
+            const trade_engine_options = this.dbot?.interpreter?.bot?.tradeEngine?.options;
+            if (trade_engine_options) {
+                const { shouldRestartOnError, timeMachineEnabled } = trade_engine_options;
+                const is_bot_recoverable = shouldRestartOnError || timeMachineEnabled;
 
-            if (is_bot_recoverable) {
-                this.error_type = undefined;
-                this.setContractStage(contract_stages.PURCHASE_SENT);
-            } else {
-                this.setIsRunning(false);
-                indicateBotStopped();
+                if (is_bot_recoverable) {
+                    this.error_type = undefined;
+                    this.setContractStage(contract_stages.PURCHASE_SENT);
+                } else {
+                    this.setIsRunning(false);
+                    indicateBotStopped();
+                }
             }
         } else if (this.error_type === ErrorTypes.UNRECOVERABLE_ERRORS) {
             // Bot should indicate it stopped in below cases:
@@ -593,11 +588,8 @@ export default class RunPanelStore implements IRunPanelStore {
                 break;
             }
             case 'contract.purchase_received': {
+                this.is_contracy_buying_in_progress = false;
                 this.setContractStage(contract_stages.PURCHASE_RECEIVED);
-
-                // Close transaction-specific popover, if any.
-                this.root_store.transactions.setActiveTransactionId(null);
-
                 const { buy } = contract_status;
                 const { is_virtual } = this.core.client;
 
@@ -639,6 +631,7 @@ export default class RunPanelStore implements IRunPanelStore {
         }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError = (data: { error: any }) => {
         // data.error for API errors, data for code errors
         const error = data.error || data;

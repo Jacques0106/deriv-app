@@ -1,4 +1,5 @@
 import { useCallback, useRef, useMemo, useEffect, useState } from 'react';
+import { LocalStorageUtils } from '@deriv-com/utils';
 import useOnfidoServiceToken from './useOnfidoServiceToken';
 import { ALPHA_2_TO_ALPHA_3, ONFIDO_PHRASES } from '../constants';
 import useSettings from './useSettings';
@@ -96,14 +97,15 @@ const useOnfido = (country?: string, selectedDocument?: string) => {
     );
 
     const initOnfido = useCallback(async () => {
-        const i18NLanguage = window.localStorage.getItem('i18n_language')?.toLowerCase() ?? 'en';
+        const localizeLanguage = LocalStorageUtils.getValue<string>('i18n_language');
+        const i18NLanguage = localizeLanguage || 'en';
         const onfidoCountryCode =
             countryCode.length !== 3 ? ALPHA_2_TO_ALPHA_3[countryCode.toUpperCase()] : countryCode;
         try {
             onfidoRef.current = await window.Onfido.init({
                 containerId: onfidoContainerId,
                 language: {
-                    locale: i18NLanguage,
+                    locale: i18NLanguage.toLowerCase(),
                     phrases: ONFIDO_PHRASES,
                     mobilePhrases: ONFIDO_PHRASES,
                 },
@@ -154,10 +156,10 @@ const useOnfido = (country?: string, selectedDocument?: string) => {
             setIsOnfidoLoading(true);
             const scriptNode = document.createElement('script');
             const linkNode = document.createElement('link');
-
+            // [TODO] - Need to lock version of onfido sdk - Current version in CDN is 13.8.4
             scriptNode.id = 'onfido_sdk';
-            scriptNode.src = 'https://assets.onfido.com/web-sdk-releases/latest/onfido.min.js';
-            linkNode.href = 'https://assets.onfido.com/web-sdk-releases/latest/style.css';
+            scriptNode.src = 'https://assets.onfido.com/web-sdk-releases/13.8.4/onfido.min.js';
+            linkNode.href = 'https://assets.onfido.com/web-sdk-releases/13.8.4/style.css';
             linkNode.rel = 'stylesheet';
 
             document.body.appendChild(scriptNode);
@@ -183,7 +185,7 @@ const useOnfido = (country?: string, selectedDocument?: string) => {
             hasSubmitted,
         },
         isOnfidoInitialized,
-        isServiceTokenLoading,
+        isLoading: isServiceTokenLoading || isOnfidoLoading,
         serviceTokenError,
         onfidoInitializationError,
     };

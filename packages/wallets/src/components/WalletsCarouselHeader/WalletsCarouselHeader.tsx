@@ -1,9 +1,10 @@
 import React from 'react';
 import classNames from 'classnames';
 import { useHistory } from 'react-router-dom';
-import { useBalance } from '@deriv/api-v2';
-import IcCashierTransfer from '../../public/images/ic-cashier-transfer.svg';
-import { IconButton, WalletText } from '../Base';
+import { LabelPairedArrowUpArrowDownSmBoldIcon } from '@deriv/quill-icons';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
+import { IconButton } from '../Base';
 import { WalletCurrencyCard } from '../WalletCurrencyCard';
 import './WalletsCarouselHeader.scss';
 
@@ -11,42 +12,47 @@ type TProps = {
     balance?: string;
     currency: string;
     hidden?: boolean;
+    isBalanceLoading?: boolean;
     isDemo?: boolean;
 };
 
-const WalletsCarouselHeader: React.FC<TProps> = ({ balance, currency, hidden, isDemo }) => {
+const WalletsCarouselHeader: React.FC<TProps> = ({ balance, currency, hidden, isBalanceLoading, isDemo }) => {
     const history = useHistory();
-    const { isLoading } = useBalance();
+    const { localize } = useTranslations();
+    const { isMobile } = useDevice();
 
     return (
         <div className={classNames('wallets-carousel-header', { 'wallets-carousel-header--hidden': hidden })}>
             <div className='wallets-carousel-header__content'>
-                <WalletCurrencyCard currency={currency} isCarouselHeader isDemo={isDemo} size='md' />
+                <WalletCurrencyCard currency={currency} isDemo={isDemo} size='md' />
                 <div className='wallets-carousel-header__details'>
-                    <WalletText color='general' size='sm'>
-                        {currency} Wallet
-                    </WalletText>
-                    {isLoading ? (
+                    <Text color='general' size={isMobile ? 'sm' : 'xs'}>
+                        {isDemo ? (
+                            <Localize i18n_default_text='{{currency}} Demo Wallet' values={{ currency }} />
+                        ) : (
+                            <Localize i18n_default_text='{{currency}} Wallet' values={{ currency }} />
+                        )}
+                    </Text>
+                    {isBalanceLoading ? (
                         <div
                             className='wallets-skeleton wallets-carousel-header__balance-loader'
                             data-testid='dt_wallets_carousel_header_balance_loader'
                         />
                     ) : (
-                        <WalletText color='general' size='lg' weight='bold'>
+                        <Text color='general' size={isMobile ? 'lg' : 'md'} weight='bold'>
                             {balance}
-                        </WalletText>
+                        </Text>
                     )}
                 </div>
             </div>
             <IconButton
-                color='transparent'
+                aria-label={localize('Transfer')}
+                className='wallets-carousel-header__button'
+                color='white'
                 data-testid='dt_wallets_carousel_header_button'
-                icon={<IcCashierTransfer />}
-                iconSize='lg'
-                onClick={() => {
-                    history.push(`/wallets/cashier/transfer`);
-                }}
-                size='lg'
+                icon={<LabelPairedArrowUpArrowDownSmBoldIcon />}
+                onClick={() => history.push('/wallet/account-transfer')}
+                size='md'
             />
         </div>
     );

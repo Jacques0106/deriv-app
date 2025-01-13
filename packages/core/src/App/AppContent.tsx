@@ -1,79 +1,195 @@
 import React from 'react';
-import Cookies from 'js-cookie';
-import { useRemoteConfig } from '@deriv/api';
-import { DesktopWrapper } from '@deriv/components';
-import { useFeatureFlags } from '@deriv/hooks';
-import { getAppId, LocalStore } from '@deriv/shared';
-import { observer, useStore } from '@deriv/stores';
-import { getLanguage } from '@deriv/translations';
-import { Analytics } from '@deriv-com/analytics';
 
-import BinaryBotIFrame from 'Modules/BinaryBotIFrame';
+import { useRemoteConfig } from '@deriv/api';
+import {
+    useFreshChat,
+    useGrowthbookGetFeatureValue,
+    useGrowthbookIsOn,
+    useIntercom,
+    useIsHubRedirectionEnabled,
+    useLiveChat,
+    useOauth2,
+    useSilentLoginAndLogout,
+} from '@deriv/hooks';
+import { observer, useStore } from '@deriv/stores';
+import { ThemeProvider } from '@deriv-com/quill-ui';
+import { useTranslations } from '@deriv-com/translations';
+import { useDevice } from '@deriv-com/ui';
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser';
+
+import P2PIFrame from 'Modules/P2PIFrame';
 import SmartTraderIFrame from 'Modules/SmartTraderIFrame';
 
+import initDatadog from '../Utils/Datadog';
+import initHotjar from '../Utils/Hotjar';
+
 import ErrorBoundary from './Components/Elements/Errors/error-boundary.jsx';
+import LandscapeBlocker from './Components/Elements/LandscapeBlocker';
 import AppToastMessages from './Containers/app-toast-messages.jsx';
 import AppContents from './Containers/Layout/app-contents.jsx';
 import Footer from './Containers/Layout/footer.jsx';
 import Header from './Containers/Layout/header';
 import AppModals from './Containers/Modals';
-import PlatformContainer from './Containers/PlatformContainer/PlatformContainer.jsx';
 import Routes from './Containers/Routes/routes.jsx';
 import Devtools from './Devtools';
-import initDatadog from '../Utils/Datadog';
 
 const AppContent: React.FC<{ passthrough: unknown }> = observer(({ passthrough }) => {
-    const { is_next_wallet_enabled } = useFeatureFlags();
     const store = useStore();
+    const {
+        has_wallet,
+        is_logged_in,
+        loginid,
+        is_client_store_initialized,
+        landing_company_shortcode,
+        currency,
+        residence,
+        logout,
+        email,
+        setIsPasskeySupported,
+        account_settings,
+        setIsPhoneNumberVerificationEnabled,
+        setIsCountryCodeDropdownEnabled,
+        accounts,
+    } = store.client;
+    const { first_name, last_name } = account_settings;
+    const { current_language, changeSelectedLanguage } = store.common;
+    const { is_dark_mode_on, setDarkMode } = store.ui;
 
-    const { data } = useRemoteConfig();
-    const { marketing_growthbook, tracking_datadog, tracking_rudderstack } = data;
+    const { isMobile } = useDevice();
+    const { switchLanguage } = useTranslations();
+
+    const { isOAuth2Enabled } = useOauth2({
+        handleLogout: async () => {
+            await logout();
+        },
+    });
+    const { isChangingToHubAppId } = useIsHubRedirectionEnabled();
+
+    const is_app_id_set = localStorage.getItem('config.app_id');
+    const is_change_login_app_id_set = localStorage.getItem('change_login_app_id');
+
+    const [isWebPasskeysFFEnabled, isGBLoaded] = useGrowthbookIsOn({
+        featureFlag: 'web_passkeys',
+    });
+    const [isServicePasskeysFFEnabled] = useGrowthbookIsOn({
+        featureFlag: 'service_passkeys',
+    });
+    const [isPhoneNumberVerificationEnabled, isPhoneNumberVerificationGBLoaded] = useGrowthbookGetFeatureValue({
+        featureFlag: 'phone_number_verification',
+    });
+    const [isCountryCodeDropdownEnabled, isCountryCodeDropdownGBLoaded] = useGrowthbookGetFeatureValue({
+        featureFlag: 'enable_country_code_dropdown',
+    });
+
+    // NOTE: Commented this out for now due to single logout causing Deriv.app to be logged out continously
+    // There is a case where if logged_state is false coming from other platforms, Deriv app will SLO the user out
+    // TODO: Revert this once OIDC is enabled back for Deriv.app
+    // useSilentLoginAndLogout({
+    //     is_client_store_initialized,
+    //     isOAuth2Enabled,
+    //     oAuthLogout,
+    //     isGBLoaded,
+    // });
+
+    const { data } = useRemoteConfig(true);
+    const { tracking_datadog } = data;
+    const is_passkeys_supported = browserSupportsWebAuthn();
+
+    const livechat_client_information: Parameters<typeof useLiveChat>[0] = {
+        is_client_store_initialized,
+        is_logged_in,
+        loginid,
+        landing_company_shortcode,
+        currency,
+        residence,
+        email,
+        first_name,
+        last_name,
+    };
+
+    useLiveChat(livechat_client_information);
+    const active_account = accounts?.[loginid ?? ''];
+    const token = active_account ? active_account.token : null;
+    useFreshChat(token);
+    useIntercom(token);
 
     React.useEffect(() => {
-        if (process.env.RUDDERSTACK_KEY && tracking_rudderstack) {
-            const config = {
-                growthbookKey: marketing_growthbook ? process.env.GROWTHBOOK_CLIENT_KEY : undefined,
-                growthbookDecryptionKey: marketing_growthbook ? process.env.GROWTHBOOK_DECRYPTION_KEY : undefined,
-                rudderstackKey: process.env.RUDDERSTACK_KEY,
-            };
-            Analytics.initialise(config);
-            Analytics.setAttributes({
-                account_type: LocalStore?.get('active_loginid')?.substring(0, 2) ?? 'unlogged',
-                app_id: String(getAppId()),
-                device_type: store?.ui?.is_mobile ? 'mobile' : 'desktop',
-                device_language: navigator?.language || 'en-EN',
-                user_language: getLanguage().toLowerCase(),
-                country: Cookies.get('clients_country') || Cookies?.getJSON('website_status'),
-            });
+        if (isChangingToHubAppId && !is_app_id_set) {
+            const app_id = process.env.NODE_ENV === 'production' ? 61554 : 53503;
+            localStorage.setItem('change_login_app_id', app_id.toString());
+            return;
         }
+        is_change_login_app_id_set && localStorage.removeItem('change_login_app_id');
+    }, [isChangingToHubAppId, is_app_id_set, is_change_login_app_id_set]);
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.marketing_growthbook, tracking_rudderstack]);
+    React.useEffect(() => {
+        switchLanguage(current_language);
+    }, [current_language, switchLanguage]);
+
+    React.useEffect(() => {
+        if (isPhoneNumberVerificationGBLoaded) {
+            setIsPhoneNumberVerificationEnabled(!!isPhoneNumberVerificationEnabled);
+        }
+    }, [isPhoneNumberVerificationEnabled, setIsPhoneNumberVerificationEnabled, isPhoneNumberVerificationGBLoaded]);
+
+    React.useEffect(() => {
+        if (isCountryCodeDropdownGBLoaded) {
+            setIsCountryCodeDropdownEnabled(!!isCountryCodeDropdownEnabled);
+        }
+    }, [isCountryCodeDropdownEnabled, setIsCountryCodeDropdownEnabled, isCountryCodeDropdownGBLoaded]);
+
+    React.useEffect(() => {
+        if (isGBLoaded && isWebPasskeysFFEnabled && isServicePasskeysFFEnabled) {
+            setIsPasskeySupported(
+                is_passkeys_supported && isServicePasskeysFFEnabled && isWebPasskeysFFEnabled && isMobile
+            );
+        }
+    }, [
+        isServicePasskeysFFEnabled,
+        isGBLoaded,
+        isWebPasskeysFFEnabled,
+        is_passkeys_supported,
+        isMobile,
+        setIsPasskeySupported,
+    ]);
 
     React.useEffect(() => {
         initDatadog(tracking_datadog);
     }, [tracking_datadog]);
 
+    React.useEffect(() => {
+        if (is_client_store_initialized) initHotjar(store.client);
+    }, [store.client, is_client_store_initialized]);
+
+    // intentionally switch the user with wallets to light mode and EN language
+    React.useLayoutEffect(() => {
+        if (has_wallet) {
+            if (is_dark_mode_on) {
+                setDarkMode(false);
+            }
+        }
+    }, [has_wallet, current_language, changeSelectedLanguage, is_dark_mode_on, setDarkMode]);
+
+    const isCallBackPage = window.location.pathname.includes('callback');
+
     return (
-        <PlatformContainer>
-            <Header />
+        <ThemeProvider theme={is_dark_mode_on ? 'dark' : 'light'}>
+            <LandscapeBlocker />
+            {!isCallBackPage && <Header />}
             <ErrorBoundary root_store={store}>
                 <AppContents>
                     {/* TODO: [trader-remove-client-base] */}
                     <Routes passthrough={passthrough} />
                 </AppContents>
             </ErrorBoundary>
-            <DesktopWrapper>
-                <Footer />
-            </DesktopWrapper>
+            <Footer />
             <ErrorBoundary root_store={store}>
                 <AppModals />
             </ErrorBoundary>
-            <SmartTraderIFrame />
-            <BinaryBotIFrame />
+            {!isOAuth2Enabled && <P2PIFrame />}
             <AppToastMessages />
-            {is_next_wallet_enabled && <Devtools />}
-        </PlatformContainer>
+            <Devtools />
+        </ThemeProvider>
     );
 });
 

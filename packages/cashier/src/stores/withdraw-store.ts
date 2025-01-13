@@ -7,9 +7,14 @@ import ErrorStore from './error-store';
 import { TWebSocket, TRootStore } from '../types';
 
 export default class WithdrawStore {
-    constructor(public WS: TWebSocket, public root_store: TRootStore) {
+    constructor(
+        public WS: TWebSocket,
+        public root_store: TRootStore
+    ) {
         makeObservable(this, {
             blockchain_address: observable,
+            crypto_estimations_fee_unique_id: observable,
+            crypto_estimations_fee: observable,
             error: observable,
             is_10k_withdrawal_limit_reached: observable,
             is_withdraw_confirmed: observable,
@@ -29,6 +34,8 @@ export default class WithdrawStore {
             check10kLimit: action.bound,
             set10kLimitation: action.bound,
             setCryptoConfig: action.bound,
+            setCryptoEstimationsFeeUniqueId: action.bound,
+            setCryptoEstimationsFee: action.bound,
             setWithdrawPercentageSelectorResult: action.bound,
             validateWithdrawFromAmount: action.bound,
             validateWithdrawToAmount: action.bound,
@@ -39,6 +46,8 @@ export default class WithdrawStore {
     }
 
     blockchain_address = '';
+    crypto_estimations_fee_unique_id = '';
+    crypto_estimations_fee = 0;
     error = new ErrorStore();
     is_10k_withdrawal_limit_reached?: boolean = undefined;
     is_withdraw_confirmed = false;
@@ -68,6 +77,14 @@ export default class WithdrawStore {
         this.withdraw_amount = amount;
     }
 
+    setCryptoEstimationsFeeUniqueId(crypto_estimations_fee_unique_id: string) {
+        this.crypto_estimations_fee_unique_id = crypto_estimations_fee_unique_id;
+    }
+
+    setCryptoEstimationsFee(crypto_estimations_fee: number) {
+        this.crypto_estimations_fee = crypto_estimations_fee;
+    }
+
     async requestWithdraw(verification_code: string) {
         const { client, modules } = this.root_store;
         const { crypto_fiat_converter } = modules.cashier;
@@ -85,6 +102,7 @@ export default class WithdrawStore {
             address: this.blockchain_address,
             amount: +crypto_fiat_converter.converter_from_amount,
             verification_code,
+            estimated_fee_unique_id: this.crypto_estimations_fee_unique_id || undefined,
             dry_run: 1,
         }).then(response => {
             if (response.error) {
@@ -103,6 +121,7 @@ export default class WithdrawStore {
         await this.WS.cryptoWithdraw({
             address: this.blockchain_address,
             amount: +converter_from_amount,
+            estimated_fee_unique_id: this.crypto_estimations_fee_unique_id || undefined,
             verification_code,
         }).then(response => {
             if (response.error) {
@@ -131,6 +150,7 @@ export default class WithdrawStore {
         const container = Constants.map_action[active_container as keyof typeof Constants.map_action];
 
         this.setBlockchainAddress('');
+        this.setCryptoEstimationsFee(0);
         setConverterFromAmount('');
         setConverterToAmount('');
         client.setVerificationCode('', container);
@@ -154,7 +174,7 @@ export default class WithdrawStore {
     async onMountWithdraw(verification_code?: string) {
         const { client, modules } = this.root_store;
         const active_container = modules.cashier?.general_store.active_container;
-        const is_crypto = modules.cashier?.general_store.is_crypto;
+        const is_crypto_provider = modules.cashier?.general_store.is_crypto_provider;
         const onMountCommon = modules.cashier?.general_store.onMountCommon;
         const setLoading = modules.cashier?.general_store.setLoading;
         const setOnRemount = modules.cashier?.general_store.setOnRemount;
@@ -211,7 +231,7 @@ export default class WithdrawStore {
 
                 client.setVerificationCode('', container);
             }
-        } else if (is_crypto) {
+        } else if (is_crypto_provider) {
             setLoading(false);
         } else {
             await checkIframeLoaded();
@@ -281,10 +301,17 @@ export default class WithdrawStore {
     async check10kLimit() {
         const { client } = this.root_store;
 
-        const remainder = (await client.getLimits())?.get_limits?.remainder;
+        await this.WS.wait('get_limits');
+
+        const remainder = client.account_limits?.remainder;
         this.setMaxWithdrawAmount(Number(remainder));
+
+        const fractional_digit = 10 ** -getDecimalPlaces(client.currency);
         const min_withdrawal = getMinWithdrawal(client.currency);
-        const is_limit_reached = !!(typeof remainder !== 'undefined' && +remainder < min_withdrawal);
+        const is_limit_reached = !!(
+            typeof remainder !== 'undefined' &&
+            remainder < (client.currency === 'XRP' ? fractional_digit : min_withdrawal)
+        );
         this.set10kLimitation(is_limit_reached);
     }
 
@@ -321,7 +348,10 @@ export default class WithdrawStore {
         const { crypto_fiat_converter } = modules.cashier;
         const { converter_from_amount, setConverterFromError } = crypto_fiat_converter;
 
-        const min_withdraw_amount = Number(this.crypto_config?.currencies_config?.[currency]?.minimum_withdrawal);
+        const min_withdraw_amount =
+            currency === 'XRP'
+                ? 10 ** -getDecimalPlaces(client.currency)
+                : Number(this.crypto_config?.currencies_config?.[currency]?.minimum_withdrawal);
         const max_withdraw_amount =
             Number(this.max_withdraw_amount) > Number(balance) ? Number(balance) : Number(this.max_withdraw_amount);
 

@@ -1,27 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useCopyToClipboard, useHover } from 'usehooks-ts';
-import useDevice from '../../../hooks/useDevice';
-import Clipboard from '../../../public/images/clipboard.svg';
-import CheckmarkCircle from '../../../public/images/ic-checkmark-circle.svg';
-import { Tooltip } from '../Tooltip';
-import './WalletClipboard.scss';
+import React, { ComponentProps, useEffect, useState } from 'react';
+import classNames from 'classnames';
+import { useCopyToClipboard } from 'usehooks-ts';
+import { LegacyCopy1pxIcon, LegacyWonIcon } from '@deriv/quill-icons';
+import { useTranslations } from '@deriv-com/translations';
+import { Tooltip, useDevice } from '@deriv-com/ui';
 
 type TProps = {
-    infoMessage?: string;
-    popoverAlignment?: 'bottom' | 'left' | 'right' | 'top';
-    successMessage?: string;
+    className?: ComponentProps<typeof Tooltip>['className'];
+    popoverAlignment?: ComponentProps<typeof Tooltip>['tooltipPosition'];
     textCopy: string;
 };
 
-const WalletClipboard = ({
-    //  info_message, popoverAlignment, success_message,
-    textCopy,
-}: TProps) => {
+const WalletClipboard = ({ className, popoverAlignment = 'right', textCopy }: TProps) => {
     const [, copy] = useCopyToClipboard();
-    const { isMobile } = useDevice();
+    const { isDesktop } = useDevice();
+    const { localize } = useTranslations();
     const [isCopied, setIsCopied] = useState(false);
-    const hoverRef = useRef(null);
-    const isHovered = useHover(hoverRef);
     let timeoutClipboard: ReturnType<typeof setTimeout>;
 
     const onClick = (event: { stopPropagation: () => void }) => {
@@ -38,10 +32,19 @@ const WalletClipboard = ({
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-        <Tooltip alignment='right' isVisible={isHovered && !isMobile} message={isCopied ? 'Copied!' : 'Copy'}>
-            <button className='wallets-clipboard' onClick={onClick} ref={hoverRef}>
-                {isCopied ? <CheckmarkCircle /> : <Clipboard />}
-            </button>
+        <Tooltip
+            as='button'
+            className={classNames('wallets-clipboard', className)}
+            hideTooltip={!isDesktop}
+            onClick={onClick}
+            tooltipContent={isCopied ? localize('Copied!') : localize('Copy')}
+            tooltipPosition={popoverAlignment}
+        >
+            {isCopied ? (
+                <LegacyWonIcon data-testid='dt_legacy_won_icon' fill='#4BB4B3' iconSize='xs' />
+            ) : (
+                <LegacyCopy1pxIcon data-testid='dt_legacy_copy_icon' iconSize='xs' />
+            )}
         </Tooltip>
     );
 };

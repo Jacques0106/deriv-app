@@ -1,8 +1,10 @@
 import React from 'react';
+import { useDevice } from '@deriv-com/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ModalProvider } from '../../../../../../../../../components/ModalProvider';
-import useDevice from '../../../../../../../../../hooks/useDevice';
 import TransactionsPendingRowField from '../TransactionsPendingRowField';
+import { APIProvider } from '@deriv/api-v2';
+import WalletsAuthProvider from '../../../../../../../../../AuthProvider';
 
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
@@ -11,7 +13,10 @@ jest.mock('react-router-dom', () => ({
     }),
 }));
 
-jest.mock('../../../../../../../../../hooks/useDevice', () => jest.fn());
+jest.mock('@deriv-com/ui', () => ({
+    ...jest.requireActual('@deriv-com/ui'),
+    useDevice: jest.fn(() => ({})),
+}));
 
 const mockWindowOpen = jest.fn();
 window.open = mockWindowOpen;
@@ -20,6 +25,7 @@ describe('TransactionsPendingRowField', () => {
     let $root: HTMLDivElement, $modalContainer: HTMLDivElement;
 
     beforeEach(() => {
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: true });
         jest.clearAllMocks();
         $root = document.createElement('div');
         $root.id = 'root';
@@ -32,6 +38,7 @@ describe('TransactionsPendingRowField', () => {
     afterEach(() => {
         document.body.removeChild($root);
         document.body.removeChild($modalContainer);
+        jest.clearAllMocks();
     });
 
     test('should render component with default props', () => {
@@ -44,12 +51,14 @@ describe('TransactionsPendingRowField', () => {
             name: 'Test Name',
             value: 'Test Value',
         };
-
-        (useDevice as jest.Mock).mockReturnValue({ isMobile: false });
         render(
-            <ModalProvider>
-                <TransactionsPendingRowField {...props} />
-            </ModalProvider>
+            <APIProvider>
+                <WalletsAuthProvider>
+                    <ModalProvider>
+                        <TransactionsPendingRowField {...props} />
+                    </ModalProvider>
+                </WalletsAuthProvider>
+            </APIProvider>
         );
 
         expect(screen.getByText('Test Name')).toBeInTheDocument();
@@ -70,9 +79,13 @@ describe('TransactionsPendingRowField', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
 
         render(
-            <ModalProvider>
-                <TransactionsPendingRowField {...props} />
-            </ModalProvider>,
+            <APIProvider>
+                <WalletsAuthProvider>
+                    <ModalProvider>
+                        <TransactionsPendingRowField {...props} />
+                    </ModalProvider>
+                </WalletsAuthProvider>
+            </APIProvider>,
             { container: $root }
         );
         fireEvent.click(screen.getByText('Test Value'));
@@ -93,9 +106,13 @@ describe('TransactionsPendingRowField', () => {
         (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
 
         render(
-            <ModalProvider>
-                <TransactionsPendingRowField {...props} />
-            </ModalProvider>,
+            <APIProvider>
+                <WalletsAuthProvider>
+                    <ModalProvider>
+                        <TransactionsPendingRowField {...props} />
+                    </ModalProvider>
+                </WalletsAuthProvider>
+            </APIProvider>,
             { container: $root }
         );
         fireEvent.click(screen.getByText('Test Value'));

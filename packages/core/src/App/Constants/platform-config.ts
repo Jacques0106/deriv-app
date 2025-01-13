@@ -23,7 +23,7 @@ const platform_config: TPlatformConfig[] = [
         title: () => getPlatformSettings('dbot').name,
         name: getPlatformSettings('dbot').name,
         description: () => localize('Automated trading at your fingertips. No coding needed.'),
-        link_to: routes.bot,
+        href: routes.bot,
     },
     {
         icon: getPlatformSettings('smarttrader').icon,
@@ -31,16 +31,6 @@ const platform_config: TPlatformConfig[] = [
         name: getPlatformSettings('smarttrader').name,
         description: () => localize('Trade the world’s markets with our popular user-friendly platform.'),
         href: routes.smarttrader,
-    },
-    {
-        icon: getPlatformSettings('bbot').icon,
-        title: () => getPlatformSettings('bbot').name,
-        name: getPlatformSettings('bbot').name,
-        description: () =>
-            localize(
-                'Our classic “drag-and-drop” tool for creating trading bots, featuring pop-up trading charts, for advanced users.'
-            ),
-        href: routes.binarybot,
     },
 ];
 

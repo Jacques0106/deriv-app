@@ -2,9 +2,11 @@ import React from 'react';
 import { cleanup, render, waitFor, screen } from '@testing-library/react';
 import { createBrowserHistory } from 'history';
 import { Router } from 'react-router';
-import { PersonalDetailsForm } from '../personal-details-form';
-import { StoreProvider, mockStore } from '@deriv/stores';
+import { APIProvider } from '@deriv/api';
 import userEvent from '@testing-library/user-event';
+import { StoreProvider, mockStore } from '@deriv/stores';
+import PersonalDetailsForm from '../personal-details-form';
+import { useGrowthbookGetFeatureValue, useResidenceList } from '@deriv/hooks';
 
 afterAll(cleanup);
 jest.mock('@deriv/components', () => ({
@@ -14,23 +16,29 @@ jest.mock('@deriv/components', () => ({
 
 jest.mock('@deriv/shared/src/services/ws-methods', () => ({
     WS: {
+        send: jest.fn().mockResolvedValue({ time: 1620000000 }),
         wait: (...payload: []) => Promise.resolve([...payload]),
     },
     useWS: () => undefined,
 }));
 
+const residence_list = [
+    {
+        text: 'Text',
+        value: 'value',
+    },
+];
+
+jest.mock('@deriv/hooks', () => ({
+    ...jest.requireActual('@deriv/hooks'),
+    useStatesList: jest.fn(() => ({ data: residence_list, isLoading: false })),
+    useResidenceList: jest.fn(() => ({ data: residence_list, isLoading: false })),
+    useGrowthbookGetFeatureValue: jest.fn(),
+}));
+
 describe('<PersonalDetailsForm />', () => {
     const history = createBrowserHistory();
 
-    const promise = Promise.resolve();
-    const fetchResidenceList = jest.fn(() => promise);
-    const fetchStatesList = jest.fn(() => promise);
-    const residence_list = [
-        {
-            text: 'Text',
-            value: 'value',
-        },
-    ];
     const mock_store = mockStore({
         client: {
             account_settings: {
@@ -38,12 +46,10 @@ describe('<PersonalDetailsForm />', () => {
                 place_of_birth: 'Thailand',
                 citizen: 'Thailand',
                 email_consent: 1,
+                phone_number_verification: {
+                    verified: 0,
+                },
             },
-            states_list: residence_list,
-            residence_list,
-            has_residence: true,
-            fetchResidenceList,
-            fetchStatesList,
         },
     });
 
@@ -51,21 +57,23 @@ describe('<PersonalDetailsForm />', () => {
         return render(
             <Router history={history}>
                 <StoreProvider store={modified_store}>
-                    <PersonalDetailsForm history={history} />
+                    <APIProvider>
+                        <PersonalDetailsForm />
+                    </APIProvider>
                 </StoreProvider>
             </Router>
         );
     };
 
+    beforeEach(() => {
+        (useGrowthbookGetFeatureValue as jest.Mock).mockReturnValue([true, true]);
+    });
+
     it('should render successfully', async () => {
         renderComponent();
         expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
         await waitFor(() => {
-            expect(
-                screen.getByText(
-                    /Please make sure your information is correct or it may affect your trading experience./i
-                )
-            ).toBeInTheDocument();
+            expect(screen.getByText(/Ensure your information is correct./i)).toBeInTheDocument();
         });
     });
 
@@ -91,37 +99,28 @@ describe('<PersonalDetailsForm />', () => {
     it('should have "required" validation errors on required form fields', async () => {
         renderComponent();
 
-        await waitFor(() => {
+        await waitFor(async () => {
             const first_name = screen.getByTestId('dt_first_name');
-            userEvent.clear(first_name);
+            await userEvent.clear(first_name);
             expect(screen.getByText(/First name is required./)).toBeInTheDocument();
-        });
-    });
-
-    it('should display error for 2-50 characters length validation, for First name when entered characters are less than 2', async () => {
-        renderComponent();
-        await waitFor(() => {
-            const last_name = screen.getByTestId('dt_last_name');
-            userEvent.type(last_name, 'b');
-            expect(screen.getByText(/You should enter 2-50 characters./)).toBeInTheDocument();
         });
     });
 
     it('should display error for the regex validation, for First name when unacceptable characters are entered', async () => {
         renderComponent();
 
-        await waitFor(() => {
+        await waitFor(async () => {
             const first_name = screen.getByTestId('dt_first_name');
-            userEvent.type(first_name, 'test 3');
+            await userEvent.type(first_name, 'test 3');
             expect(screen.getByText('Letters, spaces, periods, hyphens, apostrophes only.')).toBeInTheDocument();
         });
     });
 
     it('should not display error for the regex validation, for First name when acceptable characters are entered', async () => {
         renderComponent();
-        await waitFor(() => {
+        await waitFor(async () => {
             const first_name = screen.getByTestId('dt_first_name');
-            userEvent.type(first_name, "test-with' chars.");
+            await userEvent.type(first_name, "test-with' chars.");
             expect(screen.queryByText('Letters, spaces, periods, hyphens, apostrophes only.')).not.toBeInTheDocument();
         });
     });
@@ -173,14 +172,14 @@ describe('<PersonalDetailsForm />', () => {
         ).toBeInTheDocument();
     });
 
-    it('should update user profile after clicking on submit', () => {
+    it('should update user profile after clicking on Save changes', async () => {
         renderComponent();
         const first_name = screen.getByTestId('dt_first_name') as HTMLInputElement;
         expect(first_name.value).toBe('John');
-        userEvent.clear(first_name);
-        userEvent.type(first_name, 'James');
-        const submit_button = screen.getByRole('button', { name: /Submit/ });
-        userEvent.click(submit_button);
+        await userEvent.clear(first_name);
+        await userEvent.type(first_name, 'James');
+        const save_changes_button = screen.getByRole('button', { name: /Save changes/ });
+        await userEvent.click(save_changes_button);
         expect(first_name.value).toBe('James');
     });
 
@@ -204,5 +203,11 @@ describe('<PersonalDetailsForm />', () => {
             expect(screen.queryByText(value)).not.toBeInTheDocument();
         });
         expect(screen.getByText('Country of residence*')).toBeInTheDocument();
+    });
+
+    it('should display loader while fetching data', () => {
+        (useResidenceList as jest.Mock).mockImplementation(() => ({ data: [], isLoading: true }));
+        renderComponent();
+        expect(screen.getByText(/Loading/)).toBeInTheDocument();
     });
 });

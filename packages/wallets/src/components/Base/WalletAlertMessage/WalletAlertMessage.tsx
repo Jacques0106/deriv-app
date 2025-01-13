@@ -1,47 +1,59 @@
 import React, { ReactNode } from 'react';
-import ErrorCircleCrossmark from '../../../public/images/error-circle-crossmark.svg';
-import InfoCircleDots from '../../../public/images/info-circle-dots.svg';
-import SuccessCircleCheckmark from '../../../public/images/success-circle-checkmark.svg';
-import { WalletText } from '../index';
+import classNames from 'classnames';
+import { LegacyLossIcon, LegacySettlementFillIcon, LegacyWarningIcon, LegacyWonIcon } from '@deriv/quill-icons';
+import { Text } from '@deriv-com/ui';
 import './WalletAlertMessage.scss';
 
 const typeMapper = {
     error: {
         color: 'error',
-        icon: ErrorCircleCrossmark,
+        fill: '#EC3F3F',
+        icon: LegacyLossIcon,
     },
     info: {
         color: 'blue',
-        icon: InfoCircleDots,
+        fill: '#377CFC',
+        icon: LegacySettlementFillIcon,
     },
     success: {
         color: 'success',
-        icon: SuccessCircleCheckmark,
+        fill: '#4BB4B3',
+        icon: LegacyWonIcon,
     },
-};
+    warning: {
+        color: 'warning',
+        fill: '#FFD166',
+        icon: LegacyWarningIcon,
+    },
+} as const;
 
 type TProps = {
     children?: ReactNode;
     message: ReactNode;
-    type: 'error' | 'info' | 'success';
+    type: 'error' | 'info' | 'success' | 'warning';
 };
 
 const WalletAlertMessage: React.FC<TProps> = ({ children, message, type }) => {
     const Icon = typeMapper[type].icon;
     const color = typeMapper[type].color;
+    const fill = typeMapper[type].fill;
 
     return (
         <div className='wallets-alert-message' data-testid='dt_wallet-alert-message'>
             <div className='wallets-alert-message__icon-container'>
                 <div className='wallets-alert-message__icon-container__line' />
-                <div className='wallets-alert-message__icon-container__icon'>
-                    <Icon />
-                </div>
+                <Icon
+                    className={classNames('wallets-alert-message__icon-container__icon', {
+                        'wallets-alert-message__icon-container__icon--info': type === 'info',
+                    })}
+                    fill={fill}
+                    iconSize='xs'
+                />
             </div>
             <div className='wallets-alert-message__message-container'>
-                <WalletText color={color} size='xs'>
+                <Text align='start' color={color} size='xs'>
                     {message}
-                </WalletText>
+                </Text>
             </div>
             {children && <>{children}</>}
         </div>

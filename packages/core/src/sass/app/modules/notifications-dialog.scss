@@ -66,7 +66,7 @@
             &-text {
                 margin: 1rem 0;
             }
-            @include mobile {
+            @include mobile-screen {
                 display: none;
             }
         }
@@ -111,7 +111,7 @@
                 position: sticky;
                 bottom: 0;
             }
-            @include mobile {
+            @include mobile-screen {
                 height: calc(100vh - 40px);
             }
         }
@@ -124,7 +124,10 @@
             opacity: 0;
             transform: translate3d(0, -20px, 0);
         }
-        @include mobile {
+        &--shifted {
+            left: calc(-50% - 18rem);
+        }
+        @include mobile-screen {
             opacity: unset;
             transform: none;
             position: relative;
@@ -134,13 +137,6 @@
             height: 100%;
             width: 100%;
             background: var(--general-main-2);
-        }
-        &--pre-appstore {
-            left: calc(-50% - 18rem);
-
-            @include mobile {
-                left: calc(3% - 1rem);
-            }
         }
     }
 
@@ -193,10 +189,11 @@
         &__cta-button {
             padding: 0.3rem 0.8rem;
             margin: 0.8rem 0 0.8rem auto;
-            height: 2.4rem;
+            height: auto;
             width: auto;
+            white-space: normal;
 
-            @include mobile {
+            @include mobile-screen {
                 margin: 0.8rem 0 1.6rem auto;
             }
         }
@@ -232,7 +229,7 @@
             display: flex;
             justify-content: flex-end;
         }
-        @include mobile {
+        @include mobile-screen {
             display: flex;
             flex-direction: column;
 

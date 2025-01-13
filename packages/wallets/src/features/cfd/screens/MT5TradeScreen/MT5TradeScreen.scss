@@ -2,7 +2,9 @@
     width: 100%;
     max-width: 60rem;
     min-width: 51.2rem;
-    @include mobile {
+    margin-inline: auto;
+
+    @include mobile-screen {
         width: 100%;
         min-width: 100%;
         height: auto;
@@ -11,42 +13,52 @@
     &__label {
         display: flex;
         flex-direction: row;
+        align-items: center;
         gap: 0.6rem;
     }
 
-    &__title {
+    &__description {
         display: flex;
         align-items: center;
-        flex-direction: row;
-        gap: 0.6rem;
+        width: 100%;
+
+        &-badge {
+            width: auto;
+            padding-block: 0.5rem;
+        }
+
+        &-balance {
+            margin-inline-start: auto;
+        }
+
+        &-details {
+            display: flex;
+            flex-direction: column;
+            padding: 0 0.8rem;
+        }
+
+        &-icon {
+            & > svg {
+                width: 2.4rem;
+                height: 2.4rem;
+            }
+        }
     }
 
-    &__details {
+    &__content {
         display: flex;
         flex-direction: column;
         padding: 2.4rem;
         gap: 1.6rem;
 
-        &-description {
+        &-header {
             display: flex;
-            align-items: center;
-            width: 100%;
+            flex-direction: column;
+            gap: 0.8rem;
 
-            &__icon {
-                & > svg {
-                    width: 2.4rem;
-                    height: 2.4rem;
-                }
-            }
-
-            &__details {
+            &-btn {
                 display: flex;
-                flex-direction: column;
-                padding-left: 0.8rem;
-            }
-
-            &__balance {
-                margin-left: auto;
+                justify-content: flex-end;
             }
         }
 
@@ -71,8 +83,12 @@
         &-maintenance {
             display: grid;
             grid-template-columns: 1.6rem auto;
-            align-items: start;
+            align-items: center;
             gap: 0.8rem;
+        }
+
+        &-text {
+            text-align: start;
         }
     }
 

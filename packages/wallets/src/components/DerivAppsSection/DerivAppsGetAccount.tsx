@@ -3,15 +3,22 @@ import {
     useActiveLinkedToTradingAccount,
     useActiveWalletAccount,
     useCreateNewRealAccount,
+    useCreateNewVirtualAccount,
+    useInvalidateQuery,
+    useIsEuRegion,
     useSettings,
 } from '@deriv/api-v2';
-import { toMoment } from '@deriv/utils';
-import { AccountsDerivAccountLightIcon } from '@deriv/quill-icons';
+import { displayMoney } from '@deriv/api-v2/src/utils';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Button, Text, useDevice } from '@deriv-com/ui';
+import { FormatUtils } from '@deriv-com/utils';
 import { CFDSuccess } from '../../features/cfd/screens/CFDSuccess';
-import useDevice from '../../hooks/useDevice';
+import useAllBalanceSubscription from '../../hooks/useAllBalanceSubscription';
 import useSyncLocalStorageClientAccounts from '../../hooks/useSyncLocalStorageClientAccounts';
-import { ModalStepWrapper, WalletButton, WalletText } from '../Base';
+import { ModalStepWrapper } from '../Base';
 import { useModal } from '../ModalProvider';
+import { TradingAccountCard } from '../TradingAccountCard';
+import { WalletMarketIcon } from '../WalletMarketIcon';
 import { DerivAppsSuccessFooter } from './DerivAppsSuccessFooter';
 
 const DerivAppsGetAccount: React.FC = () => {
@@ -19,38 +26,71 @@ const DerivAppsGetAccount: React.FC = () => {
     const { isDesktop } = useDevice();
     const { data: activeWallet } = useActiveWalletAccount();
     const {
-        data: newTradingAccountData,
+        isLoading: isAccountCreationLoading,
         isSuccess: isAccountCreationSuccess,
-        mutate: createNewRealAccount,
+        mutateAsync: createNewRealAccount,
     } = useCreateNewRealAccount();
+    const {
+        isLoading: isVirtualAccountCreationLoading,
+        isSuccess: isVirtualAccountCreationSuccess,
+        mutateAsync: createNewVirtualAccount,
+    } = useCreateNewVirtualAccount();
     const {
         data: { country_code: countryCode, date_of_birth: dateOfBirth, first_name: firstName, last_name: lastName },
     } = useSettings();
     const { addTradingAccountToLocalStorage } = useSyncLocalStorageClientAccounts();
+    const invalidate = useInvalidateQuery();
 
-    const { data: activeLinkedToTradingAccount } = useActiveLinkedToTradingAccount();
+    const { isLoading: isActiveLinkedToTradingAccountLoading } = useActiveLinkedToTradingAccount();
 
-    const landingCompanyName = activeWallet?.landing_company_name?.toLocaleUpperCase();
+    const { data: balanceData } = useAllBalanceSubscription();
 
-    const createTradingAccount = () => {
+    const { localize } = useTranslations();
+    const { data: isEuRegion } = useIsEuRegion();
+
+    const createTradingAccount = async () => {
         if (!activeWallet?.is_virtual) {
-            createNewRealAccount({
+            const createAccountResponse = await createNewRealAccount({
                 payload: {
                     currency: activeWallet?.currency_config?.display_code,
-                    date_of_birth: toMoment(dateOfBirth).format('YYYY-MM-DD'),
+                    date_of_birth: FormatUtils.getFormattedDateString(Number(dateOfBirth), {
+                        format: 'YYYY-MM-DD',
+                        unix: true,
+                    }),
                     first_name: firstName,
                     last_name: lastName,
                     residence: countryCode || '',
                 },
             });
+
+            const newAccountReal = createAccountResponse?.new_account_real;
+
+            if (!newAccountReal) return;
+
+            await addTradingAccountToLocalStorage(newAccountReal, false);
+
+            invalidate('account_list');
+        } else {
+            const createAccountResponse = await createNewVirtualAccount();
+            const newAccountVirtual = createAccountResponse?.new_account_virtual;
+
+            if (!newAccountVirtual) return;
+
+            await addTradingAccountToLocalStorage(newAccountVirtual, true);
+            invalidate('account_list');
         }
     };
 
     useEffect(() => {
-        if (newTradingAccountData && isAccountCreationSuccess) {
-            addTradingAccountToLocalStorage(newTradingAccountData);
-        }
-        if (isAccountCreationSuccess) {
+        if (isAccountCreationSuccess || isVirtualAccountCreationSuccess) {
+            const displayBalance = displayMoney(
+                balanceData?.[activeWallet?.loginid ?? '']?.balance,
+                activeWallet?.currency,
+                {
+                    fractional_digits: activeWallet?.currency_config?.fractional_digits,
+                }
+            );
+
             show(
                 <ModalStepWrapper
                     renderFooter={isDesktop ? undefined : () => <DerivAppsSuccessFooter />}
@@ -58,10 +98,20 @@ const DerivAppsGetAccount: React.FC = () => {
                     shouldHideHeader={isDesktop}
                 >
                     <CFDSuccess
-                        description={`Transfer funds from your ${activeWallet?.wallet_currency_type} Wallet to your Options (${landingCompanyName}) account to start trading.`}
-                        displayBalance={activeLinkedToTradingAccount?.display_balance ?? '0.00'}
-                        renderButton={() => <DerivAppsSuccessFooter />}
-                        title={`Your Options (${landingCompanyName}) account is ready`}
+                        actionButtons={<DerivAppsSuccessFooter />}
+                        description={localize(
+                            'Transfer funds from your {{walletCurrencyType}} Wallet to your {{accountType}} account to start trading.',
+                            {
+                                accountType: isEuRegion ? localize('Multipliers') : localize('Options'),
+                                walletCurrencyType: activeWallet?.wallet_currency_type,
+                            }
+                        )}
+                        displayBalance={displayBalance}
+                        title={
+                            isEuRegion
+                                ? localize('Your Multipliers account is ready')
+                                : localize('Your Options account is ready')
+                        }
                     />
                 </ModalStepWrapper>,
                 {
@@ -70,27 +120,48 @@ const DerivAppsGetAccount: React.FC = () => {
             );
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [addTradingAccountToLocalStorage, newTradingAccountData, isAccountCreationSuccess]);
+    }, [addTradingAccountToLocalStorage, isAccountCreationSuccess, isVirtualAccountCreationSuccess]);
 
     return (
-        <div className='wallets-deriv-apps-section wallets-deriv-apps-section__get-account'>
-            <div className='wallets-deriv-apps-section__icon'>
-                <AccountsDerivAccountLightIcon iconSize='lg' />
-            </div>
-            <div className='wallets-deriv-apps-section__get-content'>
-                <div className='wallets-deriv-apps-section__details'>
-                    <WalletText size='sm' weight='bold'>
-                        Options
-                    </WalletText>
-                    <WalletText size={isDesktop ? '2xs' : 'xs'}>
-                        Trade options on multiple platforms with a single account.
-                    </WalletText>
-                </div>
-                <WalletButton color='primary-light' onClick={createTradingAccount}>
-                    Get
-                </WalletButton>
-            </div>
-        </div>
+        <TradingAccountCard className='wallets-deriv-apps-section wallets-deriv-apps-section__border'>
+            <TradingAccountCard.Icon>
+                <WalletMarketIcon icon='standard' size={isDesktop ? 'lg' : 'md'} />
+            </TradingAccountCard.Icon>
+            <TradingAccountCard.Section>
+                <TradingAccountCard.Content>
+                    <Text align='start' size='sm'>
+                        {isEuRegion ? (
+                            <Localize i18n_default_text='Multipliers' />
+                        ) : (
+                            <Localize i18n_default_text='Options' />
+                        )}
+                    </Text>
+                    <Text align='start' size='xs'>
+                        {isEuRegion ? (
+                            <Localize i18n_default_text='Expand your potential gains; risk only what you put in.' />
+                        ) : (
+                            <Localize i18n_default_text='One options account for all platforms.' />
+                        )}
+                    </Text>
+                </TradingAccountCard.Content>
+                <TradingAccountCard.Button>
+                    <Button
+                        borderWidth='sm'
+                        color='black'
+                        disabled={
+                            isAccountCreationLoading ||
+                            isVirtualAccountCreationLoading ||
+                            isActiveLinkedToTradingAccountLoading
+                        }
+                        onClick={createTradingAccount}
+                        rounded='md'
+                        variant='outlined'
+                    >
+                        <Localize i18n_default_text='Enable' />
+                    </Button>
+                </TradingAccountCard.Button>
+            </TradingAccountCard.Section>
+        </TradingAccountCard>
     );
 };
 

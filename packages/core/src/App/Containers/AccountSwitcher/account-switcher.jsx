@@ -1,7 +1,6 @@
 import React from 'react';
 import classNames from 'classnames';
 import PropTypes from 'prop-types';
-import Cookies from 'js-cookie';
 import { withRouter } from 'react-router';
 import {
     Button,
@@ -17,10 +16,9 @@ import {
     Loading,
 } from '@deriv/components';
 import { observer, useStore } from '@deriv/stores';
-import { routes, formatMoney, ContentFlag, getStaticUrl, getAppId, LocalStore } from '@deriv/shared';
-import { getLanguage, localize, Localize } from '@deriv/translations';
-import { useHasSetCurrency } from '@deriv/hooks';
-import { Analytics } from '@deriv-com/analytics';
+import { routes, formatMoney, ContentFlag } from '@deriv/shared';
+import { localize, Localize } from '@deriv/translations';
+import { useHasSetCurrency, useOauth2 } from '@deriv/hooks';
 import { getAccountTitle } from 'App/Containers/RealAccountSignup/helpers/constants';
 import { BinaryLink } from 'App/Components/Routes';
 import AccountList from './account-switcher-account-list.jsx';
@@ -35,8 +33,6 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
         accounts,
         account_type,
         account_list,
-        residence: client_residence,
-        country_standpoint,
         currency,
         is_eu,
         is_landing_company_loaded,
@@ -45,17 +41,17 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
         is_logged_in,
         is_virtual,
         has_fiat,
-        landing_company_shortcode,
         mt5_login_list,
+        logout: logoutClient,
         obj_total_balance,
         switchAccount,
         resetVirtualBalance,
         has_active_real_account,
-        logout: logoutClient,
         upgradeable_landing_companies,
         real_account_creation_unlock_date,
         has_any_real_account,
         virtual_account_loginid,
+        has_maltainvest_account,
     } = client;
     const { show_eu_related_content, content_flag, selectRegion, setTogglePlatformType } = traders_hub;
     const {
@@ -67,6 +63,7 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
         toggleSetCurrencyModal,
         should_show_real_accounts_list,
         setShouldShowCooldownModal,
+        setIsForcedToExitPnv,
     } = ui;
     const [active_tab_index, setActiveTabIndex] = React.useState(!is_virtual || should_show_real_accounts_list ? 0 : 1);
     const [is_deriv_demo_visible, setDerivDemoVisible] = React.useState(true);
@@ -97,14 +94,31 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
         }
     };
 
+    const logoutHandler = async () => {
+        // for DBot we need to logout first and only after this redirect to TH
+        if (window.location.pathname.startsWith(routes.bot)) {
+            await logoutClient();
+            history.push(routes.traders_hub);
+        } else {
+            if (window.location.pathname.startsWith(routes.phone_verification)) {
+                setIsForcedToExitPnv(true);
+                // Add a small delay to ensure state is updated before navigation because adding await doesn't work here
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            history.push(routes.traders_hub);
+            await logoutClient();
+        }
+    };
+
+    const { oAuthLogout } = useOauth2({ handleLogout: logoutHandler });
+
     const handleLogout = async () => {
         closeAccountsDialog();
         if (is_positions_drawer_on) {
             togglePositionsDrawer(); // TODO: hide drawer inside logout, once it is a mobx action
         }
-        await logoutClient();
-        window.location.href = getStaticUrl('/');
-        history.push(routes.index);
+
+        await oAuthLogout();
     };
 
     const closeAccountsDialog = () => {
@@ -124,14 +138,6 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
         closeAccountsDialog();
         if (account_loginid === loginid) return;
         await switchAccount(loginid);
-        Analytics.setAttributes({
-            account_type: LocalStore?.get('active_loginid')?.substring(0, 2) ?? 'unlogged',
-            app_id: getAppId(),
-            device_type: is_mobile ? 'mobile' : 'desktop',
-            device_language: navigator?.language || 'en-EN',
-            user_language: getLanguage().toLowerCase(),
-            country: Cookies.get('clients_country') || Cookies.getJSON('website_status'),
-        });
     };
 
     const resetBalance = async () => {
@@ -161,20 +167,9 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
         return !is_virtual;
     };
 
-    const is_regulated_able_to_change_currency =
-        show_eu_related_content &&
-        (landing_company_shortcode === 'malta' ||
-            (landing_company_shortcode === 'iom' && upgradeable_landing_companies.length !== 0));
-
     // SVG clients can't upgrade.
     const getRemainingRealAccounts = () => {
-        if (
-            show_eu_related_content ||
-            is_virtual ||
-            !canOpenMulti() ||
-            is_regulated_able_to_change_currency ||
-            is_low_risk
-        ) {
+        if (show_eu_related_content || is_virtual || !canOpenMulti() || is_low_risk) {
             return upgradeable_landing_companies;
         }
         return [];
@@ -245,13 +240,13 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                                     balance={accounts[account.loginid].balance}
                                     currency={accounts[account.loginid].currency}
                                     currency_icon={`IcCurrency-${account.icon}`}
-                                    country_standpoint={country_standpoint}
                                     display_type={'currency'}
                                     has_balance={'balance' in accounts[account.loginid]}
                                     has_reset_balance={canResetBalance(accounts[account_loginid])}
                                     is_disabled={account.is_disabled}
                                     is_virtual={account.is_virtual}
                                     loginid={account.loginid}
+                                    product={account.product}
                                     redirectAccount={account.is_disabled ? undefined : () => doSwitch(account.loginid)}
                                     onClickResetVirtualBalance={resetBalance}
                                     selected_loginid={account_loginid}
@@ -271,7 +266,7 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                         <AccountWrapper
                             className='acc-switcher__title'
                             header={
-                                is_low_risk
+                                is_low_risk && has_maltainvest_account
                                     ? localize(`Non-EU Deriv ${have_more_accounts('CR') ? 'accounts' : 'account'}`)
                                     : localize(`Deriv ${have_more_accounts('CR') ? 'accounts' : 'account'}`)
                             }
@@ -292,7 +287,6 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                                                 balance={accounts[account.loginid].balance}
                                                 currency={accounts[account.loginid].currency}
                                                 currency_icon={`IcCurrency-${account.icon}`}
-                                                country_standpoint={country_standpoint}
                                                 display_type={'currency'}
                                                 has_balance={'balance' in accounts[account.loginid]}
                                                 is_disabled={account.is_disabled}
@@ -315,11 +309,7 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                                         <div key={index} className='acc-switcher__new-account'>
                                             <Icon icon='IcDeriv' size={24} />
                                             <Text size='xs' color='general' className='acc-switcher__new-account-text'>
-                                                {getAccountTitle(
-                                                    account,
-                                                    { account_residence: client_residence },
-                                                    country_standpoint
-                                                )}
+                                                {getAccountTitle(account)}
                                             </Text>
                                             <Button
                                                 id='dt_core_account-switcher_add-new-account'
@@ -344,10 +334,10 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                         <div className='acc-switcher__separator' />
                     </React.Fragment>
                 ) : null}
-                {!is_high_risk || is_eu ? (
+                {(!is_high_risk && has_maltainvest_account) || is_eu ? (
                     <AccountWrapper
                         header={
-                            is_low_risk
+                            is_low_risk && has_maltainvest_account
                                 ? localize(`EU Deriv ${have_more_accounts('MF') ? 'accounts' : 'account'}`)
                                 : localize(`Deriv ${have_more_accounts('MF') ? 'accounts' : 'account'}`)
                         }
@@ -368,7 +358,6 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                                             balance={accounts[account.loginid].balance}
                                             currency={accounts[account.loginid].currency}
                                             currency_icon={`IcCurrency-${account.icon}`}
-                                            country_standpoint={country_standpoint}
                                             display_type={'currency'}
                                             has_balance={'balance' in accounts[account.loginid]}
                                             is_disabled={account.is_disabled}
@@ -391,11 +380,7 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                                     <div key={index} className='acc-switcher__new-account'>
                                         <Icon icon='IcDeriv' size={24} />
                                         <Text size='xs' color='general' className='acc-switcher__new-account-text'>
-                                            {getAccountTitle(
-                                                account,
-                                                { account_residence: client_residence },
-                                                country_standpoint
-                                            )}
+                                            {getAccountTitle(account)}
                                         </Text>
                                         <Button
                                             id='dt_core_account-switcher_add-new-account'
@@ -545,11 +530,7 @@ const AccountSwitcher = observer(({ history, is_mobile, is_visible }) => {
                             <Text color='prominent' size='xs' align='left' className='acc-switcher__logout-text'>
                                 {localize('Log out')}
                             </Text>
-                            <Icon
-                                icon='IcLogout'
-                                className='acc-switcher__logout-icon drawer__icon'
-                                onClick={handleLogout}
-                            />
+                            <Icon icon='IcLogout' className='acc-switcher__logout-icon drawer__icon' />
                         </div>
                     </div>
                 </React.Fragment>

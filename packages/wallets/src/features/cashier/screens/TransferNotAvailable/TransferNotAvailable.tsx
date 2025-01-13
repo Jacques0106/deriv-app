@@ -1,10 +1,9 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
 import { useActiveWalletAccount } from '@deriv/api-v2';
-import { WalletsActionScreen } from '../../../../components';
+import { ActionScreen } from '@deriv-com/ui';
 import type { THooks } from '../../../../types';
 import getMessage from './TransferNotAvailableProvider';
-import './TransferNotAvailable.scss';
 
 type TProps = {
     accounts: THooks.TransferAccount[];
@@ -26,15 +25,12 @@ const TransferNotAvailable: React.FC<React.PropsWithChildren<TProps>> = ({ accou
 
     if (state) {
         return (
-            <div className='wallets-transfer-not-available'>
-                <WalletsActionScreen
-                    description={state.description}
-                    descriptionSize='md'
-                    renderButtons={state.actionButton}
-                    title={state.title}
-                    titleSize='xl'
-                />
-            </div>
+            <ActionScreen
+                actionButtons={state.actionButton}
+                description={state.description}
+                title={state.title}
+                titleSize='xl'
+            />
         );
     }
 

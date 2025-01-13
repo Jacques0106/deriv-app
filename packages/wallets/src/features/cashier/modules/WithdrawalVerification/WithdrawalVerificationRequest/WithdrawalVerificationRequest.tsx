@@ -1,6 +1,7 @@
 import React from 'react';
-import { WalletButton, WalletsActionScreen, WalletText } from '../../../../../components';
-import EmailVerification from '../../../../../public/images/email-verification.svg';
+import { DerivLightEmailVerificationIcon } from '@deriv/quill-icons';
+import { Localize } from '@deriv-com/translations';
+import { ActionScreen, Button, Text } from '@deriv-com/ui';
 import './WithdrawalVerificationRequest.scss';
 
 type TProps = {
@@ -10,16 +11,20 @@ type TProps = {
 const WithdrawalVerificationRequest: React.FC<TProps> = ({ sendEmail }) => {
     return (
         <div className='wallets-withdrawal-verification-request'>
-            <WalletsActionScreen
+            <ActionScreen
+                actionButtons={
+                    <Button onClick={sendEmail} size='lg' textSize='md'>
+                        <Localize i18n_default_text='Send email' />
+                    </Button>
+                }
                 description={
                     <div className='wallets-withdrawal-verification-request__description'>
-                        <WalletText align='center'>
-                            Click the button below and we&apos;ll send you an email with a link. Click that link to
-                            verify your withdrawal request.
-                        </WalletText>
-                        <WalletText align='center'>
-                            This is to protect your account from unauthorised withdrawals.
-                        </WalletText>
+                        <Text align='center'>
+                            <Localize i18n_default_text="Press the button below, and we'll email you a verification link." />
+                        </Text>
+                        <Text align='center'>
+                            <Localize i18n_default_text="This is to confirm that it's you making the withdrawal request." />
+                        </Text>
                     </div>
                 }
                 icon={
@@ -27,15 +32,10 @@ const WithdrawalVerificationRequest: React.FC<TProps> = ({ sendEmail }) => {
                         className='wallets-withdrawal-verification-request__icon'
                         data-testid='dt_withdrawal_verification_request_icon'
                     >
-                        <EmailVerification />
+                        <DerivLightEmailVerificationIcon height={102} width={102} />
                     </div>
                 }
-                renderButtons={() => (
-                    <WalletButton onClick={sendEmail} size='lg'>
-                        Send email
-                    </WalletButton>
-                )}
-                title='Please help us verify your withdrawal request.'
+                title={<Localize i18n_default_text='Confirm your identity to make a withdrawal.' />}
             />
         </div>
     );

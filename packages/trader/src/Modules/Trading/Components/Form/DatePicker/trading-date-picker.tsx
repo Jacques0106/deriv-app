@@ -29,7 +29,6 @@ const TradingDatePicker = observer(({ id, is_24_hours_contract, mode, name }: TT
         duration_units_list,
         expiry_type,
         onChange,
-        sendTradeParamsAnalytics,
         start_date,
         start_time,
         symbol,
@@ -64,7 +63,7 @@ const TradingDatePicker = observer(({ id, is_24_hours_contract, mode, name }: TT
     const getMomentContractStartDateTime = () => {
         return setTime(
             toMoment(getMinDuration()),
-            isTimeValid(start_time ?? '') ? start_time : server_time?.format('HH:mm:ss') ?? ''
+            isTimeValid(start_time ?? '') ? start_time : (server_time?.format('HH:mm:ss') ?? '')
         );
     };
 
@@ -119,15 +118,6 @@ const TradingDatePicker = observer(({ id, is_24_hours_contract, mode, name }: TT
                     value,
                 },
             });
-            sendTradeParamsAnalytics(
-                {
-                    action: 'change_parameter_value',
-                    parameter_field_type: 'date_picker',
-                    parameter_type: 'date_picker',
-                    parameter_value: `${value}`,
-                },
-                true
-            );
         }
     };
 
@@ -136,13 +126,21 @@ const TradingDatePicker = observer(({ id, is_24_hours_contract, mode, name }: TT
         async (e = toMoment().format('YYYY-MM-DD')) => {
             const new_market_events: TMarketEvent[] = [];
             let new_disabled_days: number[] = [];
-            const events = await ContractType.getTradingEvents(e, symbol);
+
+            const [events, trading_days] = await Promise.all([
+                ContractType.getTradingEvents(e, symbol),
+                ContractType.getTradingDays(e, symbol),
+            ]);
+
+            if (trading_days) {
+                const all_days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+                new_disabled_days = all_days.reduce<number[]>((disabled, day, index) => {
+                    return trading_days.includes(day) ? disabled : [...disabled, index];
+                }, []);
+            }
+
             events?.forEach(evt => {
                 const dates = evt.dates.split(', '); // convert dates str into array
-                const idx = dates.indexOf('Fridays');
-                if (idx !== -1) {
-                    new_disabled_days = [6, 0]; // Sat, Sun
-                }
                 new_market_events.push({
                     dates,
                     descrip: evt.descrip,

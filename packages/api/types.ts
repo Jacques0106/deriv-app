@@ -49,6 +49,8 @@ import type {
     CountriesListResponse,
     CryptocurrencyConfigurationsRequest,
     CryptocurrencyConfigurationsResponse,
+    CryptocurrencyEstimationsRequest,
+    CryptocurrencyEstimationsResponse,
     DocumentUploadRequest,
     DocumentUploadResponse,
     EconomicCalendarRequest,
@@ -123,6 +125,8 @@ import type {
     P2PAdvertUpdateResponse,
     P2PChatCreateRequest,
     P2PChatCreateResponse,
+    P2PCountryListRequest,
+    P2PCountryListResponse,
     P2POrderCancelRequest,
     P2POrderCancelResponse,
     P2POrderConfirmRequest,
@@ -240,6 +244,10 @@ type KycAuthStatus = {
          * Current POA status.
          */
         status?: 'none' | 'pending' | 'rejected' | 'verified' | 'expired';
+        /**
+         * Supported documents per document_type.
+         */
+        supported_documents?: string[];
     };
     /**
      * POI authentication status details.
@@ -261,6 +269,10 @@ type KycAuthStatus = {
              * Reason(s) for the rejected POI attempt.
              */
             rejected_reasons?: string[];
+            /**
+             * Indicate if the verification report was returned by the provider (IDV only).
+             */
+            report_available?: 0 | 1;
         };
         /**
          * Service used for the current POI status.
@@ -269,7 +281,7 @@ type KycAuthStatus = {
         /**
          * Current POI status.
          */
-        status?: 'none' | 'pending' | 'rejected' | 'verified' | 'expired' | 'suspected';
+        status?: 'none' | 'pending' | 'rejected' | 'verified' | 'expired' | 'suspected' | 'required';
         /**
          * Supported documents per service.
          */
@@ -2142,6 +2154,50 @@ type TPrivateSocketEndpoints = {
             [k: string]: unknown;
         };
     };
+    reset_password: {
+        request: {
+            /**
+             * Must be `1`
+             */
+            reset_password: 1;
+            /**
+             * New password. For validation (Accepts any printable ASCII character. Must be within 8-25 characters, and include numbers, lowercase and uppercase letters. Must not be the same as the user's email address).
+             */
+            new_password: string;
+            /**
+             * Email verification code (received from a `verify_email` call, which must be done first)
+             */
+            verification_code: string;
+            /**
+             * [Optional] Used to pass data through the websocket, which may be retrieved via the `echo_req` output field.
+             */
+            passthrough?: {
+                [k: string]: unknown;
+            };
+            /**
+             * [Optional] Used to map request to response.
+             */
+            req_id?: number;
+        };
+        response: {
+            reset_password?: 0 | 1;
+            /**
+             * Echo of the request made.
+             */
+            echo_req: {
+                [k: string]: unknown;
+            };
+            /**
+             * Action name of the request made.
+             */
+            msg_type: 'reset_password';
+            /**
+             * Optional field sent in request to map to response, present only when request contains `req_id`.
+             */
+            req_id?: number;
+            [k: string]: unknown;
+        };
+    };
 };
 
 // TODO: remove these mock passkeys types after implementing them inside api-types
@@ -2232,7 +2288,259 @@ type PasskeyRegisterResponse = {
     req_id?: number;
     [k: string]: unknown;
 };
+type PasskeysRenameRequest = {
+    passkeys_rename: 1;
+    id: number;
+    name: string;
+    req_id?: number;
+};
+type PasskeysRenameResponse = {
+    passkeys_rename?: 1 | 0;
+    echo_req: {
+        [k: string]: unknown;
+    };
+    msg_type: 'passkeys_rename';
+    req_id?: number;
+    [k: string]: unknown;
+};
 
+// TODO: remove these mock phone number challenge types after implementing them inside api-types
+type PhoneNumberChallengeRequest = {
+    /**
+     * Must be `1`
+     */
+    phone_number_challenge: 1;
+    /**
+     * The carrier sending the email code.
+     */
+    email_code: string;
+    /**
+     * The carrier sending the OTP.
+     */
+    carrier?: 'whatsapp' | 'sms';
+    /**
+     * [Optional] The login id of the user. If left unspecified, it defaults to the initial authorized token's login id.
+     */
+    loginid?: string;
+    /**
+     * [Optional] Used to pass data through the websocket, which may be retrieved via the `echo_req` output field.
+     */
+    passthrough?: {
+        [k: string]: unknown;
+    };
+    /**
+     * [Optional] Used to map request to response.
+     */
+    req_id?: number;
+};
+
+type PhoneNumberChallengeResponse = {
+    phone_number_challenge?: number;
+    /**
+     * Echo of the request made.
+     */
+    echo_req: {
+        [k: string]: unknown;
+    };
+    /**
+     * Action name of the request made.
+     */
+    msg_type: 'phone_number_challenge';
+    /**
+     * Optional field sent in request to map to response, present only when request contains `req_id`.
+     */
+    req_id?: number;
+    [k: string]: unknown;
+};
+
+type PhoneNumberSettingsRequest = {
+    /**
+     * Must be `1`
+     */
+    phone_settings: 1;
+    /**
+     * [Optional] Used to map request to response.
+     */
+    req_id?: number;
+};
+
+type PhoneNumberSettingsResponse = {
+    /**
+     * Echo of the request made.
+     */
+    echo_req: {
+        [k: string]: unknown;
+    };
+    phone_settings?: {
+        /**
+         * List of carriers supported.
+         */
+        carriers: string[];
+        /**
+         * List of countries with their carriers.
+         */
+        countries: {
+            calling_country_code: string;
+            display_name: string;
+            carriers: string[];
+            country_code: string;
+        }[];
+    };
+    /**
+     * Action name of the request made.
+     */
+    msg_type: 'phone_settings';
+    /**
+     * Optional field sent in request to map to response, present only when request contains `req_id`.
+     */
+    req_id?: number;
+    [k: string]: unknown;
+};
+
+// TODO: remove these mock phone number challenge types after implementing them inside api-types
+type PhoneNumberVerifyRequest = {
+    /**
+     * Must be `1`
+     */
+    phone_number_verify: 1;
+    /**
+     * The carrier sending the OTP.
+     */
+    otp: string;
+    /**
+     * [Optional] Used to map request to response.
+     */
+    req_id?: number;
+};
+
+type PhoneNumberVerifyResponse = {
+    /**
+     * Echo of the request made.
+     */
+    echo_req: {
+        [k: string]: unknown;
+    };
+    /**
+     * Action name of the request made.
+     */
+    msg_type: 'phone_number_verify';
+    /**
+     * Optional field sent in request to map to response, present only when request contains `req_id`.
+     */
+    req_id?: number;
+    [k: string]: unknown;
+};
+
+type ChangeEmailRequest = {
+    change_email: 'verify' | 'update';
+    new_email: string;
+    new_password?: string;
+    verification_code: string;
+    loginid?: string;
+    passthrough?: {
+        [k: string]: unknown;
+    };
+    req_id?: number;
+};
+type ChangeEmailResponse = {
+    change_email: 0 | 1;
+    echo_req: {
+        [k: string]: unknown;
+    };
+    msg_type: 'change_email';
+    req_id?: number;
+};
+
+/**
+ * Get the validations for Tax Identification Numbers (TIN)
+ */
+export interface TINValidationRequest {
+    /**
+     * Must be `1`
+     */
+    tin_validations: 1;
+    /**
+     * The tax residence selected by the client.
+     */
+    tax_residence: string;
+    /**
+     * [Optional] Used to pass data through the websocket, which may be retrieved via the `echo_req` output field.
+     */
+    passthrough?: {
+        [k: string]: unknown;
+    };
+    /**
+     * [Optional] Used to map request to response.
+     */
+    req_id?: number;
+}
+
+/**
+ * A message with validations for Tax Identification Numbers (TIN)
+ */
+export type TINValidationResponse = {
+    tin_validations?: TinValidations;
+    /**
+     * Echo of the request made.
+     */
+    echo_req: {
+        [k: string]: unknown;
+    };
+    /**
+     * Action name of the request made.
+     */
+    msg_type: 'tin_validations';
+    /**
+     * Optional field sent in request to map to response, present only when request contains `req_id`.
+     */
+    req_id?: number;
+    [k: string]: unknown;
+};
+/**
+ * Validations for Tax Identification Numbers (TIN)
+ */
+export type TinValidations = {
+    /**
+     * List of employment statuses that bypass TIN requirements for the selected country
+     */
+    tin_employment_status_bypass?: string[];
+    /**
+     * Whether the TIN is mandatory for the selected country
+     */
+    is_tin_mandatory?: boolean;
+    /**
+     * Country tax identifier formats.
+     */
+    tin_format?: string[];
+    /**
+     * Invalid regex patterns for tin validation
+     */
+    invalid_patterns?: string[];
+};
+/**
+ * Get list of platform and their server status
+ */
+type TradingPlatformStatusRequest = {
+    /**
+     * Must be 1
+     */
+    trading_platform_status: 1;
+};
+/**
+ * response containing platform and their server status.
+ */
+type TradingPlatformStatusResponse = {
+    trading_platform_status: {
+        /**
+         * types of cfd platforms
+         */
+        platform: 'mt5' | 'ctrader' | 'dxtrade';
+        /**
+         * possible server statuses
+         */
+        status: 'active' | 'maintenance' | 'unavailable';
+    }[];
+};
 type TSocketEndpoints = {
     active_symbols: {
         request: ActiveSymbolsRequest;
@@ -2298,6 +2606,10 @@ type TSocketEndpoints = {
         request: CashierInformationRequest;
         response: CashierInformationResponse;
     };
+    change_email: {
+        request: ChangeEmailRequest;
+        response: ChangeEmailResponse;
+    };
     contract_update_history: {
         request: UpdateContractHistoryRequest;
         response: UpdateContractHistoryResponse;
@@ -2329,6 +2641,10 @@ type TSocketEndpoints = {
     crypto_config: {
         request: CryptocurrencyConfigurationsRequest;
         response: CryptocurrencyConfigurationsResponse;
+    };
+    crypto_estimations: {
+        request: CryptocurrencyEstimationsRequest;
+        response: CryptocurrencyEstimationsResponse;
     };
     document_upload: {
         request: DocumentUploadRequest;
@@ -2490,6 +2806,10 @@ type TSocketEndpoints = {
         request: P2PChatCreateRequest;
         response: P2PChatCreateResponse;
     };
+    p2p_country_list: {
+        request: P2PCountryListRequest;
+        response: P2PCountryListResponse;
+    };
     p2p_order_cancel: {
         request: P2POrderCancelRequest;
         response: P2POrderCancelResponse;
@@ -2530,6 +2850,10 @@ type TSocketEndpoints = {
         request: PasskeysListRequest;
         response: PasskeysListResponse;
     };
+    passkeys_rename: {
+        request: PasskeysRenameRequest;
+        response: PasskeysRenameResponse;
+    };
     passkeys_register_options: {
         request: PasskeysRegisterOptionsRequest;
         response: PasskeysRegisterOptionsResponse;
@@ -2569,6 +2893,18 @@ type TSocketEndpoints = {
     payout_currencies: {
         request: PayoutCurrenciesRequest;
         response: PayoutCurrenciesResponse;
+    };
+    phone_number_challenge: {
+        request: PhoneNumberChallengeRequest;
+        response: PhoneNumberChallengeResponse;
+    };
+    phone_settings: {
+        request: PhoneNumberSettingsRequest;
+        response: PhoneNumberSettingsResponse;
+    };
+    phone_number_verify: {
+        request: PhoneNumberVerifyRequest;
+        response: PhoneNumberVerifyResponse;
     };
     ping: {
         request: PingRequest;
@@ -2650,6 +2986,10 @@ type TSocketEndpoints = {
         request: ServerTimeRequest;
         response: ServerTimeResponse;
     };
+    tin_validations: {
+        request: TINValidationRequest;
+        response: TINValidationResponse;
+    };
     tnc_approval: {
         request: TermsAndConditionsApprovalRequest;
         response: TermsAndConditionsApprovalResponse;
@@ -2669,6 +3009,10 @@ type TSocketEndpoints = {
     trading_platform_password_reset: {
         request: TradingPlatformPasswordResetRequest;
         response: TradingPlatformPasswordResetResponse;
+    };
+    trading_platform_status: {
+        request: TradingPlatformStatusRequest;
+        response: TradingPlatformStatusResponse;
     };
     trading_servers: {
         request: ServerListRequest;
@@ -2741,7 +3085,7 @@ export type TSocketResponseData<T extends TSocketEndpointNames> = Omit<
     'req_id' | 'msg_type' | 'echo_req' | 'subscription'
 >;
 
-type TSocketRequest<T extends TSocketEndpointNames> = TSocketEndpoints[T]['request'];
+export type TSocketRequest<T extends TSocketEndpointNames> = TSocketEndpoints[T]['request'];
 
 type TRemovableEndpointName<T extends TSocketEndpointNames> = T extends KeysMatching<TSocketRequest<T>, 1> ? T : never;
 
@@ -2761,18 +3105,19 @@ export type TSocketPaginatateableRequestCleaned<T extends TSocketPaginateableEnd
 };
 
 export type TSocketRequestPayload<
-    T extends TSocketEndpointNames | TSocketPaginateableEndpointNames = TSocketEndpointNames
-> = Partial<TSocketRequestCleaned<T>> extends TSocketRequestCleaned<T>
-    ? {
-          payload?: T extends TSocketPaginateableEndpointNames
-              ? TSocketPaginatateableRequestCleaned<T>
-              : TSocketRequestCleaned<T>;
-      }
-    : {
-          payload: T extends TSocketPaginateableEndpointNames
-              ? TSocketPaginatateableRequestCleaned<T>
-              : TSocketRequestCleaned<T>;
-      };
+    T extends TSocketEndpointNames | TSocketPaginateableEndpointNames = TSocketEndpointNames,
+> =
+    Partial<TSocketRequestCleaned<T>> extends TSocketRequestCleaned<T>
+        ? {
+              payload?: T extends TSocketPaginateableEndpointNames
+                  ? TSocketPaginatateableRequestCleaned<T>
+                  : TSocketRequestCleaned<T>;
+          }
+        : {
+              payload: T extends TSocketPaginateableEndpointNames
+                  ? TSocketPaginatateableRequestCleaned<T>
+                  : TSocketRequestCleaned<T>;
+          };
 
 export type TSocketRequestQueryOptions<T extends TSocketEndpointNames> = Parameters<
     typeof useQuery<TSocketResponseData<T>, TSocketError<T>>
@@ -2789,7 +3134,7 @@ export type TSocketRequestMutationOptions<T extends TSocketEndpointNames> = Para
 type TSocketRequestWithOptions<
     T extends TSocketEndpointNames,
     O extends boolean = false,
-    OT extends 'useQuery' | 'useInfiniteQuery' = 'useQuery'
+    OT extends 'useQuery' | 'useInfiniteQuery' = 'useQuery',
 > = Omit<
     TSocketRequestPayload<T> & {
         options?: OT extends 'useQuery' ? TSocketRequestQueryOptions<T> : TSocketRequestInfiniteQueryOptions<T>;
@@ -2804,18 +3149,19 @@ type TNever<T> = T extends Record<string, never> ? never : T;
 type TSocketRequestProps<
     T extends TSocketEndpointNames,
     O extends boolean = false,
-    OT extends 'useQuery' | 'useInfiniteQuery' = 'useQuery'
+    OT extends 'useQuery' | 'useInfiniteQuery' = 'useQuery',
 > = TNever<TSocketRequestWithOptions<T, O, OT>>;
 
 export type TSocketAcceptableProps<
     T extends TSocketEndpointNames,
     O extends boolean = false,
-    OT extends 'useQuery' | 'useInfiniteQuery' = 'useQuery'
-> = TSocketRequestProps<T, O, OT> extends never
-    ? [undefined?]
-    : Partial<TSocketRequestProps<T, O, OT>> extends TSocketRequestProps<T, O, OT>
-    ? [TSocketRequestProps<T, O, OT>?]
-    : [TSocketRequestProps<T, O, OT>];
+    OT extends 'useQuery' | 'useInfiniteQuery' = 'useQuery',
+> =
+    TSocketRequestProps<T, O, OT> extends never
+        ? [undefined?]
+        : Partial<TSocketRequestProps<T, O, OT>> extends TSocketRequestProps<T, O, OT>
+          ? [TSocketRequestProps<T, O, OT>?]
+          : [TSocketRequestProps<T, O, OT>];
 
 export type TSocketPaginateableEndpointNames = KeysMatching<
     TSocketEndpoints,

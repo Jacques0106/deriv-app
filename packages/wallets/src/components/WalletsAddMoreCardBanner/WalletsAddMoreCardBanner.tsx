@@ -1,15 +1,16 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
-import { useCreateWallet } from '@deriv/api-v2';
+import { useCreateWallet, useIsEuRegion, useLandingCompany, useWalletAccountsList } from '@deriv/api-v2';
 import { LabelPairedCheckMdFillIcon, LabelPairedPlusMdFillIcon } from '@deriv/quill-icons';
-import useDevice from '../../hooks/useDevice';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Button, useDevice } from '@deriv-com/ui';
+import { redirectToOutSystems } from '../../helpers/urls';
 import useSyncLocalStorageClientAccounts from '../../hooks/useSyncLocalStorageClientAccounts';
 import useWalletAccountSwitcher from '../../hooks/useWalletAccountSwitcher';
 import { TWalletCarouselItem } from '../../types';
-import { WalletButton } from '../Base';
 import { useModal } from '../ModalProvider';
 import { WalletAddedSuccess } from '../WalletAddedSuccess';
-import WalletAddMoreCurrencyIcon from '../WalletAddMoreCurrencyIcon';
+import { WalletCurrencyIcon } from '../WalletCurrencyIcon';
 import { WalletError } from '../WalletError';
 
 const WalletsAddMoreCardBanner: React.FC<TWalletCarouselItem> = ({
@@ -19,45 +20,35 @@ const WalletsAddMoreCardBanner: React.FC<TWalletCarouselItem> = ({
 }) => {
     const switchWalletAccount = useWalletAccountSwitcher();
 
-    const { data, error, isSuccess: isMutateSuccess, mutate, status } = useCreateWallet();
-    const { isMobile } = useDevice();
+    const { data, error, isLoading: isWalletCreationLoading, mutateAsync, status } = useCreateWallet();
+    const { isDesktop } = useDevice();
     const history = useHistory();
     const modal = useModal();
     const { addWalletAccountToLocalStorage } = useSyncLocalStorageClientAccounts();
-
-    const renderButtons = useCallback(
-        () => (
-            <div className='wallets-add-more__success-footer'>
-                <WalletButton color='black' onClick={() => modal.hide()} variant='outlined'>
-                    Maybe later
-                </WalletButton>
-                <WalletButton onClick={() => history.push('/wallets/cashier/deposit')}>Deposit now</WalletButton>
-            </div>
-        ),
-        [history] // eslint-disable-line react-hooks/exhaustive-deps
-    );
-
-    useEffect(() => {
-        if (data && isMutateSuccess) {
-            addWalletAccountToLocalStorage(data);
-            switchWalletAccount(data?.client_id);
-        }
-    }, [addWalletAccountToLocalStorage, data, isMutateSuccess, switchWalletAccount]);
+    const { localize } = useTranslations();
+    const { data: isEuRegion } = useIsEuRegion();
+    const { data: landingCompany } = useLandingCompany();
+    const { data: wallets } = useWalletAccountsList();
+    const hasAnyActiveRealWallets = wallets?.some(wallet => !wallet.is_virtual && !wallet.is_disabled);
+    const shortcode = landingCompany?.financial_company?.shortcode ?? landingCompany?.gaming_company?.shortcode;
 
     useEffect(
         () => {
             if (status === 'error') {
                 modal.show(
-                    <WalletError buttonText='Close' errorMessage={error.error.message} onClick={() => modal.hide()} />
+                    <WalletError
+                        buttonText={localize('Close')}
+                        errorMessage={error.error.message}
+                        onClick={() => modal.hide()}
+                    />
                 );
             } else if (status === 'success') {
                 modal.show(
                     <WalletAddedSuccess
                         currency={data?.currency}
                         displayBalance={data?.display_balance ?? `0.00 ${data?.currency}`}
-                        landingCompany={data?.landing_company_shortcode}
                         onPrimaryButtonClick={() => {
-                            history.push('/wallets/cashier/deposit');
+                            history.push('/wallet/deposit');
                             modal.hide();
                         }}
                         onSecondaryButtonClick={() => modal.hide()}
@@ -71,8 +62,7 @@ const WalletsAddMoreCardBanner: React.FC<TWalletCarouselItem> = ({
             data?.display_balance,
             data?.landing_company_shortcode,
             error?.error.message,
-            isMobile,
-            renderButtons,
+            isDesktop,
             status,
         ]
     );
@@ -80,11 +70,11 @@ const WalletsAddMoreCardBanner: React.FC<TWalletCarouselItem> = ({
     return (
         <div className='wallets-add-more__banner'>
             <div className='wallets-add-more__banner-header'>
-                <WalletAddMoreCurrencyIcon currency={currency ? currency.toLowerCase() : ''} />
+                <WalletCurrencyIcon currency={currency ?? 'USD'} size={isDesktop ? 'sm' : 'xs'} />
             </div>
-            <WalletButton
+            <Button
                 color='white'
-                disabled={isAdded}
+                disabled={isAdded || isWalletCreationLoading}
                 icon={
                     // TODO: Replace hex colors with values from Deriv UI
                     isAdded ? (
@@ -93,14 +83,32 @@ const WalletsAddMoreCardBanner: React.FC<TWalletCarouselItem> = ({
                         <LabelPairedPlusMdFillIcon fill='#333333' />
                     )
                 }
-                onClick={e => {
+                onClick={async e => {
                     e.stopPropagation();
-                    currency && mutate({ account_type: isCrypto ? 'crypto' : 'doughflow', currency });
+
+                    if (!currency) return;
+
+                    if (isEuRegion || !hasAnyActiveRealWallets) {
+                        return redirectToOutSystems(shortcode, currency);
+                    }
+
+                    const createAccountResponse = await mutateAsync({
+                        account_type: isCrypto ? 'crypto' : 'doughflow',
+                        currency,
+                    });
+
+                    const newAccountWallet = createAccountResponse?.new_account_wallet;
+
+                    if (!newAccountWallet) return;
+
+                    await addWalletAccountToLocalStorage({ ...newAccountWallet, display_balance: `0.00 ${currency}` });
+                    switchWalletAccount(newAccountWallet.client_id);
                 }}
-                size={isMobile ? 'sm' : 'lg'}
+                size={isDesktop ? 'lg' : 'sm'}
+                textSize='sm'
             >
-                {isAdded ? 'Added' : 'Add'}
-            </WalletButton>
+                {isAdded ? <Localize i18n_default_text='Added' /> : <Localize i18n_default_text='Add' />}
+            </Button>
         </div>
     );
 };

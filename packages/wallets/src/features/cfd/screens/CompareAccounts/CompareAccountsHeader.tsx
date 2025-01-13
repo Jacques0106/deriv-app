@@ -1,32 +1,37 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
-import { WalletText } from '../../../../components';
-import CloseIcon from '../../../../public/images/ic-close-dark.svg';
+import { LegacyClose2pxIcon } from '@deriv/quill-icons';
+import { Localize } from '@deriv-com/translations';
+import { Text } from '@deriv-com/ui';
 import './CompareAccountsHeader.scss';
 
 type TCompareAccountsHeader = {
     isDemo: boolean;
-    isEuRegion: boolean;
+    isLoading: boolean;
 };
 
-const CompareAccountsHeader = ({ isDemo, isEuRegion }: TCompareAccountsHeader) => {
+const CompareAccountsHeader = ({ isDemo, isLoading }: TCompareAccountsHeader) => {
     const history = useHistory();
 
-    const headerTitle = isEuRegion
-        ? `Deriv MT5 CFDs ${isDemo ? 'Demo' : 'real'} account`
-        : `Compare CFDs ${isDemo ? 'demo ' : ''}accounts`;
+    const headerText = isDemo ? (
+        <Localize i18n_default_text='Compare CFDs demo accounts' />
+    ) : (
+        <Localize i18n_default_text='Compare CFDs accounts' />
+    );
 
     return (
         <div className='wallets-compare-accounts-header'>
             <div className='wallets-compare-accounts-header__title'>
-                <WalletText size='xl' weight='bold'>
-                    {headerTitle}
-                </WalletText>
+                <Text size='xl' weight='bold'>
+                    {isLoading ? '' : headerText}
+                </Text>
             </div>
-            <CloseIcon
+            <LegacyClose2pxIcon
                 className='wallets-compare-accounts-header__close-icon'
+                data-testid='dt_wallets_compare_accounts_header_close_icon'
+                iconSize='xs'
                 onClick={() => {
-                    history.push('/wallets');
+                    history.push('/');
                 }}
             />
         </div>

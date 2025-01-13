@@ -1,3 +1,4 @@
+import { LocalStorageUtils, URLUtils } from '@deriv-com/utils';
 import { deriv_urls } from './constants';
 
 /**
@@ -22,8 +23,9 @@ export const getActionFromUrl = () => {
 
 export const getUrlSmartTrader = () => {
     const { is_staging_deriv_app } = getPlatformFromUrl();
-    const url_lang = getlangFromUrl();
-    const i18n_language = window.localStorage.getItem('i18n_language') || url_lang || 'en';
+    const localize_language = LocalStorageUtils.getValue<string>('i18n_language');
+    const url_lang = URLUtils.getQueryParameter('lang');
+    const i18n_language = localize_language || url_lang || 'en';
 
     let base_link = '';
 
@@ -36,13 +38,13 @@ export const getUrlSmartTrader = () => {
     return `${base_link}/${i18n_language.toLowerCase()}/trading.html`;
 };
 
-export const getUrlBinaryBot = (is_language_required = true) => {
+export const getUrlP2P = (is_language_required = true) => {
     const { is_staging_deriv_app } = getPlatformFromUrl();
 
-    const url_lang = getlangFromUrl();
-    const i18n_language = window.localStorage.getItem('i18n_language') || url_lang || 'en';
-
-    const base_link = is_staging_deriv_app ? deriv_urls.BINARYBOT_STAGING : deriv_urls.BINARYBOT_PRODUCTION;
+    const localize_language = LocalStorageUtils.getValue<string>('i18n_language');
+    const url_lang = URLUtils.getQueryParameter('lang');
+    const i18n_language = localize_language || url_lang || 'en';
+    const base_link = is_staging_deriv_app ? deriv_urls.P2P_STAGING : deriv_urls.P2P_PRODUCTION;
 
     return is_language_required ? `${base_link}/?l=${i18n_language.toLowerCase()}` : base_link;
 };
@@ -72,4 +74,17 @@ export const isTestDerivApp = (domain = window.location.hostname) => {
     const { is_test_deriv_app } = getPlatformFromUrl(domain);
 
     return is_test_deriv_app;
+};
+
+export const removeActionParam = (action_to_remove: string) => {
+    const { pathname, search } = window.location;
+    const search_params = new URLSearchParams(search);
+
+    if (search_params.get('action') === action_to_remove) {
+        search_params.delete('action');
+    }
+    const new_search = search_params.toString();
+    const new_path = `${pathname}${new_search ? `?${new_search}` : ''}`;
+
+    window.history.pushState({}, '', new_path);
 };

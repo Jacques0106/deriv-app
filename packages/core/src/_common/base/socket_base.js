@@ -297,7 +297,7 @@ const BinarySocketBase = (() => {
             verification_code,
         });
 
-    const cryptoWithdraw = ({ address, amount, verification_code, dry_run = 0 }) =>
+    const cryptoWithdraw = ({ address, amount, verification_code, estimated_fee_unique_id, dry_run = 0 }) =>
         deriv_api.send({
             cashier: 'withdraw',
             provider: 'crypto',
@@ -305,6 +305,7 @@ const BinarySocketBase = (() => {
             address,
             amount,
             verification_code,
+            estimated_fee_unique_id,
             dry_run,
         });
 
@@ -324,6 +325,12 @@ const BinarySocketBase = (() => {
         });
 
     const activeSymbols = (mode = 'brief') => deriv_api.activeSymbols(mode);
+
+    const contractsForCompany = ({ landing_company }) =>
+        deriv_api.send({
+            landing_company,
+            contracts_for_company: 1,
+        });
 
     const transferBetweenAccounts = (account_from, account_to, currency, amount) =>
         deriv_api.send({
@@ -393,6 +400,8 @@ const BinarySocketBase = (() => {
             name: 'test real labuan financial stp',
         });
 
+    const getPhoneSettings = () => deriv_api.send({ phone_settings: 1 });
+
     const getServiceToken = (platform, server) => {
         const temp_service = platform;
 
@@ -404,6 +413,21 @@ const BinarySocketBase = (() => {
     };
 
     const changeEmail = api_request => deriv_api.send(api_request);
+
+    const getWalletMigrationState = () =>
+        deriv_api.send({
+            wallet_migration: 'state',
+        });
+
+    const startWalletMigration = () =>
+        deriv_api.send({
+            wallet_migration: 'start',
+        });
+
+    const resetWalletMigration = () =>
+        deriv_api.send({
+            wallet_migration: 'reset',
+        });
 
     return {
         init,
@@ -455,6 +479,7 @@ const BinarySocketBase = (() => {
         newAccountVirtual,
         newAccountReal,
         newAccountRealMaltaInvest,
+        getPhoneSettings,
         p2pSubscribe,
         profitTable,
         statement,
@@ -466,6 +491,7 @@ const BinarySocketBase = (() => {
         tradingPlatformInvestorPasswordChange,
         tradingPlatformInvestorPasswordReset,
         activeSymbols,
+        contractsForCompany,
         paymentAgentList,
         allPaymentAgentList,
         paymentAgentDetails,
@@ -493,6 +519,9 @@ const BinarySocketBase = (() => {
         triggerMt5DryRun,
         getServiceToken,
         changeEmail,
+        getWalletMigrationState,
+        startWalletMigration,
+        resetWalletMigration,
     };
 })();
 
@@ -527,7 +556,7 @@ const proxyForAuthorize = obj =>
             if (target[field] && typeof target[field] !== 'function') {
                 return proxyForAuthorize(target[field]);
             }
-            return (...args) => BinarySocketBase?.wait('authorize').then(() => target[field](...args));
+            return (...args) => BinarySocketBase?.wait('authorize')?.then(() => target[field](...args));
         },
     });
 

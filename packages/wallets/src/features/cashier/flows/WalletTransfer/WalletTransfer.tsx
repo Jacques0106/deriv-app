@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { useTransferBetweenAccounts } from '@deriv/api-v2';
-import { Loader } from '../../../../components';
-import { CashierLocked, TransferModule } from '../../modules';
+import { WalletLoader } from '../../../../components';
+import { TransferModule } from '../../modules';
 import { TransferNotAvailable } from '../../screens/TransferNotAvailable';
 
 const WalletTransfer = () => {
@@ -13,14 +13,12 @@ const WalletTransfer = () => {
         requestTransferAccounts();
     }, [requestTransferAccounts]);
 
-    if (isTransferAccountsLoading || !data?.accounts) return <Loader />;
+    if (isTransferAccountsLoading || !data?.accounts) return <WalletLoader />;
 
     return (
-        <CashierLocked>
-            <TransferNotAvailable accounts={data.accounts}>
-                <TransferModule accounts={data.accounts} />
-            </TransferNotAvailable>
-        </CashierLocked>
+        <TransferNotAvailable accounts={data.accounts}>
+            <TransferModule accounts={data.accounts} />
+        </TransferNotAvailable>
     );
 };
 

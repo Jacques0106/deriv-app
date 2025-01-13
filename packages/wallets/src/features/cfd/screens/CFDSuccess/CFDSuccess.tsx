@@ -1,53 +1,56 @@
 import React, { ComponentProps } from 'react';
 import classNames from 'classnames';
-import { useActiveWalletAccount } from '@deriv/api-v2';
-import { WalletSuccess, WalletText } from '../../../../components';
+import { useActiveWalletAccount, useIsEuRegion } from '@deriv/api-v2';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
+import { WalletMarketCurrencyIcon, WalletSuccess } from '../../../../components';
 import { WalletGradientBackground } from '../../../../components/WalletGradientBackground';
-import { WalletMarketCurrencyIcon } from '../../../../components/WalletMarketCurrencyIcon';
-import useDevice from '../../../../hooks/useDevice';
 import { TDisplayBalance, THooks, TMarketTypes, TPlatforms } from '../../../../types';
-import { CFD_PLATFORMS, MarketTypeDetails, PlatformDetails } from '../../constants';
+import { CFD_PLATFORMS, getMarketTypeDetails, MARKET_TYPE, PlatformDetails } from '../../constants';
 import './CFDSuccess.scss';
 
 type TSuccessProps = {
-    description: string;
+    actionButtons?: ComponentProps<typeof WalletSuccess>['actionButtons'];
+    description: React.ReactNode;
     displayBalance:
         | TDisplayBalance.CtraderAccountsList
         | TDisplayBalance.DxtradeAccountsList
         | TDisplayBalance.MT5AccountsList;
-    landingCompany?: THooks.AvailableMT5Accounts['shortcode'];
+    landingCompanyName?: string;
     marketType?: TMarketTypes.SortedMT5Accounts;
     platform?: TPlatforms.All;
-    renderButton?: ComponentProps<typeof WalletSuccess>['renderButtons'];
-    title: string;
+    product?: THooks.AvailableMT5Accounts['product'];
+    title: React.ReactNode;
 };
 
 const CFDSuccess: React.FC<TSuccessProps> = ({
+    actionButtons,
     description,
     displayBalance,
-    landingCompany = 'svg',
+    landingCompanyName,
     marketType,
     platform,
-    renderButton,
+    product,
     title,
 }) => {
     const { data } = useActiveWalletAccount();
     const { isDesktop } = useDevice();
+    const { localize } = useTranslations();
+    const { data: isEuRegion } = useIsEuRegion();
     const isDemo = data?.is_virtual;
-    const landingCompanyName = landingCompany.toUpperCase();
 
     const isDxtradeOrCtrader =
-        marketType === 'all' &&
+        marketType === MARKET_TYPE.ALL &&
         (platform === PlatformDetails.dxtrade.platform || platform === PlatformDetails.ctrader.platform);
 
-    let marketTypeTitle = 'Options';
+    let marketTypeTitle = isEuRegion ? localize('Multipliers') : localize('Options');
 
     if (marketType && platform) {
         const isPlatformValid = Object.keys(PlatformDetails).includes(platform);
         if (isDxtradeOrCtrader && isPlatformValid) {
             marketTypeTitle = PlatformDetails[platform].title;
         } else {
-            marketTypeTitle = MarketTypeDetails[marketType].title;
+            marketTypeTitle = getMarketTypeDetails(localize, product, isEuRegion)[marketType].title;
         }
     }
 
@@ -55,8 +58,8 @@ const CFDSuccess: React.FC<TSuccessProps> = ({
 
     return (
         <WalletSuccess
+            actionButtons={isDesktop ? actionButtons : undefined}
             description={description}
-            renderButtons={isDesktop ? renderButton : undefined}
             renderIcon={() => (
                 <WalletGradientBackground
                     bodyClassName='wallets-cfd-success__gradient'
@@ -72,27 +75,39 @@ const CFDSuccess: React.FC<TSuccessProps> = ({
                                     `wallets-cfd-success__badge--${isDemo ? 'demo' : 'real'}`
                                 )}
                             >
-                                <WalletText color='white' size='2xs' weight='bold'>
-                                    {isDemo ? 'Demo' : 'Real'}
-                                </WalletText>
+                                <Text color='white' size='2xs' weight='bold'>
+                                    {isDemo ? localize('Demo') : localize('Real')}
+                                </Text>
                             </div>
-                            <WalletMarketCurrencyIcon
-                                currency={data?.currency ?? 'USD'}
-                                isDemo={isDemo ?? false}
-                                marketType={marketType}
-                                platform={platform}
-                            />
+                            <div className='wallets-cfd-success__market-icon'>
+                                <WalletMarketCurrencyIcon
+                                    currency={data?.currency ?? 'USD'}
+                                    isDemo={isDemo ?? false}
+                                    marketType={marketType}
+                                    platform={platform}
+                                    product={product}
+                                />
+                            </div>
                             <div className='wallets-cfd-success__info'>
-                                <WalletText size='2xs'>
-                                    {platformTitlePrefix} {marketTypeTitle}{' '}
-                                    {!isDemo && !isDxtradeOrCtrader && `(${landingCompanyName})`}
-                                </WalletText>
-                                <WalletText color='primary' size='2xs'>
-                                    {data?.currency} Wallet
-                                </WalletText>
-                                <WalletText size='sm' weight='bold'>
-                                    {displayBalance}
-                                </WalletText>
+                                <Text size='2xs'>
+                                    {platformTitlePrefix} {marketTypeTitle} {!isDemo && landingCompanyName}
+                                </Text>
+                                <Text color='primary' size='2xs'>
+                                    <Localize
+                                        i18n_default_text='{{currency}} Wallet'
+                                        values={{ currency: data?.currency }}
+                                    />
+                                </Text>
+                                {!displayBalance ? (
+                                    <div
+                                        className='wallets-skeleton wallets-cfd-success__balance-loader'
+                                        data-testid='dt_wallets_cfd_success_skeleton_loader'
+                                    />
+                                ) : (
+                                    <Text size='sm' weight='bold'>
+                                        {displayBalance}
+                                    </Text>
+                                )}
                             </div>
                         </div>
                     </div>

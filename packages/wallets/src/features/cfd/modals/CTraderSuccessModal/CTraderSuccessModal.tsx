@@ -1,57 +1,89 @@
 import React from 'react';
 import { useCtraderAccountsList } from '@deriv/api-v2';
-import { ModalStepWrapper, ModalWrapper } from '../../../../components';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { useDevice } from '@deriv-com/ui';
+import { ModalStepWrapper, ModalWrapper, WalletLoader } from '../../../../components';
 import { useModal } from '../../../../components/ModalProvider';
-import useDevice from '../../../../hooks/useDevice';
 import { THooks } from '../../../../types';
 import { PlatformDetails } from '../../constants';
 import { CFDSuccess } from '../../screens';
 import { CTraderSuccessModalButtons } from './components';
 
 type TCTraderSuccessModal = {
-    displayBalance?: string;
-    isDemo: boolean;
+    createdAccount?: THooks.CreateOtherCFDAccount;
+    isDemo?: boolean;
     walletCurrencyType: THooks.WalletAccountsList['wallet_currency_type'];
 };
 
-const CTraderSuccessModal = ({ displayBalance, isDemo, walletCurrencyType }: TCTraderSuccessModal) => {
-    const { data: cTraderAccounts } = useCtraderAccountsList();
-    const { isMobile } = useDevice();
+const CTraderSuccessModal = ({ createdAccount, isDemo, walletCurrencyType }: TCTraderSuccessModal) => {
+    const { data: cTraderAccounts, isLoading: isCtraderAccountsListLoading } = useCtraderAccountsList();
+    const { isDesktop } = useDevice();
     const { hide } = useModal();
+    const { localize } = useTranslations();
+
+    const cTraderAccount = cTraderAccounts?.find(account => account.login);
+    const isLoading = !cTraderAccounts || isCtraderAccountsListLoading || !cTraderAccount;
+
+    if (isLoading) return <WalletLoader />;
 
     const description = isDemo
-        ? `Let's practise trading with ${displayBalance} virtual funds.`
-        : `Transfer funds from your ${walletCurrencyType} Wallet to your ${PlatformDetails.ctrader.title} account to start trading.`;
+        ? localize('Practise trading with {{ctraderBalance}} virtual funds.', {
+              ctraderBalance: cTraderAccount.display_balance,
+          })
+        : localize(
+              'Transfer funds from your {{walletCurrencyType}} Wallet to your {{ctraderTitle}} account to start trading.',
+              {
+                  ctraderTitle: PlatformDetails.ctrader.title,
+                  walletCurrencyType,
+              }
+          );
 
-    if (isMobile) {
+    const title = isDemo ? (
+        <Localize
+            i18n_default_text='Your {{ctraderTitle}} demo account is ready'
+            values={{ ctraderTitle: PlatformDetails.ctrader.title }}
+        />
+    ) : (
+        <Localize
+            i18n_default_text='Your {{ctraderTitle}} account is ready'
+            values={{ ctraderTitle: PlatformDetails.ctrader.title }}
+        />
+    );
+
+    if (isDesktop) {
         return (
-            <ModalStepWrapper
-                renderFooter={() => <CTraderSuccessModalButtons hide={hide} isDemo={isDemo} />}
-                title={' '}
-            >
+            <ModalWrapper hideCloseButton>
                 <CFDSuccess
+                    actionButtons={
+                        <CTraderSuccessModalButtons createdAccount={createdAccount} hide={hide} isDemo={isDemo} />
+                    }
                     description={description}
-                    displayBalance={cTraderAccounts?.find(account => account.login)?.formatted_balance}
+                    displayBalance={cTraderAccount.display_balance}
                     marketType='all'
-                    platform='ctrader'
-                    renderButton={() => <CTraderSuccessModalButtons hide={hide} isDemo={isDemo} />}
-                    title={`Your ${PlatformDetails.ctrader.title} ${isDemo ? 'demo' : ''} account is ready`}
+                    platform={PlatformDetails.ctrader.platform}
+                    title={title}
                 />
-                ;
-            </ModalStepWrapper>
+            </ModalWrapper>
         );
     }
     return (
-        <ModalWrapper>
+        <ModalStepWrapper
+            renderFooter={() => (
+                <CTraderSuccessModalButtons createdAccount={createdAccount} hide={hide} isDemo={isDemo} />
+            )}
+            title={' '}
+        >
             <CFDSuccess
+                actionButtons={
+                    <CTraderSuccessModalButtons createdAccount={createdAccount} hide={hide} isDemo={isDemo} />
+                }
                 description={description}
-                displayBalance={cTraderAccounts?.find(account => account.login)?.formatted_balance}
+                displayBalance={cTraderAccount.display_balance}
                 marketType='all'
                 platform={PlatformDetails.ctrader.platform}
-                renderButton={() => <CTraderSuccessModalButtons hide={hide} isDemo={isDemo} />}
-                title={`Your ${PlatformDetails.ctrader.title} ${isDemo ? 'demo' : ''} account is ready`}
+                title={title}
             />
-        </ModalWrapper>
+        </ModalStepWrapper>
     );
 };
 

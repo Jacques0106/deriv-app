@@ -1,15 +1,18 @@
 import * as SocketCache from '_common/base/socket_cache';
 import { action, computed, makeObservable, observable } from 'mobx';
-import { changeLanguage, getAllowedLanguages } from '@deriv/translations';
+import { changeLanguage } from '@deriv/translations';
+import { getAllowedLanguages } from '@deriv-com/translations';
 import {
+    UNSUPPORTED_LANGUAGES,
     getAppId,
-    getUrlBinaryBot,
     getUrlSmartTrader,
     initMoment,
+    setLocale,
     isMobile,
     platforms,
     routes,
     toMoment,
+    isNavigationFromTradersHubOS,
 } from '@deriv/shared';
 import BaseStore from './base-store';
 import BinarySocket from '_common/base/socket_base';
@@ -37,6 +40,7 @@ export default class CommonStore extends BaseStore {
             has_error: observable,
             init: action.bound,
             is_from_derivgo: computed,
+            is_from_tradershub_os: computed,
             is_language_changing: observable,
             is_network_online: observable,
             is_socket_opened: observable,
@@ -58,6 +62,7 @@ export default class CommonStore extends BaseStore {
             setSelectedContractType: action.bound,
             setServerTime: action.bound,
             setServicesError: action.bound,
+            resetServicesError: action.bound,
             setWithdrawURL: action.bound,
             showError: action.bound,
             was_socket_opened: observable,
@@ -65,7 +70,7 @@ export default class CommonStore extends BaseStore {
         });
     }
 
-    allowed_languages = Object.keys(getAllowedLanguages());
+    allowed_languages = Object.keys(getAllowedLanguages(UNSUPPORTED_LANGUAGES));
     app_id = undefined;
     app_router = { history: null };
     app_routing_history = [];
@@ -119,7 +124,7 @@ export default class CommonStore extends BaseStore {
         if (key === 'EN') {
             window.localStorage.setItem('i18n_language', key);
         }
-        await WS.wait('authorize');
+        await WS?.wait('authorize');
         return new Promise((resolve, reject) => {
             WS.setSettings({
                 set_settings: 1,
@@ -134,6 +139,7 @@ export default class CommonStore extends BaseStore {
                 window.history.pushState({ path: new_url.toString() }, '', new_url.toString());
                 try {
                     await initMoment(key);
+                    await setLocale(key);
                     await changeLanguage(key, () => {
                         this.changeCurrentLanguage(key);
                         BinarySocket.closeAndOpenNewConnection(key);
@@ -167,6 +173,18 @@ export default class CommonStore extends BaseStore {
         return platforms[this.platform]?.platform_name === platforms.derivgo.platform_name;
     }
 
+    // eslint-disable-next-line class-methods-use-this
+    get is_from_outside_cashier() {
+        return !window.location.pathname.startsWith(routes.cashier);
+    }
+
+    get is_from_tradershub_os() {
+        return (
+            platforms[this.platform]?.platform_name === platforms.tradershub_os.platform_name ||
+            isNavigationFromTradersHubOS()
+        );
+    }
+
     setInitialRouteHistoryItem(location) {
         if (window.location.href.indexOf('?ext_platform_url=') !== -1) {
             const ext_url = decodeURI(new URL(window.location.href).searchParams.get('ext_platform_url'));
@@ -179,8 +197,6 @@ export default class CommonStore extends BaseStore {
                 this.addRouteHistoryItem({ pathname: ext_url, action: 'PUSH', is_external: true });
             } else if (ext_url?.indexOf(routes.cashier_p2p) === 0) {
                 this.addRouteHistoryItem({ pathname: ext_url, action: 'PUSH' });
-            } else if (ext_url?.indexOf(getUrlBinaryBot()) === 0) {
-                this.addRouteHistoryItem({ pathname: ext_url, action: 'PUSH', is_external: true });
             } else {
                 this.addRouteHistoryItem({ ...location, action: 'PUSH' });
             }
@@ -274,13 +290,15 @@ export default class CommonStore extends BaseStore {
     setWithdrawURL(withdraw_url) {
         this.withdraw_url = withdraw_url;
     }
-
-    setServicesError(error) {
+    resetServicesError() {
+        this.services_error = {};
+    }
+    setServicesError(error, hide_toast = false) {
         this.services_error = error;
         if (isMobile()) {
             if (error.code === 'CompanyWideLimitExceeded' || error.code === 'PleaseAuthenticate') {
                 this.root_store.ui.toggleServicesErrorModal(true);
-            } else {
+            } else if (!hide_toast) {
                 this.root_store.ui.addToast({
                     content: error.message,
                     type: 'error',

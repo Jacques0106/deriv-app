@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import moment from 'moment';
 import { useActiveWalletAccount, useAllAccountsList, useTransactions } from '@deriv/api-v2';
-import { Loader } from '../../../../../../components';
-import { WalletText } from '../../../../../../components/Base';
+import { Text } from '@deriv-com/ui';
+import { FormatUtils } from '@deriv-com/utils';
+import { WalletLoader } from '../../../../../../components';
 import { TransactionsCompletedRow } from '../TransactionsCompletedRow';
 import { TransactionsNoDataState } from '../TransactionsNoDataState';
 import { TransactionsTable } from '../TransactionsTable';
@@ -34,7 +34,7 @@ const TransactionsCompletedDemoResetBalance: React.FC = () => {
         (a, b) => (b.transaction_time ?? 0) - (a.transaction_time ?? 0)
     );
 
-    if (!wallet || isLoading) return <Loader />;
+    if (!wallet || isLoading) return <WalletLoader />;
 
     if (!resetBalanceTransactions.length) return <TransactionsNoDataState />;
 
@@ -42,7 +42,13 @@ const TransactionsCompletedDemoResetBalance: React.FC = () => {
         <TransactionsTable
             columns={[
                 {
-                    accessorFn: row => row.transaction_time && moment.unix(row.transaction_time).format('DD MMM YYYY'),
+                    accessorFn: row =>
+                        row.transaction_time &&
+                        FormatUtils.getFormattedDateString(row.transaction_time, {
+                            dateOptions: { day: '2-digit', month: 'short', year: 'numeric' },
+                            format: 'DD MMM YYYY',
+                            unix: true,
+                        }),
                     accessorKey: 'date',
                     header: 'Date',
                 },
@@ -51,10 +57,14 @@ const TransactionsCompletedDemoResetBalance: React.FC = () => {
             groupBy={['date']}
             rowGroupRender={transaction => (
                 <div className='wallets-transactions-completed-demo-reset-balance__group-title'>
-                    <WalletText color='primary' size='2xs'>
+                    <Text color='primary' size='2xs'>
                         {transaction.transaction_time &&
-                            moment.unix(transaction.transaction_time).format('DD MMM YYYY')}
-                    </WalletText>
+                            FormatUtils.getFormattedDateString(transaction.transaction_time, {
+                                dateOptions: { day: '2-digit', month: 'short', year: 'numeric' },
+                                format: 'DD MMM YYYY',
+                                unix: true,
+                            })}
+                    </Text>
                 </div>
             )}
             rowRender={transaction => (

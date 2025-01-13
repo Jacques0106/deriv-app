@@ -1,10 +1,11 @@
 import React, { RefObject, useCallback, useEffect, useMemo } from 'react';
 import { useFormikContext } from 'formik';
 import { useHistory } from 'react-router-dom';
-import { WalletListCardBadge, WalletText } from '../../../../../../components';
+import { LegacyChevronDown2pxIcon } from '@deriv/quill-icons';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
+import { WalletListCardBadge } from '../../../../../../components';
 import { useModal } from '../../../../../../components/ModalProvider';
-import useDevice from '../../../../../../hooks/useDevice';
-import IcDropdown from '../../../../../../public/images/ic-dropdown.svg';
 import { useTransfer } from '../../provider';
 import { TInitialTransferFormValues, TToAccount } from '../../types';
 import { TransferFormAccountCard } from '../TransferFormAccountCard';
@@ -18,10 +19,12 @@ type TProps = {
 
 const TransferFormDropdown: React.FC<TProps> = ({ fieldName, mobileAccountsListRef }) => {
     const { setValues, values } = useFormikContext<TInitialTransferFormValues>();
-    const { accounts, activeWallet } = useTransfer();
+    const { accounts, activeWallet, hasPlatformStatus } = useTransfer();
+    const { localize } = useTranslations();
     const { fromAccount, toAccount } = values;
-    const { isMobile } = useDevice();
+    const { isDesktop } = useDevice();
     const modal = useModal();
+
     const isFromAccountDropdown = fieldName === 'fromAccount';
 
     const fromAccountList = useMemo(() => {
@@ -45,12 +48,24 @@ const TransferFormDropdown: React.FC<TProps> = ({ fieldName, mobileAccountsListR
 
     const selectedAccount = isFromAccountDropdown ? fromAccount : toAccount;
     const accountsList = isFromAccountDropdown ? fromAccountList : toAccountList;
-    const label = isFromAccountDropdown ? 'Transfer from' : 'Transfer to';
-    const badgeLabel = selectedAccount?.demo_account ? 'virtual' : selectedAccount?.landingCompanyName;
-
+    const label = isFromAccountDropdown ? localize('Transfer from') : localize('Transfer to');
     const { location } = useHistory();
     const toAccountLoginId =
-        location.pathname === '/wallets/cashier/transfer' ? location.state?.toAccountLoginId : undefined;
+        location.pathname === '/wallet/account-transfer' ? location.state?.toAccountLoginId : undefined;
+    const shouldDefaultUSDWallet =
+        location.pathname === '/wallet/account-transfer' ? location.state?.shouldSelectDefaultWallet : false;
+
+    const toDefaultAccount = useMemo(
+        () => toAccountList.walletAccounts.find(wallet => wallet.currency === 'USD'),
+        [toAccountList.walletAccounts]
+    );
+    // This sets a 'To transfer' to USD Wallet account to be selected by default when user transfers from a crypto wallet
+    if (!toAccount && toDefaultAccount && shouldDefaultUSDWallet) {
+        setValues(prev => ({
+            ...prev,
+            toAccount: toDefaultAccount,
+        }));
+    }
 
     useEffect(() => {
         const toAccount: TToAccount = Object.values(accounts)
@@ -97,19 +112,22 @@ const TransferFormDropdown: React.FC<TProps> = ({ fieldName, mobileAccountsListR
     return (
         <button
             className='wallets-transfer-form-dropdown'
+            data-testid='dt_wallets_transfer_form_dropdown'
             onClick={() => {
                 modal.show(
                     <TransferFormAccountSelection
                         accountsList={accountsList}
                         activeWallet={activeWallet}
                         fromAccount={fromAccount}
+                        hasPlatformStatus={hasPlatformStatus}
+                        isFromAccountDropdown={isFromAccountDropdown}
                         label={label}
                         onSelect={handleSelect}
                         selectedAccount={selectedAccount}
                         toAccount={toAccount}
                     />,
                     {
-                        rootRef: isMobile ? mobileAccountsListRef : undefined,
+                        rootRef: !isDesktop ? mobileAccountsListRef : undefined,
                     }
                 );
             }}
@@ -117,30 +135,38 @@ const TransferFormDropdown: React.FC<TProps> = ({ fieldName, mobileAccountsListR
         >
             <div className='wallets-transfer-form-dropdown__content'>
                 <div className='wallets-transfer-form-dropdown__header'>
-                    <WalletText size='sm'>{label}</WalletText>
+                    <Text size='sm'>{label}</Text>
 
-                    {isMobile && <IcDropdown />}
+                    {!isDesktop && <LegacyChevronDown2pxIcon iconSize='xs' />}
                 </div>
 
                 {selectedAccount ? (
-                    <TransferFormAccountCard account={selectedAccount} activeWallet={activeWallet} type='input' />
+                    <TransferFormAccountCard
+                        account={selectedAccount}
+                        hasPlatformStatus={hasPlatformStatus}
+                        type='input'
+                    />
                 ) : (
                     <div className='wallets-transfer-form-dropdown__select-account-cta'>
-                        <WalletText size='sm' weight='bold'>
-                            Select a trading account or a Wallet
-                        </WalletText>
+                        <Text size='sm' weight='bold'>
+                            {activeWallet?.demo_account === 0 ? (
+                                <Localize i18n_default_text='Select a trading account or a Wallet' />
+                            ) : (
+                                <Localize i18n_default_text='Select a trading account' />
+                            )}
+                        </Text>
                     </div>
                 )}
             </div>
 
-            {!isMobile && (
+            {isDesktop && (
                 <>
-                    {selectedAccount && (
+                    {selectedAccount?.demo_account ? (
                         <div className='wallets-transfer-form-dropdown__badge'>
-                            <WalletListCardBadge isDemo={Boolean(selectedAccount?.demo_account)} label={badgeLabel} />
+                            <WalletListCardBadge />
                         </div>
-                    )}
-                    <IcDropdown className='wallets-transfer-form-dropdown__icon-dropdown' />
+                    ) : null}
+                    <LegacyChevronDown2pxIcon className='wallets-transfer-form-dropdown__icon-dropdown' iconSize='xs' />
                 </>
             )}
         </button>

@@ -1,12 +1,13 @@
+import { FC, Fragment } from 'react';
 import { Autocomplete, SelectNative } from '@deriv/components';
-import { useStore } from '@deriv/stores';
 import { Field, FieldProps, FormikErrors } from 'formik';
-import React from 'react';
-import { TGetField, TListItem } from '../additional-kyc-info-modal/form-config';
+import { TListItem, TGetField } from '../../Types';
+import { useDevice } from '@deriv-com/ui';
 
 type TFormSelectField = TGetField & {
     onItemSelection?: (item: TListItem) => void;
     list_height?: string;
+    is_country_code_dropdown?: boolean;
 };
 
 type TSetFieldValue = (
@@ -15,7 +16,7 @@ type TSetFieldValue = (
     shouldValidate?: boolean
 ) => Promise<void | FormikErrors<Record<string, string>>>;
 
-const FormSelectField: React.FC<TFormSelectField> = ({
+const FormSelectField: FC<TFormSelectField> = ({
     label,
     name,
     required = false,
@@ -24,10 +25,9 @@ const FormSelectField: React.FC<TFormSelectField> = ({
     onItemSelection,
     placeholder,
     list_height,
+    is_country_code_dropdown = false,
 }) => {
-    const { ui } = useStore();
-    const { is_mobile } = ui;
-
+    const { isDesktop } = useDevice();
     const onSelect =
         (field: string, setFieldValue: TSetFieldValue) =>
         ({ value, text }: TListItem) => {
@@ -37,18 +37,19 @@ const FormSelectField: React.FC<TFormSelectField> = ({
     return (
         <Field name={name}>
             {({ field, meta: { touched, error }, form: { setFieldValue } }: FieldProps<string>) => (
-                <React.Fragment>
-                    {is_mobile ? (
+                <Fragment>
+                    {!isDesktop ? (
                         <SelectNative
                             {...field}
-                            // @ts-expect-error This needs to fixed in SelectNative component
+                            // @ts-expect-error This needs to fixed in AutoComplete component
                             list_items={list_items}
-                            // @ts-expect-error This needs to fixed in SelectNative component
+                            // @ts-expect-error This needs to fixed in AutoComplete component
                             label={label}
                             required={required}
                             disabled={disabled}
                             error={touched ? error : undefined}
                             use_text
+                            is_country_code_dropdown={is_country_code_dropdown}
                             data-testid={`dt_${field.name}`}
                         />
                     ) : (
@@ -61,16 +62,15 @@ const FormSelectField: React.FC<TFormSelectField> = ({
                             placeholder={placeholder}
                             required={required}
                             data-lpignore='true'
-                            autoComplete='off' // prevent chrome autocomplete
+                            autoComplete='new-password' // 'off' sometimes doesn't work, have to use new-password to prevent chrome autocomplete
                             error={touched ? error : undefined}
                             // @ts-expect-error This needs to fixed in AutoComplete component
                             onItemSelection={onItemSelection ?? onSelect(field.name, setFieldValue)}
                             data-testid={`dt_${field.name}`}
-                            // @ts-expect-error This needs to fixed in AutoComplete component
-                            list_height={list_height}
+                            list_height={list_height as string}
                         />
                     )}
-                </React.Fragment>
+                </Fragment>
             )}
         </Field>
     );

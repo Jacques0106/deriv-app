@@ -1,14 +1,13 @@
-//kept sometihings commented beacuse of mobx to integrate popup functionality here
 import React from 'react';
 import classNames from 'classnames';
-import { DesktopWrapper, Dialog, Icon, MobileFullPageModal, MobileWrapper, Text } from '@deriv/components';
+import { Icon, Text } from '@deriv/components';
 import { observer } from '@deriv/stores';
 import { localize } from '@deriv/translations';
-import { NOTIFICATION_TYPE } from 'Components/bot-notification/bot-notification-utils';
 import { DBOT_TABS } from 'Constants/bot-contents';
 import { useDBotStore } from 'Stores/useDBotStore';
-import GoogleDrive from './load-bot-preview/google-drive';
-import Recent from './load-bot-preview/recent';
+import { rudderStackSendOpenEvent } from '../../analytics/rudderstack-common-events';
+import { rudderStackSendDashboardClickEvent } from '../../analytics/rudderstack-dashboard';
+import DashboardBotList from './bot-list/dashboard-bot-list';
 
 type TCardProps = {
     has_dashboard_strategies: boolean;
@@ -19,35 +18,25 @@ type TCardArray = {
     type: string;
     icon: string;
     content: string;
-    method: () => void;
+    callback: () => void;
 };
 
 const Cards = observer(({ is_mobile, has_dashboard_strategies }: TCardProps) => {
     const { dashboard, load_modal, quick_strategy } = useDBotStore();
-    const {
-        onCloseDialog,
-        dialog_options,
-        is_dialog_open,
-        setActiveTab,
-        setFileLoaded,
-        setPreviewOnPopup,
-        setOpenSettings,
-        showVideoDialog,
-    } = dashboard;
-    const { handleFileChange, loadFileFromLocal } = load_modal;
+    const { toggleLoadModal, setActiveTabIndex } = load_modal;
+    const { is_dialog_open, setActiveTab } = dashboard;
     const { setFormVisibility } = quick_strategy;
 
-    const [is_file_supported, setIsFileSupported] = React.useState<boolean>(true);
-    const file_input_ref = React.useRef<HTMLInputElement | null>(null);
-
     const openGoogleDriveDialog = () => {
-        showVideoDialog({
-            type: 'google',
-        });
+        toggleLoadModal();
+        setActiveTabIndex(is_mobile ? 1 : 2);
+        setActiveTab(DBOT_TABS.BOT_BUILDER);
     };
 
     const openFileLoader = () => {
-        file_input_ref?.current?.click();
+        toggleLoadModal();
+        setActiveTabIndex(is_mobile ? 0 : 1);
+        setActiveTab(DBOT_TABS.BOT_BUILDER);
     };
 
     const actions: TCardArray[] = [
@@ -55,29 +44,54 @@ const Cards = observer(({ is_mobile, has_dashboard_strategies }: TCardProps) => 
             type: 'my-computer',
             icon: is_mobile ? 'IcLocal' : 'IcMyComputer',
             content: is_mobile ? localize('Local') : localize('My computer'),
-            method: openFileLoader,
+            callback: () => {
+                openFileLoader();
+                rudderStackSendOpenEvent({
+                    subpage_name: 'bot_builder',
+                    subform_source: 'dashboard',
+                    subform_name: 'load_strategy',
+                    load_strategy_tab: 'local',
+                });
+            },
         },
         {
             type: 'google-drive',
             icon: 'IcGoogleDriveDbot',
             content: localize('Google Drive'),
-            method: openGoogleDriveDialog,
+            callback: () => {
+                openGoogleDriveDialog();
+                rudderStackSendOpenEvent({
+                    subpage_name: 'bot_builder',
+                    subform_source: 'dashboard',
+                    subform_name: 'load_strategy',
+                    load_strategy_tab: 'google drive',
+                });
+            },
         },
         {
             type: 'bot-builder',
             icon: 'IcBotBuilder',
             content: localize('Bot Builder'),
-            method: () => {
+            callback: () => {
                 setActiveTab(DBOT_TABS.BOT_BUILDER);
+                rudderStackSendDashboardClickEvent({
+                    dashboard_click_name: 'bot_builder',
+                    subpage_name: 'bot_builder',
+                });
             },
         },
         {
             type: 'quick-strategy',
             icon: 'IcQuickStrategy',
             content: localize('Quick strategy'),
-            method: () => {
+            callback: () => {
                 setActiveTab(DBOT_TABS.BOT_BUILDER);
                 setFormVisibility(true);
+                rudderStackSendOpenEvent({
+                    subpage_name: 'bot_builder',
+                    subform_source: 'dashboard',
+                    subform_name: 'quick_strategy',
+                });
             },
         },
     ];
@@ -96,13 +110,22 @@ const Cards = observer(({ is_mobile, has_dashboard_strategies }: TCardProps) => 
                     id='tab__dashboard__table__tiles'
                 >
                     {actions.map(icons => {
-                        const { icon, content, method } = icons;
+                        const { icon, content, callback } = icons;
                         return (
                             <div
                                 key={content}
                                 className={classNames('tab__dashboard__table__block', {
                                     'tab__dashboard__table__block--minimized': has_dashboard_strategies && is_mobile,
                                 })}
+                                onClick={() => {
+                                    callback();
+                                }}
+                                onKeyDown={(e: React.KeyboardEvent) => {
+                                    if (e.key === 'Enter') {
+                                        callback();
+                                    }
+                                }}
+                                tabIndex={0}
                             >
                                 <Icon
                                     className={classNames('tab__dashboard__table__images', {
@@ -112,9 +135,6 @@ const Cards = observer(({ is_mobile, has_dashboard_strategies }: TCardProps) => 
                                     height='8rem'
                                     icon={icon}
                                     id={icon}
-                                    onClick={() => {
-                                        method();
-                                    }}
                                 />
                                 <Text color='prominent' size={is_mobile ? 'xxs' : 'xs'}>
                                     {content}
@@ -122,49 +142,8 @@ const Cards = observer(({ is_mobile, has_dashboard_strategies }: TCardProps) => 
                             </div>
                         );
                     })}
-                    <input
-                        type='file'
-                        ref={file_input_ref}
-                        accept='application/xml, text/xml'
-                        hidden
-                        onChange={e => {
-                            setIsFileSupported(handleFileChange(e, false));
-                            loadFileFromLocal();
-                            setFileLoaded(true);
-                            setOpenSettings(NOTIFICATION_TYPE.BOT_IMPORT);
-                        }}
-                    />
-                    <DesktopWrapper>
-                        <Dialog
-                            title={dialog_options.title}
-                            is_visible={is_dialog_open}
-                            onCancel={onCloseDialog}
-                            is_mobile_full_width
-                            className='dc-dialog__wrapper--google-drive'
-                            has_close_icon
-                        >
-                            <GoogleDrive />
-                        </Dialog>
-                    </DesktopWrapper>
-                    <MobileWrapper>
-                        <MobileFullPageModal
-                            is_modal_open={is_dialog_open}
-                            className='load-strategy__wrapper'
-                            header={localize('Load strategy')}
-                            onClickClose={() => {
-                                setPreviewOnPopup(false);
-                                onCloseDialog();
-                            }}
-                            height_offset='80px'
-                            page_overlay
-                        >
-                            <div label='Google Drive' className='google-drive-label'>
-                                <GoogleDrive />
-                            </div>
-                        </MobileFullPageModal>
-                    </MobileWrapper>
                 </div>
-                <Recent is_file_supported={is_file_supported} />
+                <DashboardBotList />
             </div>
         ),
         // eslint-disable-next-line react-hooks/exhaustive-deps

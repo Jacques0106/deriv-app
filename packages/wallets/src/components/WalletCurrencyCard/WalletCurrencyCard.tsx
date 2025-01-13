@@ -1,25 +1,41 @@
-import React from 'react';
-import { TGenericSizes, THooks } from '../../types';
-import { WalletCardIcon } from '../WalletCardIcon';
+/* eslint-disable sort-keys */
+import React, { ComponentProps } from 'react';
+import { fiatIcons } from '../../constants/icons';
+import { THooks } from '../../types';
+import { WalletCurrencyIcon } from '../WalletCurrencyIcon';
 import { WalletGradientBackground } from '../WalletGradientBackground';
 import './WalletCurrencyCard.scss';
 
+const roundedIconWidth = {
+    xs: '12',
+    sm: '16',
+    md: '24',
+    lg: '32',
+    xl: '48',
+} as const;
+
+const defaultIconWidth = {
+    xs: '18',
+    sm: '30',
+    md: '43',
+    lg: '58',
+    xl: '83',
+} as const;
+
 type TProps = {
+    className?: string;
     currency: THooks.WalletAccountsList['wallet_currency_type'];
-    isCarouselHeader?: boolean;
-    isDemo?: THooks.WalletAccountsList['is_virtual'];
-    size?: Extract<TGenericSizes, 'lg' | 'md' | 'sm'>;
+    isDemo?: ComponentProps<typeof WalletGradientBackground>['isDemo'];
+    size: keyof typeof defaultIconWidth | keyof typeof roundedIconWidth;
 };
 
-const WalletCurrencyCard: React.FC<TProps> = ({ currency, isCarouselHeader = false, isDemo, size = 'lg' }: TProps) => {
+const WalletCurrencyCard: React.FC<TProps> = ({ className, currency, isDemo, size = 'lg' }: TProps) => {
+    const isFiat = fiatIcons.includes(currency as typeof fiatIcons[number]);
+    const IconSize = isFiat && !isDemo ? roundedIconWidth[size] : defaultIconWidth[size];
     return (
-        <WalletGradientBackground currency={currency} isDemo={isDemo} type='card'>
+        <WalletGradientBackground bodyClassName={className} currency={currency} isDemo={isDemo} type='card'>
             <div className={`wallets-currency-card wallets-currency-card--${size}`}>
-                <WalletCardIcon
-                    device={isCarouselHeader ? 'mobile' : 'desktop'}
-                    size={size}
-                    type={isDemo ? 'Demo' : currency}
-                />
+                <WalletCurrencyIcon currency={isDemo ? 'DEMO' : currency} width={IconSize} />
             </div>
         </WalletGradientBackground>
     );

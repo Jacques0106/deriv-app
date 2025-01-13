@@ -36,6 +36,29 @@ type TObjExpiry = {
     date_expiry?: number;
 };
 
+type TValidationParams =
+    | {
+          validation_params?: {
+              payout?: {
+                  max: string;
+              };
+              max_payout?: string;
+              max_ticks?: number;
+              stake?: {
+                  max: string;
+                  min: string;
+              };
+              take_profit: {
+                  max: string;
+                  min: string;
+              };
+              stop_loss: { max: string; min: string };
+          };
+      }
+    | undefined;
+
+export type ExpandedProposal = Proposal & TValidationParams;
+
 const isVisible = (elem: HTMLElement) => !(!elem || (elem.offsetWidth === 0 && elem.offsetHeight === 0));
 
 const map_error_field: { [key: string]: string } = {
@@ -57,9 +80,9 @@ export const getProposalErrorField = (response: PriceProposalResponse) => {
 export const getProposalInfo = (
     store: TTradeStore,
     response: PriceProposalResponse & TError,
-    obj_prev_contract_basis: TObjContractBasis
+    obj_prev_contract_basis?: TObjContractBasis
 ) => {
-    const proposal = response.proposal || ({} as Proposal);
+    const proposal: ExpandedProposal = response.proposal || ({} as ExpandedProposal);
     const profit = (proposal.payout || 0) - (proposal.ask_price || 0);
     const returns = (profit * 100) / (proposal.ask_price || 1);
     const stake = proposal.display_value;
@@ -72,7 +95,7 @@ export const getProposalInfo = (
 
     const is_stake = contract_basis?.value === 'stake';
 
-    const price = is_stake ? stake : (proposal[contract_basis?.value as keyof Proposal] as string | number);
+    const price = is_stake ? stake : (proposal[contract_basis?.value as keyof ExpandedProposal] as string | number);
 
     const obj_contract_basis = {
         text: contract_basis?.text || '',
@@ -103,6 +126,7 @@ export const getProposalInfo = (
         returns: `${returns.toFixed(2)}%`,
         stake,
         spot: proposal.spot,
+        validation_params: proposal?.validation_params,
         ...accumulators_details,
     };
 };
@@ -143,7 +167,7 @@ const setProposalAccumulator = (store: TTradeStore, obj_accumulator: TObjAccum) 
     }
 };
 
-const createProposalRequestForContract = (store: TTradeStore, type_of_contract: string) => {
+export const createProposalRequestForContract = (store: TTradeStore, type_of_contract: string) => {
     const obj_accumulator: TObjAccum = {};
     const obj_expiry: TObjExpiry = {};
     const obj_multiplier: TObjMultiplier = {};
@@ -182,10 +206,14 @@ const createProposalRequestForContract = (store: TTradeStore, type_of_contract: 
               }
             : obj_expiry),
         ...((store.barrier_count > 0 || store.form_components.indexOf('last_digit') !== -1) &&
-            !isAccumulatorContract(type_of_contract) && {
-                barrier: store.barrier_1 || store.last_digit,
+            !isAccumulatorContract(type_of_contract) &&
+            !isTurbosContract(type_of_contract) && {
+                barrier: store.barrier || store.barrier_1 || store.last_digit,
             }),
         ...(store.barrier_count === 2 && !isAccumulatorContract(type_of_contract) && { barrier2: store.barrier_2 }),
+        ...(isTurbosContract(type_of_contract) && {
+            payout_per_point: store.payout_per_point || store.last_digit,
+        }),
         limit_order,
         ...obj_accumulator,
         ...obj_multiplier,

@@ -58,7 +58,8 @@
     }
 
     &__cancel-button {
-        margin-left: 0.3rem;
+        display: flex;
+        margin-inline-start: 0.3rem;
         padding: 0;
         border: none;
         outline: none;
@@ -69,4 +70,8 @@
         color: var(--brand-coral, #ff444f);
         text-decoration: none;
     }
+}
+
+.wallets-action-modal {
+    width: 40rem;
 }

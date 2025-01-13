@@ -1,34 +1,24 @@
 import React from 'react';
 import classNames from 'classnames';
-import {
-    WalletCurrencyCard,
-    WalletListCardBadge,
-    WalletsAppLinkedWithWalletIcon,
-    WalletText,
-} from '../../../../../../components';
-import useDevice from '../../../../../../hooks/useDevice';
-import { TWalletLandingCompanyName } from '../../../../../../types';
-import { getTradingAppIcon, getWalletIcon } from '../../../../helpers';
+import { Localize } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
+import { WalletCurrencyCard, WalletListCardBadge, WalletMarketCurrencyIcon } from '../../../../../../components';
+import { TPlatforms } from '../../../../../../types';
+import { PlatformStatusBadge } from '../../../../../cfd/components/PlatformStatusBadge';
+import { DISABLED_PLATFORM_STATUSES } from '../../../../../cfd/constants';
 import type { TAccount } from '../../types';
 import './TransferFormAccountCard.scss';
 
 type TProps = {
     account?: TAccount;
-    activeWallet?: TAccount;
+    hasPlatformStatus: (account: TAccount) => boolean;
     type?: 'input' | 'modal';
 };
 
-const WalletTransferFormAccountCard: React.FC<TProps> = ({ account, activeWallet, type = 'modal' }) => {
-    const { isMobile } = useDevice();
+const TransferFormAccountCard: React.FC<TProps> = ({ account, hasPlatformStatus, type = 'modal' }) => {
+    const { isDesktop } = useDevice();
     const isInput = type === 'input';
     const isModal = type === 'modal';
-    const badgeLabel = account?.demo_account ? 'virtual' : account?.landingCompanyName;
-    const appIcon = getTradingAppIcon(
-        account?.account_type ?? '',
-        activeWallet?.landingCompanyName as TWalletLandingCompanyName,
-        account?.mt5_group
-    );
-    const walletIcon = getWalletIcon(activeWallet?.currency ?? 'USD', Boolean(activeWallet?.demo_account));
 
     return (
         <div
@@ -46,34 +36,51 @@ const WalletTransferFormAccountCard: React.FC<TProps> = ({ account, activeWallet
                             size='sm'
                         />
                     ) : (
-                        <WalletsAppLinkedWithWalletIcon
-                            appIcon={appIcon}
-                            currency={activeWallet?.currency ?? ''}
+                        <WalletMarketCurrencyIcon
+                            currency={account?.currency ?? ''}
                             isDemo={Boolean(account?.demo_account)}
-                            size='small'
-                            walletIcon={walletIcon}
+                            marketType={account?.market_type}
+                            platform={account?.account_type as TPlatforms.All}
+                            product={account?.product}
+                            size='xs'
                         />
                     )}
                 </div>
-                {isInput && isMobile && (
-                    <WalletListCardBadge isDemo={Boolean(account?.demo_account)} label={badgeLabel} />
-                )}
+                {isInput && !isDesktop && !!account?.demo_account && <WalletListCardBadge />}
             </div>
 
             <div className='wallets-transfer-form-account-card__content'>
-                <WalletText as='p' size={isInput ? '2xs' : 'sm'} weight='bold'>
+                <Text as='p' size={isInput ? '2xs' : 'sm'} weight='bold'>
                     {account?.accountName}
-                </WalletText>
-                <WalletText size={isInput ? '2xs' : 'xs'}>Balance: {account?.displayBalance}</WalletText>
+                </Text>
+                {!hasPlatformStatus(account) && (
+                    <Text size={isInput ? '2xs' : 'xs'}>
+                        <Localize
+                            i18n_default_text='Balance: {{balance}}'
+                            values={{
+                                balance: account?.displayBalance,
+                            }}
+                        />
+                    </Text>
+                )}
+                {isModal && hasPlatformStatus(account) && (
+                    <PlatformStatusBadge
+                        badgeSize='sm'
+                        className='wallets-transfer-form-account-card--badge'
+                        status={
+                            (account?.status || account?.platformStatus) as (typeof DISABLED_PLATFORM_STATUSES)[number]
+                        }
+                    />
+                )}
             </div>
 
-            {isModal && (
+            {isModal && !!account?.demo_account && (
                 <div className='wallets-transfer-form-account-card__modal-badge'>
-                    <WalletListCardBadge isDemo={Boolean(account?.demo_account)} label={badgeLabel} />
+                    <WalletListCardBadge />
                 </div>
             )}
         </div>
     );
 };
 
-export default WalletTransferFormAccountCard;
+export default TransferFormAccountCard;

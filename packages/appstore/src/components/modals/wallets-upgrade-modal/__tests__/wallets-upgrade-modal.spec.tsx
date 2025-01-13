@@ -1,15 +1,23 @@
 import React from 'react';
+
+import { useGrowthbookGetFeatureValue, useWalletMigration } from '@deriv/hooks';
+import { mockStore, StoreProvider } from '@deriv/stores';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useWalletMigration } from '@deriv/hooks';
-import { StoreProvider, mockStore } from '@deriv/stores';
+
 import WalletsUpgradeModal from '../wallets-upgrade-modal';
+
+const mockStartMigration = jest.fn();
 
 jest.mock('@deriv/hooks', () => ({
     ...jest.requireActual('@deriv/hooks'),
     useWalletMigration: jest.fn(() => ({
         is_eligible: true,
+        is_in_progress: false,
+        is_migrating: false,
+        startMigration: mockStartMigration,
     })),
+    useGrowthbookGetFeatureValue: jest.fn(() => [false]),
 }));
 
 jest.mock('@deriv/stores', () => ({
@@ -30,7 +38,7 @@ describe('<WalletsUpgradeModal />', () => {
         document.body.removeChild(modal_root_el);
     });
 
-    it('Should show modal if user is eligible for migration and is_wallet_modal_closed is not in sessionStorage', () => {
+    it('shows modal if user is eligible for migration and is_wallet_modal_closed is not in sessionStorage', () => {
         const mock = mockStore({
             traders_hub: {
                 toggleWalletsUpgrade: jest.fn(),
@@ -49,11 +57,39 @@ describe('<WalletsUpgradeModal />', () => {
 
         render(<WalletsUpgradeModal />, { wrapper });
 
+        const close_button = screen.getByTestId('dt_modal_close_icon');
+
         expect(screen.getByText('Introducing Wallets')).toBeInTheDocument();
         expect(screen.getByText('Enable now')).toBeInTheDocument();
+        expect(close_button).toBeInTheDocument();
     });
 
-    it('Should not show modal if user is not eligible for migration', () => {
+    it('shows modal without close button for force migration if force migration is enabled and user is not migrating or in progress', () => {
+        (useGrowthbookGetFeatureValue as jest.Mock).mockReturnValueOnce([true]);
+        const mock = mockStore({
+            traders_hub: {
+                toggleWalletsUpgrade: jest.fn(),
+            },
+            ui: {
+                is_mobile: false,
+                is_desktop: true,
+            },
+        });
+
+        const wrapper = ({ children }: { children: JSX.Element }) => (
+            <StoreProvider store={mock}>{children}</StoreProvider>
+        );
+
+        render(<WalletsUpgradeModal />, { wrapper });
+
+        const close_button = screen.queryByTestId('dt_modal_close_icon');
+
+        expect(screen.getByText('Introducing Wallets')).toBeInTheDocument();
+        expect(screen.getByText('Enable now')).toBeInTheDocument();
+        expect(close_button).not.toBeInTheDocument();
+    });
+
+    it('does not show modal if user is not eligible for migration', () => {
         const mock = mockStore({
             traders_hub: {
                 toggleWalletsUpgrade: jest.fn(),
@@ -79,7 +115,7 @@ describe('<WalletsUpgradeModal />', () => {
         expect(screen.queryByText('Enable now')).not.toBeInTheDocument();
     });
 
-    it('Should not show modal if is_wallet_modal_closed is in sessionStorage', () => {
+    it('does not show modal if is_wallet_modal_closed is in sessionStorage', () => {
         const mock = mockStore({
             traders_hub: {
                 toggleWalletsUpgrade: jest.fn(),
@@ -104,7 +140,7 @@ describe('<WalletsUpgradeModal />', () => {
         expect(screen.queryByText('Enable now')).not.toBeInTheDocument();
     });
 
-    it('Should close modal when close button is clicked', () => {
+    it('closes modal when close button is clicked', async () => {
         const mock = mockStore({
             traders_hub: {
                 toggleWalletsUpgrade: jest.fn(),
@@ -125,11 +161,34 @@ describe('<WalletsUpgradeModal />', () => {
         render(<WalletsUpgradeModal />, { wrapper });
 
         const close_button = screen.getByTestId('dt_modal_close_icon');
-        userEvent.click(close_button);
+        await userEvent.click(close_button);
 
         expect(setModalOpen).toHaveBeenCalledWith(false);
         expect(sessionStorage.getItem('is_wallet_migration_modal_closed')).toBe('true');
     });
 
-    // TODO: Add test for clicking Enable now button after the next flow is ready
+    it('starts migration when Enable now button is clicked', async () => {
+        const mock = mockStore({
+            traders_hub: {
+                toggleWalletsUpgrade: jest.fn(),
+            },
+            ui: {
+                is_mobile: false,
+                is_desktop: true,
+            },
+        });
+
+        jest.spyOn(React, 'useState').mockImplementationOnce(() => [true, jest.fn()]);
+
+        const wrapper = ({ children }: { children: JSX.Element }) => (
+            <StoreProvider store={mock}>{children}</StoreProvider>
+        );
+
+        render(<WalletsUpgradeModal />, { wrapper });
+
+        const enable_now_button = screen.getByRole('button', { name: 'Enable now' });
+        await userEvent.click(enable_now_button);
+
+        expect(mockStartMigration).toHaveBeenCalled();
+    });
 });

@@ -1,6 +1,5 @@
 import React from 'react';
 import { FormikHelpers as FormikActions } from 'formik';
-
 import {
     DetailsOfEachMT5Loginid,
     GetAccountStatus,
@@ -17,7 +16,7 @@ import {
     TJurisdictionCardItemVerification,
     TJurisdictionCardSection,
     TJurisdictionCardSectionTitleIndicators,
-    TTradingPlatformAvailableAccount,
+    TModifiedTradingPlatformAvailableAccount,
 } from '../Components/props.types';
 import RootStore from '../Stores/index';
 
@@ -55,8 +54,6 @@ export type TCFDDashboardContainer = {
 export type TMT5AccountOpeningRealFinancialStpModal = {
     enableApp: () => void;
     disableApp: () => void;
-    toggleCFDVerificationModal: () => void;
-    is_cfd_verification_modal_visible: boolean;
 };
 
 export type TMissingRealAccount = {
@@ -104,16 +101,6 @@ export type TPasswordManagerModalFormValues = Record<'old_password' | 'new_passw
 export type TMultiStepRefProps = {
     goNextStep: () => void;
     goPrevStep: () => void;
-};
-
-export type TInvestorPasswordManager = {
-    error_message_investor: string;
-    is_submit_success_investor: boolean;
-    multi_step_ref: React.MutableRefObject<TMultiStepRefProps | undefined>;
-    onSubmit: (values: TPasswordManagerModalFormValues) => Promise<void>;
-    setPasswordType: (value: string) => void;
-    toggleModal: () => void;
-    validatePassword: (values: { old_password: string; new_password: string; password_type: string }) => void | object;
 };
 
 export type TCountdownComponent = {
@@ -218,14 +205,6 @@ export type TVerificationStatusBannerProps = {
     residence_list: ResidenceList;
 };
 
-export type TJurisdictionCheckBoxProps = {
-    class_name: string;
-    is_checked: boolean;
-    jurisdiction_selected_shortcode: string;
-    onCheck: () => void;
-    should_restrict_bvi_account_creation: boolean;
-    should_restrict_vanuatu_account_creation: boolean;
-};
 export type TOpenAccountTransferMeta = {
     category: string;
     type?: string;
@@ -245,10 +224,10 @@ export type TJurisdictionModalContentProps = {
     is_non_idv_design: boolean;
     jurisdiction_selected_shortcode: string;
     setJurisdictionSelectedShortcode: (card_type: string) => void;
-    synthetic_available_accounts: TTradingPlatformAvailableAccount[];
-    financial_available_accounts: TTradingPlatformAvailableAccount[];
-    all_market_type_available_accounts: TTradingPlatformAvailableAccount[];
-    swapfree_available_accounts: TTradingPlatformAvailableAccount[];
+    synthetic_available_accounts: TModifiedTradingPlatformAvailableAccount[];
+    financial_available_accounts: TModifiedTradingPlatformAvailableAccount[];
+    all_market_type_available_accounts: TModifiedTradingPlatformAvailableAccount[];
+    swapfree_available_accounts: TModifiedTradingPlatformAvailableAccount[];
     real_synthetic_accounts_existing_data: TExistingData;
     real_financial_accounts_existing_data: TExistingData;
     real_swapfree_accounts_existing_data: TExistingData;
@@ -288,7 +267,6 @@ export type TCompareAccountRowProps = TCompareAccountContentProps & {
     available_accounts_count: number;
     classname_for_demo_and_eu: string | null;
     content_flag: string;
-    is_pre_appstore_setting: boolean;
     pre_appstore_class: string;
     is_high_risk_for_mt5: boolean;
     CFDs_restricted_countries: boolean;
@@ -309,7 +287,6 @@ export type TDMT5CompareModalContentProps = {
     content_flag: string;
     is_demo_tab: boolean;
     is_logged_in: boolean;
-    is_pre_appstore_setting: boolean;
     is_preappstore_cr_demo_account: boolean;
     is_preappstore_restricted_cr_demo_account: boolean;
     is_real_enabled: boolean;
@@ -320,23 +297,6 @@ export type TDMT5CompareModalContentProps = {
     should_show_derivx: boolean;
     show_eu_related_content: boolean;
     toggleCompareAccounts: () => void;
-};
-
-export type TCFDDbviOnboardingProps = {
-    account_status: GetAccountStatus;
-    context: RootStore;
-    disableApp: () => void;
-    enableApp: () => void;
-    fetchAccountSettings: () => void;
-    has_created_account_for_selected_jurisdiction: boolean;
-    has_submitted_cfd_personal_details: boolean;
-    is_cfd_verification_modal_visible: boolean;
-    is_virtual: boolean;
-    jurisdiction_selected_shortcode: string;
-    openPasswordModal: () => void;
-    toggleCFDVerificationModal: () => void;
-    updateAccountStatus: () => void;
-    updateMT5Status: () => void;
 };
 
 type TDynamicLeverage = {

@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import '@testing-library/jest-dom/extend-expect';
 import TradingAssessmentNewUser from '../trading-assessment-new-user';
 import { StoreProvider, mockStore } from '@deriv/stores';
 
@@ -40,13 +39,9 @@ describe('TradingAssessmentNewUser', () => {
         jest.clearAllMocks();
     });
 
-    it('should handle the cancel event correctly', () => {
+    it('should handle the cancel event correctly', async () => {
         mockGetCurrentStep.mockReturnValue(2);
-        const mock_store = mockStore({
-            ui: {
-                is_mobile: false,
-            },
-        });
+        const mock_store = mockStore({});
         render(
             <StoreProvider store={mock_store}>
                 <TradingAssessmentNewUser {...baseProps} />
@@ -54,7 +49,7 @@ describe('TradingAssessmentNewUser', () => {
         );
 
         const cancelButton = screen.getByRole('button', { name: /Previous/i });
-        userEvent.click(cancelButton);
+        await userEvent.click(cancelButton);
 
         expect(mockOnSave).toHaveBeenCalledWith(1, baseProps.value);
         expect(mockOnCancel).toHaveBeenCalledWith(1, mockgotoPreviousStep);

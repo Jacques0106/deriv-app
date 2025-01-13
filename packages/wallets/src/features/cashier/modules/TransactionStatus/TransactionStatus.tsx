@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect } from 'react';
 import { useActiveWalletAccount, useCryptoTransactions } from '@deriv/api-v2';
-import { Loader } from '../../../../components';
-import { Divider, WalletText } from '../../../../components/Base';
-import Warning from '../../../../public/images/warning.svg';
+import { LegacyWarningIcon } from '@deriv/quill-icons';
+import { Localize } from '@deriv-com/translations';
+import { Divider, Text } from '@deriv-com/ui';
+import { WalletLoader } from '../../../../components';
 import { THooks } from '../../../../types';
 import { TransactionStatusError } from './components/TransactionStatusError';
 import { TransactionStatusSuccess } from './components/TransactionStatusSuccess';
@@ -47,19 +48,19 @@ const TransactionStatus: React.FC<TTransactionStatus> = ({ transactionType }) =>
     return (
         <div className='wallets-transaction-status'>
             <div className='wallets-transaction-status__header'>
-                <WalletText size='sm' weight='bold'>
-                    Transaction status
-                </WalletText>
-                {isError && <Warning />}
+                <Text align='start' size='sm' weight='bold'>
+                    <Localize i18n_default_text='Transaction status' />
+                </Text>
+                {isError && <LegacyWarningIcon fill='var(--status-warning)' iconSize='xs' />}
             </div>
-            <Divider color='#d6dadb' /> {/* --color-grey-5 */}
+            <Divider color='var(--general-active)' />
             <div className='wallets-transaction-status__body'>
-                {!isError && isLoading && (
+                {isLoading && (
                     <div className='wallets-transaction-status__loader'>
-                        <Loader />
+                        <WalletLoader />
                     </div>
                 )}
-                {isError && <TransactionStatusError refresh={refresh} />}
+                {isError && !isLoading && <TransactionStatusError refresh={refresh} />}
                 {isTransactionStatusSuccessVisible && (
                     <TransactionStatusSuccess
                         transactionType={transactionType}

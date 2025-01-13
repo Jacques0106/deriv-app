@@ -1,57 +1,50 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { lazy } from 'react';
+import { useActiveWalletAccount, useAllWalletAccounts, useIsEuRegion } from '@deriv/api-v2';
+import { useDevice } from '@deriv-com/ui';
 import {
-    DesktopWalletsList,
+    WalletListHeader,
     WalletsAddMoreCarousel,
-    WalletsCarousel,
-    WalletsResetMT5Password,
-    WalletTourGuide,
+    WalletsCardLoader,
+    WalletsDisclaimerBanner,
+    WalletsResponsiveLoader,
 } from '../../components';
-import { useModal } from '../../components/ModalProvider';
-import { CFD_PLATFORMS } from '../../features/cfd/constants';
 import ResetMT5PasswordHandler from '../../features/cfd/ResetMT5PasswordHandler';
-import { getActionFromUrl } from '../../helpers/urls';
-import useDevice from '../../hooks/useDevice';
-import { TPlatforms } from '../../types';
 import './WalletsListingRoute.scss';
 
-const WalletsListingRoute: React.FC = () => {
-    const { isMobile } = useDevice();
-    const { show } = useModal();
-    const resetTradingPlatformActionParams = getActionFromUrl();
+type TWalletsListingRouteProps = {
+    isHubRedirectionEnabled: boolean;
+};
 
-    const platformMapping: Record<string, Exclude<TPlatforms.All, 'ctrader'>> = useMemo(
-        () => ({
-            trading_platform_dxtrade_password_reset: CFD_PLATFORMS.DXTRADE,
-            trading_platform_mt5_password_reset: CFD_PLATFORMS.MT5,
-        }),
-        []
-    );
+const LazyWalletsCarousel = lazy(() => import('../../components/WalletsCarousel/WalletsCarousel'));
+const LazyDesktopWalletsList = lazy(() => import('../../components/DesktopWalletsList/DesktopWalletsList'));
 
-    useEffect(() => {
-        const platformKey = resetTradingPlatformActionParams ? platformMapping[resetTradingPlatformActionParams] : null;
-        if (platformKey) {
-            const verificationCode = localStorage.getItem(
-                `verification_code.trading_platform_${platformKey}_password_reset`
-            );
+const WalletsListingRoute: React.FC<TWalletsListingRouteProps> = ({ isHubRedirectionEnabled }) => {
+    const { isDesktop } = useDevice();
+    const { data: isEuRegion, isLoading: isEuRegionLoading } = useIsEuRegion();
+    const { data: activeWallet } = useActiveWalletAccount();
+    const { data: allWallets, isLoading: isAllWalletsLoading } = useAllWalletAccounts();
+    const hasAddedWallet = allWallets?.some(wallet => wallet.is_added);
+    const shouldHideAddMoreCarousel = isAllWalletsLoading || isEuRegionLoading || (isEuRegion && hasAddedWallet);
 
-            if (verificationCode) {
-                show(
-                    <WalletsResetMT5Password
-                        actionParams={resetTradingPlatformActionParams ?? ''}
-                        platform={platformKey}
-                        verificationCode={verificationCode}
-                    />
-                );
-            }
-        }
-    }, [platformMapping, resetTradingPlatformActionParams, show]);
+    if (isHubRedirectionEnabled) {
+        return null;
+    }
 
     return (
         <div className='wallets-listing-route'>
-            {isMobile ? <WalletsCarousel /> : <DesktopWalletsList />}
-            <WalletsAddMoreCarousel />
-            {!isMobile && <WalletTourGuide />}
+            {isDesktop && <WalletListHeader />}
+            {isDesktop ? (
+                <React.Suspense fallback={<WalletsCardLoader />}>
+                    <LazyDesktopWalletsList />
+                </React.Suspense>
+            ) : (
+                <React.Suspense fallback={<WalletsResponsiveLoader />}>
+                    <LazyWalletsCarousel />
+                </React.Suspense>
+            )}
+            {shouldHideAddMoreCarousel ? null : <WalletsAddMoreCarousel />}
             <ResetMT5PasswordHandler />
+            {isEuRegion && !activeWallet?.is_virtual && <WalletsDisclaimerBanner />}
         </div>
     );
 };

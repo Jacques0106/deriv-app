@@ -18,6 +18,15 @@ export const MARKET_TYPE = {
     ALL: 'all',
 } as const;
 
+export const PRODUCT = {
+    SWAPFREE: 'swap_free',
+    ZEROSPREAD: 'zero_spread',
+    CTRADER: 'ctrader',
+    DERIVX: 'derivx',
+    STP: 'stp',
+    GOLD: 'gold',
+} as const;
+
 export const MOBILE_PLATFORMS = {
     IOS: 'ios',
     HAUWEI: 'huawei',
@@ -44,16 +53,16 @@ export const JURISDICTION = {
 } as const;
 
 export const MARKET_TYPE_SHORTCODE = {
-    SYNTHETIC_SVG: 'synthetic_svg',
-    SYNTHETIC_BVI: 'synthetic_bvi',
-    SYNTHETIC_VANUATU: 'synthetic_vanuatu',
+    SYNTHETIC: 'synthetic',
     GAMING: 'gaming',
-    FINANCIAL_SVG: 'financial_svg',
-    FINANCIAL_BVI: 'financial_bvi',
-    FINANCIAL_VANUATU: 'financial_vanuatu',
-    FINANCIAL_LABUAN: 'financial_labuan',
+    FINANCIAL: 'financial',
+    FINANCIAL_LABUAN: 'financial_stp_labuan',
     FINANCIAL_MALTA_INVEST: 'financial_maltainvest',
-    ALL_SVG: 'all_svg',
+    FINANCIAL_GOLD: 'financial_gold',
+    CFDS_GOLD: 'CFDs_gold',
+    ALL_SWAP_FREE_SVG: 'all_swap_free_svg',
+    ALL_ZERO_SPREAD_BVI: 'all_zero_spread_bvi',
+    ALL_ZS_BVI: 'all_bvi',
     ALL_DXTRADE: 'all_',
 } as const;
 

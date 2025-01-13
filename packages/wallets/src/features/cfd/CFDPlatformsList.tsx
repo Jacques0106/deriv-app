@@ -1,83 +1,94 @@
 import React from 'react';
-import { Trans, useTranslation } from 'react-i18next';
 import { useHistory } from 'react-router-dom';
-import { useActiveWalletAccount } from '@deriv/api-v2';
-import { WalletButton, WalletLink, WalletText } from '../../components/Base';
-import useDevice from '../../hooks/useDevice';
+import { useActiveWalletAccount, useIsEuRegion } from '@deriv/api-v2';
+import { Localize } from '@deriv-com/translations';
+import { Button, Text, useDevice } from '@deriv-com/ui';
+import { WalletLink } from '../../components/Base';
 import CFDPlatformsListEmptyState from './CFDPlatformsListEmptyState';
 import { CFDPlatformsListAccounts } from './components';
 import './CFDPlatformsList.scss';
 
-type TProps = {
-    onMT5PlatformListLoaded?: (value: boolean) => void;
+const CFDPlatformsListHeader: React.FC<{ isDesktop?: boolean; isEuRegion?: boolean }> = ({ isDesktop, isEuRegion }) => {
+    const history = useHistory();
+
+    return isDesktop ? (
+        <React.Fragment>
+            <div className='wallets-cfd-list__header-compare-accounts'>
+                <Text size='xl' weight='bold'>
+                    <Localize i18n_default_text='CFDs' />
+                </Text>
+                <Button
+                    color='primary-transparent'
+                    onClick={() => {
+                        history.push('/compare-accounts');
+                    }}
+                    size='sm'
+                    variant='ghost'
+                >
+                    {isEuRegion ? (
+                        <Localize i18n_default_text='Account Information' />
+                    ) : (
+                        <Localize i18n_default_text='Compare accounts' />
+                    )}
+                </Button>
+            </div>
+            <Text align='start' size='md'>
+                <Localize
+                    components={[<WalletLink key={0} staticUrl='/trade-types/cfds/' />]}
+                    i18n_default_text='Trade bigger positions with less capital on a wide range of global markets. <0>Learn more</0>'
+                />
+            </Text>
+        </React.Fragment>
+    ) : (
+        <div className='wallets-cfd-list__header-description'>
+            <Text align='start' size='sm'>
+                <Localize
+                    components={[
+                        <a
+                            className='wallets-cfd-list__header-description__link'
+                            href='https://deriv.com/trade-types/cfds/'
+                            key={0}
+                            rel='noopener noreferrer'
+                            target='_blank'
+                        />,
+                    ]}
+                    i18n_default_text='Trade bigger positions with less capital on a wide range of global markets. <0>Learn more</0>'
+                />
+            </Text>
+            <Button
+                color='primary-transparent'
+                onClick={() => {
+                    history.push('/compare-accounts');
+                }}
+                size='sm'
+                textSize='sm'
+                variant='ghost'
+            >
+                {isEuRegion ? (
+                    <Localize i18n_default_text='Account Information' />
+                ) : (
+                    <Localize i18n_default_text='Compare accounts' />
+                )}
+            </Button>
+        </div>
+    );
 };
 
-const CFDPlatformsList: React.FC<TProps> = ({ onMT5PlatformListLoaded }) => {
+const CFDPlatformsList: React.FC = () => {
     const { data: activeWallet } = useActiveWalletAccount();
-    const { isMobile } = useDevice();
-    const { t } = useTranslation();
-    const history = useHistory();
+    const { isDesktop } = useDevice();
+    const { data: isEuRegion, isLoading } = useIsEuRegion();
 
     return (
         <div className='wallets-cfd-list'>
             <section className='wallets-cfd-list__header'>
-                {isMobile ? (
-                    <div className='wallets-cfd-list__header-description'>
-                        <WalletText size='sm'>
-                            <Trans
-                                components={[
-                                    <a
-                                        className='wallets-cfd-list__header-description__link'
-                                        href='https://deriv.com/trade-types/cfds/'
-                                        key={0}
-                                        rel='noopener noreferrer'
-                                        target='_blank'
-                                    />,
-                                ]}
-                                defaults='Trade bigger positions with less capital. <0>Learn more</0>'
-                            />
-                        </WalletText>
-                        <WalletButton
-                            onClick={() => {
-                                history.push('/wallets/compare-accounts');
-                            }}
-                            size='sm'
-                            textSize='sm'
-                            variant='ghost'
-                        >
-                            Compare accounts
-                        </WalletButton>
-                    </div>
+                {isLoading ? (
+                    <div className='wallets-cfd-list__header--loader' />
                 ) : (
-                    <div>
-                        <div className='wallets-cfd-list__header-compare-accounts'>
-                            <WalletText size='xl' weight='bold'>
-                                {t('CFDs')}
-                            </WalletText>
-                            <WalletButton
-                                onClick={() => {
-                                    history.push('/wallets/compare-accounts');
-                                }}
-                                size='sm'
-                                variant='ghost'
-                            >
-                                {t('Compare accounts')}
-                            </WalletButton>
-                        </div>
-                        <WalletText size='md'>
-                            <Trans
-                                components={[<WalletLink key={0} staticUrl='/trade-types/cfds/' />]}
-                                defaults='Trade bigger positions with less capital. <0>Learn more</0>'
-                            />
-                        </WalletText>
-                    </div>
+                    <CFDPlatformsListHeader isDesktop={isDesktop} isEuRegion={isEuRegion} />
                 )}
             </section>
-            {activeWallet?.currency_config?.is_crypto ? (
-                <CFDPlatformsListEmptyState />
-            ) : (
-                <CFDPlatformsListAccounts onMT5PlatformListLoaded={onMT5PlatformListLoaded} />
-            )}
+            {activeWallet?.currency_config?.is_crypto ? <CFDPlatformsListEmptyState /> : <CFDPlatformsListAccounts />}
         </div>
     );
 };

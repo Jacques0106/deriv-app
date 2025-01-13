@@ -1,15 +1,15 @@
 import React, { MouseEventHandler } from 'react';
-import { WalletButton, WalletText } from '../../../../../../components';
+import { Localize } from '@deriv-com/translations';
+import { Button, Text } from '@deriv-com/ui';
 import './FiatOnRampProviderCard.scss';
 
 type TFiatOnRampProvider = {
-    description: string;
+    description: React.ReactNode;
     getPaymentIcons: () => { icon: JSX.Element; name: string }[];
     handleDisclaimer: MouseEventHandler<HTMLButtonElement>;
     icon: React.ReactNode;
-    name: string;
+    name: React.ReactNode;
 };
-
 const FiatOnRampProviderCard: React.FC<TFiatOnRampProvider> = ({
     description,
     getPaymentIcons,
@@ -23,24 +23,36 @@ const FiatOnRampProviderCard: React.FC<TFiatOnRampProvider> = ({
         <div className='wallets-fiat-onramp-provider'>
             <div className='wallets-fiat-onramp-provider__logo'>{icon}</div>
             <div className='wallets-fiat-onramp-provider__content'>
-                <WalletText color='prominent' size='md' weight='bold'>
+                <Text align='start' color='prominent' size='md' weight='bold'>
                     {name}
-                </WalletText>
-                <WalletText size='sm'>{description}</WalletText>
+                </Text>
+                <Text align='start' size='sm'>
+                    {description}
+                </Text>
                 <div className='wallets-fiat-onramp-provider__icons'>
                     {paymentIcons.map(paymentIcon => (
-                        <div key={`payment-method-icon-${paymentIcon.name}`}>{paymentIcon.icon}</div>
+                        <div
+                            className='wallets-fiat-onramp-provider__payment-icon'
+                            key={`payment-method-icon-${paymentIcon.name}`}
+                        >
+                            {paymentIcon.icon}
+                        </div>
                     ))}
                 </div>
             </div>
             <div className='wallets-fiat-onramp-provider__mobile-icons'>
                 {paymentIcons.map(paymentIcon => (
-                    <div key={`payment-method-icon-${paymentIcon.name}`}>{paymentIcon.icon}</div>
+                    <div
+                        className='wallets-fiat-onramp-provider__payment-icon'
+                        key={`payment-method-mobile-icon-${paymentIcon.name}`}
+                    >
+                        {paymentIcon.icon}
+                    </div>
                 ))}
             </div>
-            <WalletButton onClick={handleDisclaimer} size='md'>
-                Select
-            </WalletButton>
+            <Button onClick={handleDisclaimer} size='md'>
+                <Localize i18n_default_text='Select' />
+            </Button>
         </div>
     );
 };

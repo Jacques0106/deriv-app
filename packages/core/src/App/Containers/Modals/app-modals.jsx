@@ -1,30 +1,32 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import Cookies from 'js-cookie';
 
-import { useStoreWalletAccountsList, useWalletMigration } from '@deriv/hooks';
+import { useWalletMigration, useIsTNCNeeded } from '@deriv/hooks';
 import { ContentFlag, moduleLoader, routes, SessionStore } from '@deriv/shared';
+import { observer, useStore } from '@deriv/stores';
 
 import DerivRealAccountRequiredModal from 'App/Components/Elements/Modals/deriv-real-account-required-modal.jsx';
 import MT5AccountNeededModal from 'App/Components/Elements/Modals/mt5-account-needed-modal.jsx';
 import RedirectNoticeModal from 'App/Components/Elements/Modals/RedirectNotice';
-import { observer, useStore } from '@deriv/stores';
 
 import CompletedAssessmentModal from './completed-assessment-modal.jsx';
 import ReadyToVerifyModal from './ready-to-verify-modal';
 import CooldownWarningModal from './cooldown-warning-modal.jsx';
-import MT5Notification from './mt5-notification';
 import NeedRealAccountForCashierModal from './need-real-account-for-cashier-modal';
 import ReadyToDepositModal from './ready-to-deposit-modal';
 import RiskAcceptTestWarningModal from './risk-accept-test-warning-modal';
 import WalletsUpgradeLogoutModal from './wallets-upgrade-logout-modal';
 import WalletsUpgradeCompletedModal from './wallets-upgrade-completed-modal';
-import EffortlessLoginModal from '../EffortlessLoginModal';
+import CryptoTransactionProcessingModal from './crypto-transaction-processing-modal';
+
+const SameDOBPhoneModal = React.lazy(() =>
+    moduleLoader(() => import(/* webpackChunkName: "same-dob-phone-modal" */ './same-dob-phone-modal'))
+);
 
 const TradingAssessmentExistingUser = React.lazy(() =>
     moduleLoader(() =>
-        import(
-            /* webpackChunkName: "trading-assessment-existing-user-modal" */ './trading-assessment-existing-user.jsx'
-        )
+        import(/* webpackChunkName: "trading-assessment-existing-user-modal" */ './trading-assessment-existing-user')
     )
 );
 
@@ -57,10 +59,6 @@ const ResetEmailModal = React.lazy(() => import(/* webpackChunkName: "reset-emai
 
 const UpdateEmailModal = React.lazy(() => import(/* webpackChunkName: "update-email-modal"  */ '../UpdateEmailModal'));
 
-const WarningScamMessageModal = React.lazy(() =>
-    import(/* webpackChunkName: "warning-scam-message" */ '../WarningScamMessageModal')
-);
-
 const WarningCloseCreateRealAccountModal = React.lazy(() =>
     import(/* webpackChunkName: "warning-close-create-real-account" */ '../WarningCloseCreateRealAccountModal')
 );
@@ -73,29 +71,22 @@ const OneTimeDepositModal = React.lazy(() =>
     import(/* webpackChunkName: "one-time-deposit-modal" */ '../OneTimeDepositModal')
 );
 
-const AdditionalKycInfoModal = React.lazy(() =>
-    import(
-        /* webpackChunkName: "additional-kyc-info-modal" */ '@deriv/account/src/Components/additional-kyc-info-modal'
-    )
-);
-
-const InformationSubmittedModal = React.lazy(() =>
-    import(/* webpackChunkName: "information-submitted-modal" */ './information-submitted-modal')
+const TncStatusUpdateModal = React.lazy(() =>
+    import(/* webpackChunkName: "tnc-status-update-modal" */ './tnc-status-update-modal')
 );
 
 const AppModals = observer(() => {
     const { client, ui, traders_hub } = useStore();
     const {
+        has_wallet,
         is_authorize,
         is_logged_in,
         fetchFinancialAssessment,
         setCFDScore,
         landing_company_shortcode: active_account_landing_company,
         is_trading_experience_incomplete,
-        mt5_login_list,
-        should_show_effortless_login_modal,
     } = client;
-    const { content_flag, is_tour_open } = traders_hub;
+    const { content_flag } = traders_hub;
     const {
         is_account_needed_modal_on,
         is_closing_create_real_account_modal,
@@ -105,17 +96,18 @@ const AppModals = observer(() => {
         toggleAccountSignupModal,
         is_trading_assessment_for_new_user_enabled,
         is_deriv_account_needed_modal_visible,
-        is_warning_scam_message_modal_visible,
         is_ready_to_deposit_modal_visible,
         is_need_real_account_for_cashier_modal_visible,
         should_show_risk_accept_modal,
-        is_additional_kyc_info_modal_open,
-        is_kyc_information_submitted_modal_open,
         is_verification_modal_visible,
         is_verification_submitted,
         isUrlUnavailableModalVisible,
         should_show_one_time_deposit_modal,
         should_show_account_success_modal,
+        should_show_crypto_transaction_processing_modal,
+        should_show_same_dob_phone_modal,
+        is_tnc_update_modal_open,
+        toggleTncUpdateModal,
     } = ui;
     const temp_session_signup_params = SessionStore.get('signup_query_param');
     const url_params = new URLSearchParams(useLocation().search || temp_session_signup_params);
@@ -123,18 +115,17 @@ const AppModals = observer(() => {
 
     const is_eu_user = [ContentFlag.LOW_RISK_CR_EU, ContentFlag.EU_REAL, ContentFlag.EU_DEMO].includes(content_flag);
 
-    const should_show_mt5_notification_modal =
-        is_logged_in && mt5_login_list.length > 0
-            ? mt5_login_list.find(login => login)?.white_label?.notification ?? true
-            : false;
-
     const { is_migrated } = useWalletMigration();
 
-    const { has_wallet } = useStoreWalletAccountsList();
+    const should_show_wallets_upgrade_completed_modal = Cookies.get('recent_wallets_migration');
 
-    const should_show_wallets_upgrade_completed_modal = localStorage.getItem(
-        'should_show_wallets_upgrade_completed_modal'
-    );
+    const is_tnc_needed = useIsTNCNeeded();
+
+    React.useEffect(() => {
+        if (is_tnc_needed) {
+            toggleTncUpdateModal(true);
+        }
+    }, [is_tnc_needed, toggleTncUpdateModal]);
 
     React.useEffect(() => {
         if (is_logged_in && is_authorize) {
@@ -143,7 +134,18 @@ const AppModals = observer(() => {
             });
         }
     }, [is_logged_in, is_authorize]);
-    if (temp_session_signup_params && window.location.href.includes(routes.onboarding)) {
+
+    const is_onboarding = window.location.href.includes(routes.onboarding);
+
+    const should_show_trading_assessment_existing_user_form =
+        is_logged_in &&
+        active_account_landing_company === 'maltainvest' &&
+        !is_trading_assessment_for_new_user_enabled &&
+        is_trading_experience_incomplete &&
+        content_flag !== ContentFlag.LOW_RISK_CR_EU &&
+        content_flag !== ContentFlag.LOW_RISK_CR_NON_EU;
+
+    if (temp_session_signup_params && is_onboarding) {
         toggleAccountSignupModal(true);
     } else {
         SessionStore.remove('signup_query_param');
@@ -176,77 +178,68 @@ const AppModals = observer(() => {
             }
             break;
     }
+    if (!url_action_param) {
+        if (should_show_trading_assessment_existing_user_form) {
+            ComponentToLoad = <TradingAssessmentExistingUser />;
+        } else if (is_closing_create_real_account_modal) {
+            ComponentToLoad = <WarningCloseCreateRealAccountModal />;
+        } else if (is_account_needed_modal_on) {
+            ComponentToLoad = <MT5AccountNeededModal />;
+        } else if (should_show_cooldown_modal) {
+            ComponentToLoad = <CooldownWarningModal />;
+        } else if (should_show_assessment_complete_modal) {
+            ComponentToLoad = <CompletedAssessmentModal />;
+        } else if (is_deriv_account_needed_modal_visible) {
+            ComponentToLoad = <DerivRealAccountRequiredModal />;
+        } else if (should_show_risk_accept_modal) {
+            ComponentToLoad = <RiskAcceptTestWarningModal />;
+        } else if (isUrlUnavailableModalVisible) {
+            ComponentToLoad = <UrlUnavailableModal />;
+        }
 
-    if (
-        is_logged_in &&
-        active_account_landing_company === 'maltainvest' &&
-        !is_trading_assessment_for_new_user_enabled &&
-        is_trading_experience_incomplete &&
-        content_flag !== ContentFlag.LOW_RISK_CR_EU &&
-        content_flag !== ContentFlag.LOW_RISK_CR_NON_EU
-    ) {
-        ComponentToLoad = <TradingAssessmentExistingUser />;
-    } else if (is_warning_scam_message_modal_visible) {
-        ComponentToLoad = <WarningScamMessageModal />;
-    } else if (is_closing_create_real_account_modal) {
-        ComponentToLoad = <WarningCloseCreateRealAccountModal />;
-    } else if (is_account_needed_modal_on) {
-        ComponentToLoad = <MT5AccountNeededModal />;
-    } else if (should_show_cooldown_modal) {
-        ComponentToLoad = <CooldownWarningModal />;
-    } else if (should_show_mt5_notification_modal) {
-        ComponentToLoad = <MT5Notification />;
-    } else if (should_show_assessment_complete_modal) {
-        ComponentToLoad = <CompletedAssessmentModal />;
-    } else if (is_deriv_account_needed_modal_visible) {
-        ComponentToLoad = <DerivRealAccountRequiredModal />;
-    } else if (should_show_risk_accept_modal) {
-        ComponentToLoad = <RiskAcceptTestWarningModal />;
-    } else if (isUrlUnavailableModalVisible) {
-        ComponentToLoad = <UrlUnavailableModal />;
-    }
+        if (has_wallet && should_show_wallets_upgrade_completed_modal) {
+            ComponentToLoad = <WalletsUpgradeCompletedModal />;
+        }
 
-    if (has_wallet && should_show_wallets_upgrade_completed_modal) {
-        ComponentToLoad = <WalletsUpgradeCompletedModal />;
-    }
+        if (!has_wallet && is_migrated && is_logged_in) {
+            ComponentToLoad = <WalletsUpgradeLogoutModal />;
+        }
 
-    if (!has_wallet && is_migrated) {
-        ComponentToLoad = <WalletsUpgradeLogoutModal />;
-    }
+        if (is_ready_to_deposit_modal_visible) {
+            ComponentToLoad = <ReadyToDepositModal />;
+        }
 
-    if (should_show_effortless_login_modal && !is_tour_open) {
-        ComponentToLoad = <EffortlessLoginModal />;
-    }
+        if (is_need_real_account_for_cashier_modal_visible) {
+            ComponentToLoad = <NeedRealAccountForCashierModal />;
+        }
 
-    if (is_ready_to_deposit_modal_visible) {
-        ComponentToLoad = <ReadyToDepositModal />;
-    }
+        if (is_verification_modal_visible) {
+            ComponentToLoad = <VerificationModal />;
+        }
 
-    if (is_need_real_account_for_cashier_modal_visible) {
-        ComponentToLoad = <NeedRealAccountForCashierModal />;
-    }
+        if (is_verification_submitted) {
+            ComponentToLoad = <VerificationDocumentSubmitted />;
+        }
 
-    if (is_verification_modal_visible) {
-        ComponentToLoad = <VerificationModal />;
-    }
+        if (should_show_one_time_deposit_modal) {
+            ComponentToLoad = <OneTimeDepositModal />;
+        }
 
-    if (is_verification_submitted) {
-        ComponentToLoad = <VerificationDocumentSubmitted />;
-    }
+        if (should_show_crypto_transaction_processing_modal) {
+            ComponentToLoad = <CryptoTransactionProcessingModal />;
+        }
 
-    if (should_show_one_time_deposit_modal) {
-        ComponentToLoad = <OneTimeDepositModal />;
-    }
+        if (should_show_account_success_modal) {
+            ComponentToLoad = <ReadyToVerifyModal />;
+        }
 
-    if (should_show_account_success_modal) {
-        ComponentToLoad = <ReadyToVerifyModal />;
-    }
-    if (is_additional_kyc_info_modal_open) {
-        ComponentToLoad = <AdditionalKycInfoModal />;
-    }
+        if (should_show_same_dob_phone_modal) {
+            ComponentToLoad = <SameDOBPhoneModal />;
+        }
 
-    if (is_kyc_information_submitted_modal_open) {
-        ComponentToLoad = <InformationSubmittedModal />;
+        if (is_tnc_update_modal_open) {
+            ComponentToLoad = <TncStatusUpdateModal />;
+        }
     }
 
     return (

@@ -1,17 +1,20 @@
 import React, { FC } from 'react';
+import classNames from 'classnames';
 import { useEventListener } from 'usehooks-ts';
-import CloseIcon from '../../../public/images/ic-close-dark.svg';
+import { LegacyClose2pxIcon } from '@deriv/quill-icons';
 import { useModal } from '../../ModalProvider';
 import './ModalWrapper.scss';
 
 type TProps = {
     hideCloseButton?: boolean;
+    isFullscreen?: boolean;
     shouldPreventCloseOnEscape?: boolean;
 };
 
 const ModalWrapper: FC<React.PropsWithChildren<TProps>> = ({
     children,
     hideCloseButton = false,
+    isFullscreen = false,
     shouldPreventCloseOnEscape = false,
 }) => {
     const { hide } = useModal();
@@ -23,8 +26,14 @@ const ModalWrapper: FC<React.PropsWithChildren<TProps>> = ({
     });
 
     return (
-        <div className='wallets-modal-wrapper'>
-            {!hideCloseButton && <CloseIcon className='wallets-modal-wrapper__close-icon' onClick={hide} />}
+        <div
+            className={classNames('wallets-modal-wrapper', {
+                'wallets-modal-wrapper--fullscreen': isFullscreen,
+            })}
+        >
+            {!hideCloseButton && (
+                <LegacyClose2pxIcon className='wallets-modal-wrapper__close-icon' iconSize='xs' onClick={hide} />
+            )}
             {children}
         </div>
     );

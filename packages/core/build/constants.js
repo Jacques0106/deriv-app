@@ -4,7 +4,7 @@ const CopyPlugin = require('copy-webpack-plugin');
 const HtmlWebPackPlugin = require('html-webpack-plugin');
 const HtmlWebpackTagsPlugin = require('html-webpack-tags-plugin');
 const PreloadWebpackPlugin = require('preload-webpack-plugin');
-const IgnorePlugin = require('webpack').IgnorePlugin;
+const { IgnorePlugin, DefinePlugin } = require('webpack');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const path = require('path');
@@ -33,7 +33,6 @@ const {
     IS_RELEASE,
 } = require('./loaders-config');
 const Dotenv = require('dotenv-webpack');
-const { DefinePlugin } = require('webpack');
 
 const HOISTED_PACKAGES = {
     react: path.resolve(__dirname, '../../../node_modules/react'),
@@ -41,11 +40,17 @@ const HOISTED_PACKAGES = {
     'react-router': path.resolve(__dirname, '../../../node_modules/react-router'),
     'react-router-dom': path.resolve(__dirname, '../../../node_modules/react-router-dom'),
     mobx: path.resolve(__dirname, '../../../node_modules/mobx'),
-    'mobx-react': path.resolve(__dirname, '../../../node_modules/mobx-react'),
-    '@deriv/shared': path.resolve(__dirname, '../node_modules/@deriv/shared'),
-    '@deriv/components': path.resolve(__dirname, '../node_modules/@deriv/components'),
-    '@deriv/translations': path.resolve(__dirname, '../node_modules/@deriv/translations'),
+    'mobx-react-lite': path.resolve(__dirname, '../../../node_modules/mobx-react-lite'),
+    '@deriv/shared': path.resolve(__dirname, '../../../node_modules/@deriv/shared'),
+    '@deriv/components': path.resolve(__dirname, '../../../node_modules/@deriv/components'),
+    '@deriv/translations': path.resolve(__dirname, '../../../node_modules/@deriv/translations'),
     '@deriv/deriv-charts': path.resolve(__dirname, '../../../node_modules/@deriv/deriv-charts'),
+    '@deriv/trader': path.resolve(__dirname, '../../../node_modules/@deriv/trader'),
+    '@deriv/p2p': path.resolve(__dirname, '../../../node_modules/@deriv/p2p'),
+    '@deriv/cashier': path.resolve(__dirname, '../../../node_modules/@deriv/cashier'),
+    '@deriv/bot-web-ui': path.resolve(__dirname, '../../../node_modules/@deriv/bot-web-ui'),
+    '@deriv/reports': path.resolve(__dirname, '../../../node_modules/@deriv/reports'),
+    '@deriv/cfd': path.resolve(__dirname, '../../../node_modules/@deriv/cfd'),
 };
 
 const ALIASES = {
@@ -139,6 +144,8 @@ const plugins = ({ base, is_test_env }) => {
             'process.env.GROWTHBOOK_DECRYPTION_KEY': JSON.stringify(process.env.GROWTHBOOK_DECRYPTION_KEY),
             'process.env.IS_GROWTHBOOK_ENABLED': JSON.stringify(process.env.IS_GROWTHBOOK_ENABLED),
             'process.env.REMOTE_CONFIG_URL': JSON.stringify(process.env.REMOTE_CONFIG_URL),
+            'process.env.ACC_TRANSLATION_PATH': JSON.stringify('deriv-app-account/staging'),
+            'process.env.CROWDIN_URL': JSON.stringify('https://translations.deriv.com'),
         }),
         new CleanWebpackPlugin(),
         new CopyPlugin(copyConfig(base)),

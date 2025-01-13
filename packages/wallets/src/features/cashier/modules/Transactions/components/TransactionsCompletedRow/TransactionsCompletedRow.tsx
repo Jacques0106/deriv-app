@@ -1,8 +1,13 @@
-import React, { useMemo } from 'react';
-import { WalletText } from '../../../../../../components/Base';
+import React, { useState } from 'react';
+import classNames from 'classnames';
+import { useDebounceCallback } from 'usehooks-ts';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Divider, Text } from '@deriv-com/ui';
+import { FormatUtils } from '@deriv-com/utils';
+import { WalletClipboard, WalletMoney } from '../../../../../../components';
 import { THooks } from '../../../../../../types';
-import { TransactionsCompletedRowAccountDetails } from './components/TransactionsCompletedRowAccountDetails';
-import { TransactionsCompletedRowTransferAccountDetails } from './components/TransactionsCompletedRowTransferAccountDetails';
+import { getTransactionLabels } from '../../constants';
+import { TransactionsCompletedRowAccountDetails, TransactionsCompletedRowTransferAccountDetails } from './components';
 import './TransactionsCompletedRow.scss';
 
 type TProps = {
@@ -11,68 +16,145 @@ type TProps = {
     wallet: THooks.ActiveWalletAccount;
 };
 
-const TransactionsCompletedRow: React.FC<TProps> = ({ accounts, transaction, wallet }) => {
-    // TODO: remove this once backend adds `to` and `from` for Deriv X and CTrader transfers
-    const dxtradeOrCtraderToFrom = useMemo(() => {
-        if (transaction?.action_type !== 'transfer' || !transaction.longcode) return null;
-        const longcodeMessageTokens = transaction.longcode.split(' ');
-        const direction = longcodeMessageTokens[4] === 'cTrader' ? 'to' : longcodeMessageTokens[1];
-        const dxtradeOrCtraderLoginid = longcodeMessageTokens.find(
-            token => token.startsWith('DX') || token.startsWith('CT')
+type TTransactionsCompletedRowContentProps = TProps & {
+    displayNonTransferActionType: string;
+    displayTransferActionType: string;
+    displayWalletName: string;
+    shouldShowTraceId: boolean;
+};
+
+const TransactionsCompletedRowContent: React.FC<TTransactionsCompletedRowContentProps> = ({
+    accounts,
+    displayNonTransferActionType,
+    displayTransferActionType,
+    displayWalletName,
+    shouldShowTraceId,
+    transaction,
+    wallet,
+}) => {
+    const { action_type: actionType, longcode = '', transaction_id: transactionId } = transaction;
+    const { account_type: accountType = '', currency = 'USD', is_virtual: isVirtual } = wallet;
+    const { addressHash, blockchainHash, splitLongcode } = FormatUtils.parseCryptoLongcode(longcode);
+    let descriptions = [longcode];
+
+    if (addressHash || blockchainHash) {
+        descriptions = splitLongcode?.map(
+            description => `${description[0].toLocaleUpperCase()}${description.slice(1)}`
         );
-        return dxtradeOrCtraderLoginid
-            ? {
-                  from: { loginid: wallet.loginid },
-                  to: { loginid: wallet.loginid },
-                  ...(direction && { [direction]: { loginid: dxtradeOrCtraderLoginid } }),
-              }
-            : null;
-    }, [transaction?.action_type, transaction.longcode, wallet.loginid]);
-
-    if (!transaction.action_type || !transaction.amount) return null;
-
-    const displayCurrency = wallet?.currency_config?.display_code || 'USD';
-    const displayWalletName = `${displayCurrency} Wallet`;
-    const displayActionType =
-        wallet.is_virtual && ['deposit', 'withdrawal'].includes(transaction.action_type)
-            ? 'Reset balance'
-            : transaction.action_type.replace(/^\w/, c => c.toUpperCase());
-
+    }
+    if (shouldShowTraceId && transaction.longcode) {
+        return (
+            <Text align='center' as='div'>
+                {descriptions.map((description, index) => {
+                    return (
+                        <React.Fragment key={description}>
+                            <Text align='center' as='p' lineHeight='xs' size='xs'>
+                                {description}
+                            </Text>
+                            <div>
+                                {blockchainHash && index === descriptions.length - 1 && (
+                                    <WalletClipboard popoverAlignment='top' textCopy={blockchainHash} />
+                                )}
+                                {addressHash &&
+                                    transaction.action_type === 'withdrawal' &&
+                                    index === descriptions.length - 1 && (
+                                        <WalletClipboard popoverAlignment='top' textCopy={addressHash} />
+                                    )}
+                            </div>
+                        </React.Fragment>
+                    );
+                })}
+            </Text>
+        );
+    }
     return (
-        <div className='wallets-transactions-completed-row'>
-            {transaction.action_type !== 'transfer' ? (
+        <>
+            {actionType && actionType !== 'transfer' ? (
                 <TransactionsCompletedRowAccountDetails
-                    accountType={wallet?.account_type ?? ''}
-                    actionType={transaction.action_type}
-                    currency={wallet?.currency ?? 'USD'}
+                    accountType={accountType}
+                    actionType={actionType}
+                    currency={currency}
                     displayAccountName={displayWalletName}
-                    displayActionType={displayActionType}
-                    isDemo={Boolean(wallet?.is_virtual)}
+                    displayActionType={displayNonTransferActionType}
+                    isDemo={Boolean(isVirtual)}
+                    transactionID={transactionId}
                 />
             ) : (
                 <TransactionsCompletedRowTransferAccountDetails
                     accounts={accounts}
-                    direction={
-                        (transaction.from ?? dxtradeOrCtraderToFrom?.from)?.loginid === wallet?.loginid ? 'to' : 'from'
-                    }
+                    displayActionType={displayTransferActionType}
                     loginid={
-                        [
-                            transaction.from?.loginid ?? dxtradeOrCtraderToFrom?.from.loginid,
-                            transaction.to?.loginid ?? dxtradeOrCtraderToFrom?.to.loginid,
-                        ].find(loginid => loginid !== wallet?.loginid) ?? ''
+                        [transaction.from?.loginid, transaction.to?.loginid].find(
+                            loginid => loginid !== wallet?.loginid
+                        ) ?? ''
                     }
+                    transactionID={transaction.transaction_id}
                 />
             )}
             <div className='wallets-transactions-completed-row__transaction-details'>
-                <WalletText color={transaction.amount > 0 ? 'success' : 'error'} size='xs' weight='bold'>
-                    {transaction.amount && transaction.amount > 0 ? '+' : ''}
-                    {transaction.display_amount}
-                </WalletText>
-                <WalletText color='primary' size='2xs'>
-                    Balance: {transaction.display_balance_after}
-                </WalletText>
+                <Text
+                    color={transaction.amount && transaction.amount > 0 ? 'success' : 'error'}
+                    size='xs'
+                    weight='bold'
+                >
+                    <WalletMoney amount={transaction.amount} currency={currency} hasSign />
+                </Text>
+                <Text color='primary' size='2xs'>
+                    <Localize
+                        i18n_default_text='Balance: {{balance}}'
+                        values={{
+                            balance: transaction.display_balance_after,
+                        }}
+                    />
+                </Text>
             </div>
-        </div>
+        </>
+    );
+};
+
+const TransactionsCompletedRow: React.FC<TProps> = ({ accounts, transaction, wallet }) => {
+    const { localize } = useTranslations();
+    const [shouldShowTraceId, setShouldShowTraceId] = useState(false);
+    const debouncedSetShouldShowTraceId = useDebounceCallback(() => setShouldShowTraceId(false), 5000);
+
+    if (!transaction.action_type || !transaction.amount) return null;
+
+    const displayCurrency = wallet?.currency_config?.display_code || 'USD';
+    const displayWalletName = localize('{{currency}} Wallet', { currency: displayCurrency });
+    const displayNonTransferActionType =
+        wallet.is_virtual && ['deposit', 'withdrawal'].includes(transaction.action_type)
+            ? getTransactionLabels(localize).reset_balance
+            : //@ts-expect-error we only need partial action types
+              getTransactionLabels(localize)[transaction.action_type];
+    const displayTransferActionType =
+        transaction.from?.loginid === wallet?.loginid ? localize('Transfer to') : localize('Transfer from');
+
+    const handleRowClick = () => {
+        setShouldShowTraceId(!shouldShowTraceId);
+        debouncedSetShouldShowTraceId();
+    };
+
+    return (
+        <React.Fragment>
+            <Divider color='var(--border-divider)' />
+            <div
+                className={classNames('wallets-transactions-completed-row', {
+                    'wallets-transactions-completed-row--active': shouldShowTraceId,
+                })}
+                onClick={handleRowClick}
+                onKeyDown={handleRowClick}
+            >
+                <TransactionsCompletedRowContent
+                    accounts={accounts}
+                    displayNonTransferActionType={displayNonTransferActionType}
+                    displayTransferActionType={displayTransferActionType}
+                    displayWalletName={displayWalletName}
+                    shouldShowTraceId={shouldShowTraceId}
+                    transaction={transaction}
+                    wallet={wallet}
+                />
+            </div>
+        </React.Fragment>
     );
 };
 

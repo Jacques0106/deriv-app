@@ -1,25 +1,21 @@
 import React from 'react';
-import {
-    WalletCurrencyCard,
-    WalletListCardBadge,
-    WalletsAppLinkedWithWalletIcon,
-    WalletText,
-} from '../../../../../../../../components';
-import { THooks, TWalletLandingCompanyName } from '../../../../../../../../types';
-import { getTradingAppIcon, getWalletIcon } from '../../../../../../helpers';
+import { Localize } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
+import { WalletCurrencyCard, WalletMarketCurrencyIcon } from '../../../../../../../../components';
+import { THooks, TPlatforms } from '../../../../../../../../types';
 import './TransactionsCompletedRowAccountDetails.scss';
 
 type TProps = {
     accountType: string;
     actionType: NonNullable<(THooks.InfiniteTransactions | THooks.Transactions)['action_type']>;
     currency: string;
-    displayAccountName: string;
+    displayAccountName: JSX.Element | string;
     displayActionType: string;
     isDemo: boolean;
     isInterWallet?: boolean;
-    landingCompanyName?: TWalletLandingCompanyName;
-    mt5Group?: string;
-    mt5LandingCompanyName?: string;
+    marketType?: string;
+    product?: THooks.AvailableMT5Accounts['product'];
+    transactionID?: number;
 };
 
 const TransactionsCompletedRowAccountDetails: React.FC<TProps> = ({
@@ -30,33 +26,63 @@ const TransactionsCompletedRowAccountDetails: React.FC<TProps> = ({
     displayActionType,
     isDemo,
     isInterWallet = false,
-    landingCompanyName,
-    mt5Group,
-    mt5LandingCompanyName,
+    marketType,
+    product,
+    transactionID,
 }) => {
+    const { isDesktop } = useDevice();
+
     return (
         <div className='wallets-transactions-completed-row-account-details'>
             {actionType !== 'transfer' || isInterWallet ? (
-                <WalletCurrencyCard currency={currency} isDemo={isDemo} size='md' />
-            ) : (
-                <WalletsAppLinkedWithWalletIcon
-                    appIcon={getTradingAppIcon(accountType, landingCompanyName ?? 'svg', mt5Group)}
+                <WalletCurrencyCard
+                    className='wallets-transactions-completed-row-account-details__currency-card'
                     currency={currency}
                     isDemo={isDemo}
-                    walletIcon={getWalletIcon(currency, isDemo)}
+                    size='md'
+                />
+            ) : (
+                <WalletMarketCurrencyIcon
+                    currency={currency}
+                    isDemo={isDemo}
+                    marketType={marketType}
+                    platform={accountType as TPlatforms.All}
+                    product={product}
                 />
             )}
-            <div className='wallets-transactions-completed-row-account-details__type-and-wallet-name'>
-                <WalletText color='primary' size='xs'>
+            <div
+                className='wallets-transactions-completed-row-account-details__type-and-wallet-name 
+            wallets-transactions-completed-row-account-details__column'
+            >
+                <Text color='primary' size='xs'>
                     {displayActionType}
-                </WalletText>
+                </Text>
                 <div className='wallets-transactions-completed-row-account-details__wallet-name'>
-                    <WalletText color='general' size='xs' weight='bold'>
+                    <Text color='general' size='xs' weight='bold'>
                         {displayAccountName}
-                    </WalletText>
-                    {!isDemo && <WalletListCardBadge label={mt5LandingCompanyName ?? landingCompanyName} />}
+                    </Text>
                 </div>
+                {!isDesktop && (
+                    <Text
+                        as='div'
+                        className='wallets-transactions-completed-row-account-details__transaction-id'
+                        color='less-prominent'
+                        size='xs'
+                    >
+                        <Localize i18n_default_text='Ref. ID: {{transactionID}}' values={{ transactionID }} />
+                    </Text>
+                )}
             </div>
+            {isDesktop && (
+                <div className='wallets-transactions-completed-row-account-details__column'>
+                    <Text as='div' color='less-prominent' size='2xs'>
+                        <Localize i18n_default_text='Ref. ID' />
+                    </Text>
+                    <Text as='div' color='general' size='2xs'>
+                        {transactionID}
+                    </Text>
+                </div>
+            )}
         </div>
     );
 };

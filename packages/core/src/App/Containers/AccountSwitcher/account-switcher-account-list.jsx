@@ -8,7 +8,6 @@ const AccountList = ({
     balance,
     currency,
     currency_icon,
-    country_standpoint,
     display_type,
     has_balance,
     has_error,
@@ -17,6 +16,7 @@ const AccountList = ({
     is_disabled,
     is_virtual,
     is_eu,
+    product,
     loginid,
     market_type,
     redirectAccount,
@@ -49,12 +49,7 @@ const AccountList = ({
                     />
                     <span>
                         {display_type === 'currency' ? (
-                            <CurrencyDisplay
-                                country_standpoint={country_standpoint}
-                                currency={currency}
-                                loginid={loginid}
-                                is_virtual={is_virtual}
-                            />
+                            <CurrencyDisplay currency={currency} loginid={loginid} is_virtual={is_virtual} />
                         ) : (
                             <AccountDisplay
                                 is_eu={is_eu}
@@ -63,6 +58,7 @@ const AccountList = ({
                                 sub_account_type={sub_account_type}
                                 has_error={has_error}
                                 platform={platform}
+                                product={product}
                                 is_dark_mode_on={is_dark_mode_on}
                                 shortcode={shortcode}
                                 should_show_server_name={should_show_server_name}
@@ -114,24 +110,11 @@ const AccountList = ({
     );
 };
 
-const CurrencyDisplay = ({ country_standpoint, currency, loginid, is_virtual }) => {
-    const user_is_from_this_country_list = Object.values(country_standpoint).includes(true);
+const CurrencyDisplay = ({ currency, loginid, is_virtual }) => {
     const account_type = loginid.replace(/\d/g, '');
 
-    if (user_is_from_this_country_list) {
-        if (account_type === 'MLT') {
-            return <Localize i18n_default_text='Options' />;
-        } else if (account_type === 'MX') {
-            if (country_standpoint.is_united_kingdom) {
-                return <Localize i18n_default_text='Gaming' />;
-            }
-            if (country_standpoint.is_isle_of_man) {
-                return getCurrencyName(currency);
-            }
-            return <Localize i18n_default_text='Synthetic' />;
-        } else if (account_type === 'MF') {
-            return <Localize i18n_default_text='Multipliers' />;
-        }
+    if (account_type === 'MF') {
+        return <Localize i18n_default_text='Multipliers' />;
     }
 
     if (is_virtual) {
@@ -151,12 +134,13 @@ const AccountDisplay = ({
     sub_account_type,
     platform,
     server,
+    product,
     is_dark_mode_on,
     is_eu,
     shortcode,
     should_show_server_name,
 }) => {
-    const account_title = getCFDAccountDisplay({ market_type, sub_account_type, platform, is_eu, shortcode });
+    const account_title = getCFDAccountDisplay({ market_type, sub_account_type, platform, is_eu, shortcode, product });
     // TODO: Remove once account with error has market_type and sub_account_type in details response
     const getServerName = React.useCallback(account => {
         if (account) {

@@ -8,7 +8,7 @@ type THeaderAccountActions = {
 
 const HeaderAccountActions = observer(({ onClickDeposit }: THeaderAccountActions) => {
     const { client, ui, notifications } = useStore();
-    const { account_type, balance, currency, country_standpoint, is_eu, is_logged_in, is_virtual } = client;
+    const { account_type, balance, currency, is_eu, is_logged_in, is_virtual } = client;
     const {
         account_switcher_disabled_message,
         disableApp,
@@ -19,7 +19,7 @@ const HeaderAccountActions = observer(({ onClickDeposit }: THeaderAccountActions
         toggleAccountsDialog,
     } = ui;
     const { is_notifications_visible, notifications: notifications_array, toggleNotificationsModal } = notifications;
-
+    const filtered_notifications = notifications_array.filter(item => !item.only_toast_message);
     return (
         <div id='dt_core_header_acc-info-container' className='acc-info__container'>
             <AccountActions
@@ -27,7 +27,6 @@ const HeaderAccountActions = observer(({ onClickDeposit }: THeaderAccountActions
                 account_type={account_type}
                 balance={balance}
                 currency={currency}
-                country_standpoint={country_standpoint}
                 disableApp={disableApp}
                 enableApp={enableApp}
                 is_acc_switcher_on={is_accounts_switcher_on}
@@ -37,7 +36,7 @@ const HeaderAccountActions = observer(({ onClickDeposit }: THeaderAccountActions
                 is_logged_in={is_logged_in}
                 is_virtual={is_virtual}
                 onClickDeposit={onClickDeposit}
-                notifications_count={notifications_array.length}
+                notifications_count={filtered_notifications.length}
                 toggleAccountsDialog={toggleAccountsDialog}
                 toggleNotifications={toggleNotificationsModal}
                 openRealAccountSignup={openRealAccountSignup}

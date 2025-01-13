@@ -1,5 +1,4 @@
 import { config } from '../../constants/config';
-import { removeLimitedBlocks } from '../../utils/workspace';
 import DBotStore from '../dbot-store';
 
 /**
@@ -8,16 +7,6 @@ import DBotStore from '../dbot-store';
  * @param {!Event} e Mouse down event.
  * @private
  */
-Blockly.WorkspaceSvg.prototype.onMouseDown_ = function (e) {
-    // Bubble mousedown event up for some Core elements to react correctly.
-    if (e instanceof MouseEvent) {
-        Blockly.derivWorkspace.cachedParentSvg_.dispatchEvent(new e.constructor(e.type, e));
-    }
-    const gesture = this.getGesture(e);
-    if (gesture) {
-        gesture.handleWsStart(e, this);
-    }
-};
 
 /**
  * Scroll the workspace to center on the given block.
@@ -76,7 +65,7 @@ Blockly.WorkspaceSvg.prototype.centerOnBlock = function (id, hideChaff = true) {
         Blockly.hideChaff();
     }
 
-    this.scrollbar.set(scrollToCenterX, scrollToCenterY);
+    this?.scrollbar?.set(scrollToCenterX, scrollToCenterY);
 };
 
 /**
@@ -88,21 +77,32 @@ Blockly.WorkspaceSvg.prototype.centerOnBlock = function (id, hideChaff = true) {
  */
 Blockly.WorkspaceSvg.prototype.addBlockNode = function (block_node) {
     const { flyout } = DBotStore.instance;
-    const block = Blockly.Xml.domToBlock(block_node, flyout.getFlyout().workspace_);
+    const block = Blockly.Xml.domToBlock(block_node, flyout.getFlyout().targetWorkspace);
     const top_blocks = this.getTopBlocks(true);
-    const new_block = flyout.getFlyout().createBlock(false, block);
+
+    if (config.single_instance_blocks.includes(block.type)) {
+        this.getAllBlocks().forEach(ws_block => {
+            if (ws_block.type === block.type && ws_block.id !== block.id) {
+                ws_block.dispose();
+            }
+        });
+    }
 
     if (top_blocks.length) {
         const last_block = top_blocks[top_blocks.length - 1];
         const last_block_xy = last_block.getRelativeToSurfaceXY();
         const extra_spacing = last_block.startHat_ ? Blockly.BlockSvg.START_HAT_HEIGHT : 0;
         const y = last_block_xy.y + last_block.getHeightWidth().height + extra_spacing + 30;
-        new_block.moveBy(last_block_xy.x, y);
+        block.moveBy(last_block_xy.x, y);
     }
 
+    flyout.setIsSearchFlyout(false);
+    flyout.setVisibility(false);
+
     // Call svgResize to avoid glitching workspace.
-    Blockly.svgResize(new_block.workspace);
-    this.centerOnBlock(new_block.id, false);
+    Blockly.svgResize(block.workspace);
+    // kept this commented since it is making a glitching issue,
+    // this.centerOnBlock(new_block.id, false);
 };
 
 /**
@@ -133,14 +133,16 @@ Blockly.WorkspaceSvg.prototype.cleanUp = function (x = 0, y = 0, blocks_to_clean
         let column_index = 0;
 
         root_blocks.forEach((block, index) => {
+            block?.svgGroup_?.setAttribute('data-testid', block?.type);
             if (index === (column_index + 1) * blocks_per_column) {
                 original_cursor_y = y;
                 column_index++;
             }
 
             const xy = block.getRelativeToSurfaceXY();
+
             const cursor_x = is_import ? x : -xy.x;
-            const cursor_y = original_cursor_y - (is_import ? 0 : xy.y);
+            const cursor_y = original_cursor_y - (is_import ? 0 : xy.y) + (DBotStore.instance.is_mobile ? 50 : 0);
 
             if (column_index === 0) {
                 block.moveBy(cursor_x, cursor_y);
@@ -155,6 +157,9 @@ Blockly.WorkspaceSvg.prototype.cleanUp = function (x = 0, y = 0, blocks_to_clean
                 const fat_neighbour_block = root_blocks
                     .slice(start, start + blocks_per_column)
                     ?.reduce((a, b) => (a.getHeightWidth().width > b.getHeightWidth().width ? a : b), initialValue);
+
+                Blockly.BlockSvg.MIN_BLOCK_X = 64;
+                // let position_x = cursor_x + fat_neighbour_block.getHeightWidth().width + Blockly.BlockSvg.MIN_BLOCK_X;
 
                 let position_x = 0;
                 if (this?.RTL) {
@@ -175,7 +180,7 @@ Blockly.WorkspaceSvg.prototype.cleanUp = function (x = 0, y = 0, blocks_to_clean
             }
 
             block.snapToGrid();
-
+            Blockly.BlockSvg.MIN_BLOCK_Y = 48;
             original_cursor_y =
                 block.getRelativeToSurfaceXY().y + block.getHeightWidth().height + Blockly.BlockSvg.MIN_BLOCK_Y;
         });
@@ -204,6 +209,10 @@ Blockly.WorkspaceSvg.prototype.cleanUp = function (x = 0, y = 0, blocks_to_clean
     const filtered_top_blocks = top_blocks.filter(block => !block.isMainBlock());
 
     filtered_top_blocks.forEach(block => {
+        if (this.RTL && block.comment) {
+            block.RTL = true;
+            block.comment.needsAutoPositioning_ = true;
+        }
         const xy = block.getRelativeToSurfaceXY();
         const cursor_x = is_import ? x : -xy.x;
         const cursor_y = original_cursor_y - (is_import ? 0 : xy.y);
@@ -299,144 +308,10 @@ Blockly.WorkspaceSvg.getTopLevelWorkspaceMetrics_ = function () {
 };
 
 /**
- * Paste the provided block onto the workspace.
- * @param {!Element} xml_block XML block element.
- */
-Blockly.WorkspaceSvg.prototype.paste = function (xml_block) {
-    if (!this.rendered) {
-        return;
-    }
-
-    if (this.currentGesture_) {
-        this.currentGesture_.cancel(); // Dragging while pasting?  No.
-    }
-
-    if (xml_block.tagName.toLowerCase() === 'comment') {
-        this.pasteWorkspaceComment_(xml_block);
-    } else {
-        removeLimitedBlocks(this, xml_block.getAttribute('type'));
-        this.pasteBlock_(xml_block);
-    }
-};
-
-/**
  * Show the context menu for the workspace.
  * @param {!Event} e Mouse event.
  * @private
  */
-Blockly.WorkspaceSvg.prototype.showContextMenu_ = function (e) {
-    if (this.options.readOnly || this.isFlyout) {
-        return;
-    }
-    const menu_options = [];
-    const top_blocks = this.getTopBlocks(true);
-    const all_blocks = this.getAllBlocks(true);
-
-    // Options to undo/redo previous action.
-    menu_options.push(Blockly.ContextMenu.wsUndoOption(this));
-    menu_options.push(Blockly.ContextMenu.wsRedoOption(this));
-
-    // Option to clean up blocks.
-    if (this.scrollbar) {
-        menu_options.push(Blockly.ContextMenu.wsCleanupOption(this, top_blocks.length));
-    }
-
-    if (this.options.collapse) {
-        const has_collapsed_blocks = all_blocks.some(block => block.isCollapsed());
-        const has_expanded_blocks = all_blocks.some(block => !block.isCollapsed());
-
-        menu_options.push(Blockly.ContextMenu.wsExpandOption(has_collapsed_blocks, all_blocks));
-        menu_options.push(Blockly.ContextMenu.wsCollapseOption(has_expanded_blocks, all_blocks));
-    }
-
-    // Option to add a workspace comment.
-    if (this.options.comments) {
-        menu_options.push(Blockly.ContextMenu.workspaceCommentOption(this, e));
-    }
-
-    menu_options.push(Blockly.ContextMenu.wsDeleteOption(this, top_blocks));
-
-    Blockly.ContextMenu.show(e, menu_options, this.RTL);
-};
-
-/**
- * Dispose of this workspace.
- * Unlink from all DOM elements to prevent memory leaks.
- */
-Blockly.WorkspaceSvg.prototype.dispose = function (should_show_loading = false) {
-    const disposeFn = () => {
-        // Stop rerendering.
-        this.rendered = false;
-        if (this.currentGesture_) {
-            this.currentGesture_.cancel();
-        }
-        Blockly.WorkspaceSvg.superClass_.dispose.call(this);
-        if (this.svgGroup_) {
-            goog.dom.removeNode(this.svgGroup_);
-            this.svgGroup_ = null;
-        }
-        this.svgBlockCanvas_ = null;
-        this.svgBubbleCanvas_ = null;
-        if (this.toolbox_) {
-            this.toolbox_.dispose();
-            this.toolbox_ = null;
-        }
-        if (this.flyout_) {
-            this.flyout_.dispose();
-            this.flyout_ = null;
-        }
-        if (this.trashcan) {
-            this.trashcan.dispose();
-            this.trashcan = null;
-        }
-        if (this.scrollbar) {
-            this.scrollbar.dispose();
-            this.scrollbar = null;
-        }
-        if (this.zoomControls_) {
-            this.zoomControls_.dispose();
-            this.zoomControls_ = null;
-        }
-
-        if (this.audioManager_) {
-            this.audioManager_.dispose();
-            this.audioManager_ = null;
-        }
-
-        if (this.grid_) {
-            this.grid_.dispose();
-            this.grid_ = null;
-        }
-
-        if (this.toolboxCategoryCallbacks_) {
-            this.toolboxCategoryCallbacks_ = null;
-        }
-        if (this.flyoutButtonCallbacks_) {
-            this.flyoutButtonCallbacks_ = null;
-        }
-        if (!this.options.parentWorkspace) {
-            // Top-most workspace.  Dispose of the div that the
-            // SVG is injected into (i.e. injectionDiv).
-            goog.dom.removeNode(this.getParentSvg().parentNode);
-        }
-        if (this.resizeHandlerWrapper_) {
-            Blockly.unbindEvent_(this.resizeHandlerWrapper_);
-            this.resizeHandlerWrapper_ = null;
-        }
-    };
-
-    if (should_show_loading) {
-        const { setLoading } = DBotStore.instance;
-        setLoading(true);
-
-        setTimeout(() => {
-            disposeFn();
-            setLoading(false);
-        }, 50);
-    } else {
-        disposeFn();
-    }
-};
 
 /**
  * Dispose of all blocks in workspace, with an optimization to prevent resizes.

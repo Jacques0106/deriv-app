@@ -1,5 +1,5 @@
 import React from 'react';
-import { FormikValues } from 'formik';
+import { FormikErrors, FormikValues } from 'formik';
 import countries from 'i18n-iso-countries';
 import { ResidenceList, GetAccountStatus } from '@deriv/api-types';
 import {
@@ -10,8 +10,9 @@ import {
     getIDVNotApplicableOption,
     IDV_ERROR_STATUS,
     AUTH_STATUS_CODES,
+    VERIFICATION_SERVICES,
 } from '@deriv/shared';
-import { Localize, localize } from '@deriv/translations';
+import { localize } from '@deriv-com/translations';
 import { getIDVDocuments } from '../Configs/idv-document-config';
 import { TServerError } from '../Types';
 import { LANGUAGE_CODES } from '../Constants/onfido';
@@ -76,6 +77,7 @@ export const getDocumentData = (country_code: string, document_type: string) => 
         new_display_name: '',
         example_format: '',
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const IDV_DOCUMENT_DATA: any = getIDVDocuments(country_code);
     if (IDV_DOCUMENT_DATA) {
         return IDV_DOCUMENT_DATA[document_type] ?? DEFAULT_CONFIG;
@@ -135,8 +137,8 @@ export const makeSettingsRequest = (values: FormikValues, changeable_fields: str
 
 export const validateName = (name: string) => {
     if (name) {
-        if (!validLength(name.trim(), { min: 2, max: 50 })) {
-            return localize('You should enter 2-50 characters.');
+        if (!validLength(name.trim(), { min: 1, max: 50 })) {
+            return localize('Enter no more than 50 characters.');
         } else if (!validName(name)) {
             return localize('Letters, spaces, periods, hyphens, apostrophes only.');
         }
@@ -157,42 +159,37 @@ export const isDocumentTypeValid = (document_type: FormikValues) => {
 export const isAdditionalDocumentValid = (document_type: FormikValues, additional_document_value?: string) => {
     const error_message = documentAdditionalError(additional_document_value, document_type?.additional);
     if (error_message) {
-        return localize(error_message) + getExampleFormat(document_type.additional?.example_format);
+        return error_message + getExampleFormat(document_type?.additional?.example_format);
     }
     return undefined;
 };
 
-export const isDocumentNumberValid = (document_number: string, document_type: FormikValues) => {
-    const is_document_number_invalid = document_number === document_type.example_format;
-    if (!document_number && document_type.text) {
+export const isDocumentNumberValid = (document_number?: string, document_type?: FormikValues) => {
+    const is_document_number_invalid = document_number === document_type?.example_format;
+    if (!document_number && document_type?.text) {
         let document_name = '';
         const example_format = getExampleFormat(document_type.example_format);
         switch (document_type.id) {
             case 'drivers_license':
-                document_name = 'Driver License Reference number';
+                document_name = localize('Driver License Reference number');
                 break;
             case 'ssnit':
-                document_name = 'SSNIT number';
+                document_name = localize('SSNIT number');
                 break;
             case 'national_id_no_photo':
-                document_name = 'NIN';
+                document_name = localize('NIN');
                 break;
             default:
-                document_name = 'document number';
+                document_name = localize('document number');
                 break;
         }
-        return (
-            <Localize
-                i18n_default_text='Please enter your {{document_name}}. {{example_format}}'
-                values={{ document_name, example_format }}
-            />
-        );
+        return localize('Please enter your {{document_name}}. {{example_format}}', { document_name, example_format });
     } else if (is_document_number_invalid) {
         return localize('Please enter a valid ID number.');
     }
-    const format_regex = getRegex(document_type.value);
-    if (!format_regex.test(document_number)) {
-        return localize('Please enter the correct format. ') + getExampleFormat(document_type.example_format);
+    const format_regex = getRegex(document_type?.value);
+    if (document_number && !format_regex.test(document_number)) {
+        return localize('Please enter the correct format. ') + getExampleFormat(document_type?.example_format);
     }
     return undefined;
 };
@@ -241,22 +238,25 @@ export const getOnfidoSupportedLocaleCode = (language_code: string) => {
 
 export const getIDVDocumentType = (
     idv_latest_attempt: DeepRequired<GetAccountStatus>['authentication']['attempts']['latest'],
-    residence: DeepRequired<ResidenceList[0]>
+    residence: ResidenceList[0]
 ) => {
     if (!idv_latest_attempt || !Object.keys(residence).length) return localize('identity document');
     const { document_type } = idv_latest_attempt;
     if (!document_type) return localize('identity document');
-    const {
-        identity: {
-            services: {
-                idv: { documents_supported },
+    if (residence?.identity?.services?.idv?.documents_supported) {
+        const {
+            identity: {
+                services: {
+                    idv: { documents_supported },
+                },
             },
-        },
-    } = residence;
-    return documents_supported[document_type as string].display_name;
+        } = residence;
+        return documents_supported[document_type as string].display_name;
+    }
+    return null;
 };
 
-export const validate = <T,>(errors: Record<string, string>, values: T) => {
+export const validate = <T,>(errors: FormikErrors<FormikValues>, values: T) => {
     return (fn: (value: string) => string, arr: string[], err_msg: string) => {
         arr.forEach(field => {
             const value = values[field as keyof typeof values] as string;
@@ -279,3 +279,9 @@ export const verifyFields = (status: TIDVErrorStatus) => {
 
 export const isSpecialPaymentMethod = (payment_method_icon: string) =>
     ['IcOnlineNaira', 'IcAstroPayLight', 'IcAstroPayDark'].some(icon => icon === payment_method_icon);
+
+export const convertPhoneTypeDisplay = (phone_verification_type: string) => {
+    if (phone_verification_type === VERIFICATION_SERVICES.SMS) return phone_verification_type.toUpperCase();
+
+    return 'WhatsApp';
+};

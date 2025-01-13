@@ -10,7 +10,7 @@ import { observer, useStore } from '@deriv/stores';
 import AcceptRiskForm from './accept-risk-form.jsx';
 import LoadingModal from './real-account-signup-loader.jsx';
 import { getItems } from './account-wizard-form';
-import { useIsClientHighRiskForMT5, useResidenceSelfDeclaration } from '@deriv/hooks';
+import { useResidenceSelfDeclaration, useGrowthbookGetFeatureValue } from '@deriv/hooks';
 import 'Sass/details-form.scss';
 import { Analytics } from '@deriv-com/analytics';
 
@@ -95,6 +95,7 @@ const AccountWizard = observer(props => {
         real_account_signup_form_step,
         setRealAccountSignupFormStep,
     } = client;
+    const { closeRealAccountSignup, setShouldShowSameDOBPhoneModal } = ui;
 
     const [finished] = React.useState(undefined);
     const [mounted, setMounted] = React.useState(false);
@@ -102,8 +103,12 @@ const AccountWizard = observer(props => {
     const [previous_data, setPreviousData] = React.useState([]);
     const [state_items, setStateItems] = React.useState(real_account_signup_form_data ?? []);
     const [should_accept_financial_risk, setShouldAcceptFinancialRisk] = React.useState(false);
-    const is_high_risk_client_for_mt5 = useIsClientHighRiskForMT5();
     const { is_residence_self_declaration_required } = useResidenceSelfDeclaration();
+
+    const [direct_deposit_flow] = useGrowthbookGetFeatureValue({
+        featureFlag: 'direct-deposit-flow',
+        defaultValue: false,
+    });
 
     const trackEvent = React.useCallback(
         payload => {
@@ -141,7 +146,6 @@ const AccountWizard = observer(props => {
 
     const get_items_props = {
         ...modifiedProps,
-        is_high_risk_client_for_mt5,
     };
 
     React.useEffect(() => {
@@ -295,10 +299,8 @@ const AccountWizard = observer(props => {
     const submitForm = (payload = undefined) => {
         let clone = { ...form_values() };
         delete clone?.tax_identification_confirm;
-        delete clone?.agreed_tnc;
         delete clone?.agreed_tos;
         delete clone?.confirmation_checkbox;
-        delete clone?.crs_confirmation;
 
         if (is_residence_self_declaration_required && clone?.resident_self_declaration)
             clone.resident_self_declaration = 1;
@@ -311,6 +313,9 @@ const AccountWizard = observer(props => {
             delete clone.tax_identification_number;
         }
 
+        if (clone?.tnc_acceptance) {
+            clone.tnc_acceptance = 1;
+        }
         clone = processInputData(clone);
         modifiedProps.setRealAccountFormData(clone);
         if (payload) {
@@ -325,7 +330,7 @@ const AccountWizard = observer(props => {
     const updateValue = (index, value, setSubmitting, goToNextStep, should_override = false) => {
         // This is to sync clearing of value on change of Employment status personal details and occupation in financial assessment
         if (is_eu_user && index === 1) {
-            state_items[4].form_value = { ...state_items[4].form_value, occupation: value.occupation };
+            state_items[5].form_value = { ...state_items[5].form_value, occupation: value.occupation };
             setStateItems(state_items);
         }
         saveFormData(index, value);
@@ -334,6 +339,15 @@ const AccountWizard = observer(props => {
         // Check if account wizard is not finished
         if (should_override || index + 1 >= state_items.length) {
             createRealAccount({});
+
+            //to count the last step of the wizard 'terms_of_use' as a step
+            const last_step = state_items.length - 1;
+
+            trackEvent({
+                action: 'step_passed',
+                step_num: last_step,
+                step_codename: STEP_IDENTIFIERS[last_step],
+            });
         } else {
             trackEvent({
                 action: 'step_passed',
@@ -393,14 +407,28 @@ const AccountWizard = observer(props => {
                     action: 'real_signup_finished',
                     user_choice: JSON.stringify(response?.echo_req),
                 });
+
+                const status = await WS.wait('get_account_status');
+                const { get_account_status } = status;
+
                 modifiedProps.setIsRiskWarningVisible(false);
-                if (modifiedProps.real_account_signup_target === 'maltainvest') {
+
+                // check for duplicate DOB (day of birthday) and phone number
+                const is_duplicate_dob_phone = get_account_status?.status?.includes('duplicate_dob_phone');
+                if (is_duplicate_dob_phone) {
+                    closeRealAccountSignup();
+                    setShouldShowSameDOBPhoneModal(true);
+                } else if (modifiedProps.real_account_signup_target === 'maltainvest') {
                     modifiedProps.onOpenDepositModal();
                 } else if (modifiedProps.real_account_signup_target === 'samoa') {
                     modifiedProps.onOpenWelcomeModal(response.new_account_samoa.currency.toLowerCase());
                 } else {
+                    if (direct_deposit_flow) {
+                        modifiedProps.onOpenDepositModal();
+                    }
                     modifiedProps.onFinishSuccess(response.new_account_real.currency.toLowerCase());
                 }
+
                 const country_code = modifiedProps.account_settings.citizen || modifiedProps.residence;
                 /**
                  * If IDV details are present, then submit IDV details
@@ -530,6 +558,7 @@ AccountWizard.propTypes = {
     onClose: PropTypes.func,
     onError: PropTypes.func,
     onFinishSuccess: PropTypes.func,
+    onNewFinishSuccess: PropTypes.func,
     onLoading: PropTypes.func,
     onOpenWelcomeModal: PropTypes.func,
     real_account_signup_target: PropTypes.string,

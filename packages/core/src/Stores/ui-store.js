@@ -34,12 +34,10 @@ export default class UIStore extends BaseStore {
     account_switcher_disabled_message = '';
 
     has_only_forward_starting_contracts = false;
-    has_read_scam_message = localStorage.getItem('readScamMessage') || false;
 
     // Purchase Controls
     // @observable is_purchase_confirm_on    = false;
     is_services_error_visible = false;
-    is_new_account = localStorage.getItem('isNewAccount') || false;
     is_account_signup_modal_visible = false;
     is_link_expired_modal_visible = false;
     is_set_residence_modal_visible = false;
@@ -48,8 +46,8 @@ export default class UIStore extends BaseStore {
     is_update_email_modal_visible = false;
     is_reset_trading_password_modal_visible = false;
     is_mf_verification_pending_modal_visible = false;
+    is_trading_disabled_by_residence_modal_visible = false;
     // @observable is_purchase_lock_on       = false;
-
     // SmartCharts Controls
     // TODO: enable asset information
     // @observable is_chart_asset_info_visible = true;
@@ -86,6 +84,9 @@ export default class UIStore extends BaseStore {
     real_account_signup_target = undefined;
     deposit_real_account_signup_target = undefined;
     has_real_account_signup_ended = false;
+
+    // wallets onboarding tour guide
+    is_wallets_onboarding_tour_guide_visible = false;
 
     // verification modal
     is_verification_modal_visible = false;
@@ -132,6 +133,11 @@ export default class UIStore extends BaseStore {
     prompt_when = false;
     promptFn = () => {};
 
+    //phone number verification
+    should_show_phone_number_otp = false;
+    is_forced_to_exit_pnv = false;
+    is_phone_verification_completed = false;
+
     //warn user if they want to close create real account modal
     is_closing_create_real_account_modal = false;
 
@@ -143,7 +149,6 @@ export default class UIStore extends BaseStore {
         target_label: '',
         target_dmt5_label: '',
     };
-    is_mt5_verification_failed_modal = false;
 
     manage_real_account_tab_index = 0;
 
@@ -155,6 +160,9 @@ export default class UIStore extends BaseStore {
     // add crypto accounts
     should_show_cancel = false;
 
+    should_show_same_dob_phone_modal = false;
+    should_show_deposit_now_or_later_modal = false;
+    should_show_crypto_transaction_processing_modal = false;
     should_show_risk_warning_modal = false;
     should_show_appropriateness_warning_modal = false;
     should_show_risk_accept_modal = false;
@@ -170,6 +178,7 @@ export default class UIStore extends BaseStore {
     should_show_assessment_complete_modal = false;
     app_contents_scroll_ref = null;
     is_deriv_account_needed_modal_visible = false;
+    is_redirected_from_email = false;
     is_wallet_modal_visible = false;
     is_ready_to_deposit_modal_visible = false;
     is_need_real_account_for_cashier_modal_visible = false;
@@ -178,9 +187,10 @@ export default class UIStore extends BaseStore {
     is_mt5_migration_modal_enabled = false;
     isUrlUnavailableModalVisible = false;
     sub_section_index = 0;
+    field_ref_to_focus = null;
 
-    is_additional_kyc_info_modal_open = false;
-    is_kyc_information_submitted_modal_open = false;
+    // tnc update
+    is_tnc_update_modal_open = false;
 
     getDurationFromUnit = unit => this[`duration_${unit}`];
 
@@ -202,7 +212,6 @@ export default class UIStore extends BaseStore {
             'is_dark_mode_on',
             'is_positions_drawer_on',
             'is_reports_visible',
-            'is_warning_scam_message_modal_visible',
             // 'is_purchase_confirm_on',
             // 'is_purchase_lock_on',
             'should_show_cancellation_warning',
@@ -211,16 +220,12 @@ export default class UIStore extends BaseStore {
         super({ root_store, local_storage_properties, store_name });
 
         makeObservable(this, {
-            is_additional_kyc_info_modal_open: observable,
-            is_kyc_information_submitted_modal_open: observable,
             account_needed_modal_props: observable,
             account_switcher_disabled_message: observable,
             has_only_forward_starting_contracts: observable,
-            has_read_scam_message: observable,
             is_ready_to_deposit_modal_visible: observable,
             is_need_real_account_for_cashier_modal_visible: observable,
             is_services_error_visible: observable,
-            is_new_account: observable,
             is_account_signup_modal_visible: observable,
             is_link_expired_modal_visible: observable,
             is_set_residence_modal_visible: observable,
@@ -253,24 +258,27 @@ export default class UIStore extends BaseStore {
             header_extension: observable,
             is_account_needed_modal_on: observable,
             is_account_settings_visible: observable,
+            is_forced_to_exit_pnv: observable,
+            is_phone_verification_completed: observable,
 
             is_accounts_switcher_on: observable,
 
             is_app_disabled: observable,
             is_cashier_visible: observable,
             is_cfd_page: observable,
-            is_mt5_verification_failed_modal: observable,
 
             is_closing_create_real_account_modal: observable,
             is_dark_mode_on: observable,
             is_deriv_account_needed_modal_visible: observable,
             is_from_signup_account: observable,
+            is_redirected_from_email: observable,
             is_wallet_modal_visible: observable,
 
             is_history_tab_active: observable,
             is_landscape: observable,
             is_language_settings_modal_on: observable,
             is_mf_verification_pending_modal_visible: observable,
+            is_trading_disabled_by_residence_modal_visible: observable,
             is_mobile_language_menu_open: observable,
             is_nativepicker_visible: observable,
 
@@ -288,9 +296,11 @@ export default class UIStore extends BaseStore {
             is_trading_assessment_for_existing_user_enabled: observable,
             is_trading_assessment_for_new_user_enabled: observable,
             is_verification_modal_visible: observable,
+            is_wallets_onboarding_tour_guide_visible: observable,
             is_verification_submitted: observable,
             is_mt5_migration_modal_open: observable,
             is_mt5_migration_modal_enabled: observable,
+            is_tnc_update_modal_open: observable,
             isUrlUnavailableModalVisible: observable,
             manage_real_account_tab_index: observable,
             modal_index: observable,
@@ -302,6 +312,10 @@ export default class UIStore extends BaseStore {
             real_account_signup: observable,
             reports_route_tab_index: observable,
             settings_extension: observable,
+            should_show_phone_number_otp: observable,
+            should_show_same_dob_phone_modal: observable,
+            should_show_deposit_now_or_later_modal: observable,
+            should_show_crypto_transaction_processing_modal: observable,
             should_show_appropriateness_warning_modal: observable,
             should_show_assessment_complete_modal: observable,
             should_show_cancel: observable,
@@ -335,7 +349,6 @@ export default class UIStore extends BaseStore {
             is_desktop: computed,
             is_mobile: computed,
             is_tablet: computed,
-            is_warning_scam_message_modal_visible: computed,
             url_hashed_values: observable,
             notifyAppInstall: action.bound,
             onChangeUiStore: action.bound,
@@ -353,6 +366,7 @@ export default class UIStore extends BaseStore {
             resetPurchaseStates: action.bound,
             resetRealAccountSignupParams: action.bound,
             resetRealAccountSignupTarget: action.bound,
+            setShouldShowPhoneNumberOTP: action.bound,
             setAccountSwitcherDisabledMessage: action.bound,
             setAppContentsScrollRef: action.bound,
             setCFDPasswordResetModal: action.bound,
@@ -362,6 +376,8 @@ export default class UIStore extends BaseStore {
             setDarkMode: action.bound,
             setHasOnlyForwardingContracts: action.bound,
             setHashedValue: action.bound,
+            setIsForcedToExitPnv: action.bound,
+            setIsPhoneVerificationCompleted: action.bound,
             setIsClosingCreateRealAccountModal: action.bound,
             setIsFromSignupAccount: action.bound,
             setIsNativepickerVisible: action.bound,
@@ -372,13 +388,13 @@ export default class UIStore extends BaseStore {
             toggleNeedRealAccountForCashierModal: action.bound,
             toggleShouldShowRealAccountsList: action.bound,
             shouldNavigateAfterChooseCrypto: action.bound,
-            setIsMT5VerificationFailedModal: action.bound,
             setShouldShowRiskWarningModal: action.bound,
+            setRedirectFromEmail: action.bound,
             setIsWalletModalVisible: action.bound,
-            setIsNewAccount: action.bound,
             setIsRealTabEnabled: action.bound,
             setIsTradingAssessmentForExistingUserEnabled: action.bound,
             setIsTradingAssessmentForNewUserEnabled: action.bound,
+            setIsWalletsOnboardingTourGuideVisible: action.bound,
             setManageRealAccountActiveTabIndex: action.bound,
             setModalIndex: action.bound,
             setPromptHandler: action.bound,
@@ -388,7 +404,6 @@ export default class UIStore extends BaseStore {
             setRealAccountSignupParams: action.bound,
             setResetTradingPasswordModalOpen: action.bound,
             setRouteModal: action.bound,
-            setScamMessageLocalStorage: action.bound,
             setShouldShowAppropriatenessWarningModal: action.bound,
             setShouldShowAssessmentCompleteModal: action.bound,
             setShouldShowCancel: action.bound,
@@ -402,6 +417,7 @@ export default class UIStore extends BaseStore {
             setSubSectionIndex: action.bound,
             setTopUpInProgress: action.bound,
             setIsMFVericationPendingModal: action.bound,
+            setIsTradingDisabledByResidenceModal: action.bound,
             setMT5MigrationModalEnabled: action.bound,
             setMobileLanguageMenuOpen: action.bound,
             toggleAccountsDialog: action.bound,
@@ -423,10 +439,14 @@ export default class UIStore extends BaseStore {
             toggleLanguageSettingsModal: action.bound,
             toggleUpdateEmailModal: action.bound,
             toggleAccountSuccessModal: action.bound,
-            toggleAdditionalKycInfoModal: action.bound,
-            toggleKycInformationSubmittedModal: action.bound,
             toggleMT5MigrationModal: action.bound,
             toggleUrlUnavailableModal: action.bound,
+            setShouldShowDepositNowOrLaterModal: action.bound,
+            setShouldShowCryptoTransactionProcessingModal: action.bound,
+            setShouldShowSameDOBPhoneModal: action.bound,
+            field_ref_to_focus: observable,
+            setFieldRefToFocus: action.bound,
+            toggleTncUpdateModal: action.bound,
         });
 
         window.addEventListener('resize', this.handleResize);
@@ -444,13 +464,8 @@ export default class UIStore extends BaseStore {
         }
     };
 
-    get is_warning_scam_message_modal_visible() {
-        return (
-            this.root_store.client.is_logged_in &&
-            this.root_store.client.is_brazil &&
-            !this.has_read_scam_message &&
-            !this.is_new_account
-        );
+    setFieldRefToFocus(field_ref) {
+        this.field_ref_to_focus = field_ref;
     }
 
     setIsClosingCreateRealAccountModal(is_closing_create_real_account_modal) {
@@ -461,14 +476,16 @@ export default class UIStore extends BaseStore {
         this.is_real_tab_enabled = is_real_tab_enabled;
     }
 
-    setScamMessageLocalStorage() {
-        localStorage.setItem('readScamMessage', !this.has_read_scam_message);
-        this.has_read_scam_message = localStorage.getItem('readScamMessage') || false;
+    setShouldShowPhoneNumberOTP(should_show_phone_number_otp) {
+        this.should_show_phone_number_otp = should_show_phone_number_otp;
     }
 
-    setIsNewAccount() {
-        localStorage.setItem('isNewAccount', !this.is_new_account);
-        this.is_new_account = localStorage.getItem('isNewAccount') || false;
+    async setIsForcedToExitPnv(is_forced_to_exit_pnv) {
+        this.is_forced_to_exit_pnv = is_forced_to_exit_pnv;
+    }
+
+    setIsPhoneVerificationCompleted(is_phone_verification_completed) {
+        this.is_phone_verification_completed = is_phone_verification_completed;
     }
 
     setHashedValue(url_hashed_values) {
@@ -478,10 +495,6 @@ export default class UIStore extends BaseStore {
     init(notification_messages) {
         this.setHashedValue(window.location.hash);
         this.notification_messages_ui = notification_messages;
-    }
-
-    setIsMT5VerificationFailedModal(value) {
-        this.is_mt5_verification_failed_modal = value;
     }
 
     setAppContentsScrollRef(value) {
@@ -648,6 +661,7 @@ export default class UIStore extends BaseStore {
     }
 
     toggleLanguageSettingsModal() {
+        window.fcWidget?.close();
         this.is_language_settings_modal_on = !this.is_language_settings_modal_on;
     }
 
@@ -778,6 +792,9 @@ export default class UIStore extends BaseStore {
     }
 
     toggleResetEmailModal(state_change = !this.is_reset_email_modal_visible) {
+        if (!state_change) {
+            this.root_store.client.setPreventRedirectToHub(false);
+        }
         this.is_reset_email_modal_visible = state_change;
     }
 
@@ -786,6 +803,9 @@ export default class UIStore extends BaseStore {
     }
 
     setResetTradingPasswordModalOpen(is_reset_trading_password_modal_visible) {
+        if (!is_reset_trading_password_modal_visible) {
+            this.root_store.client.setPreventRedirectToHub(false);
+        }
         this.is_reset_trading_password_modal_visible = is_reset_trading_password_modal_visible;
     }
 
@@ -889,6 +909,10 @@ export default class UIStore extends BaseStore {
         this.is_deriv_account_needed_modal_visible = !this.is_deriv_account_needed_modal_visible;
     }
 
+    setRedirectFromEmail(value) {
+        this.is_redirected_from_email = value;
+    }
+
     setIsWalletModalVisible(value) {
         this.is_wallet_modal_visible = value;
     }
@@ -973,16 +997,16 @@ export default class UIStore extends BaseStore {
         this.is_from_success_deposit_modal = value;
     }
 
+    setIsWalletsOnboardingTourGuideVisible(value) {
+        this.is_wallets_onboarding_tour_guide_visible = value;
+    }
+
     setIsMFVericationPendingModal(value) {
         this.is_mf_verification_pending_modal_visible = value;
     }
 
-    toggleAdditionalKycInfoModal() {
-        this.is_additional_kyc_info_modal_open = !this.is_additional_kyc_info_modal_open;
-    }
-
-    toggleKycInformationSubmittedModal() {
-        this.is_kyc_information_submitted_modal_open = !this.is_kyc_information_submitted_modal_open;
+    setIsTradingDisabledByResidenceModal(value) {
+        this.is_trading_disabled_by_residence_modal_visible = value;
     }
 
     setMT5MigrationModalEnabled(value) {
@@ -995,5 +1019,21 @@ export default class UIStore extends BaseStore {
 
     toggleUrlUnavailableModal(value) {
         this.isUrlUnavailableModalVisible = value;
+    }
+
+    setShouldShowDepositNowOrLaterModal(value) {
+        this.should_show_deposit_now_or_later_modal = value;
+    }
+
+    setShouldShowCryptoTransactionProcessingModal(value) {
+        this.should_show_crypto_transaction_processing_modal = value;
+    }
+
+    setShouldShowSameDOBPhoneModal(value) {
+        this.should_show_same_dob_phone_modal = value;
+    }
+
+    toggleTncUpdateModal(value) {
+        this.is_tnc_update_modal_open = value;
     }
 }

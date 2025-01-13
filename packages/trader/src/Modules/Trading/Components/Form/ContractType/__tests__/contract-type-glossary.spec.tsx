@@ -13,6 +13,11 @@ describe('<ContractTypeGlossary />', () => {
         expect(
             screen.getByText(/You can choose a growth rate with values of 1%, 2%, 3%, 4%, and 5%./i)
         ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /If you select this feature, your trade will be closed automatically at the nearest available asset price when your profit reaches or exceeds the take profit amount. Your profit may be more than the amount you entered depending on the market price at closing./i
+            )
+        ).toBeInTheDocument();
     });
     it('Ensure vanilla glossary is rendered properly', () => {
         render(<ContractTypeGlossary category={TRADE_TYPES.VANILLA.CALL} />);
@@ -28,7 +33,7 @@ describe('<ContractTypeGlossary />', () => {
 
         expect(
             screen.getByText(
-                'We’ll offer to buy your contract at this price should you choose to sell it before its expiry. This is based on several factors, such as the current spot price. We won’t offer a contract value if the remaining duration is below 15 seconds or if the contract duration is in ticks.'
+                'This is the resale value of your contract, based on the prevailing market conditions (e.g, the current spot), including additional commissions if any.'
             )
         ).toBeInTheDocument();
     });

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { MT5MarketTypeDetails, PlatformDetails } from '../../../constants';
-import { getMarketType } from '../../../helpers';
 import { TAccount, TAccountsList } from '../types';
 
 const useSortedTransferAccounts = (accounts: TAccountsList) => {
@@ -17,11 +16,12 @@ export default useSortedTransferAccounts;
 
 /** A custom hook that sort trading and wallet accounts to display on the screen. */
 const sortWalletsAccounts = (a: TAccount, b: TAccount) => {
-    if (!a?.accountName || !b?.accountName) return 0;
+    if (!a?.currency || !b?.currency) return 0;
+
     if (a.account_type === 'doughflow' && b.account_type === 'doughflow') {
-        return a.accountName.localeCompare(b.accountName);
+        return a.currency.localeCompare(b.currency);
     } else if (a.account_type === 'crypto' && b.account_type === 'crypto') {
-        return a.accountName.localeCompare(b.accountName);
+        return a.currency.localeCompare(b.currency);
     } else if (a.account_type === 'doughflow') {
         // 'doughflow' comes first
         return -1;
@@ -68,11 +68,17 @@ const sortTradingAccounts = (a: TAccount, b: TAccount) => {
 
     // For mt5 accounts, compare market types
     if (typeA === PlatformDetails.mt5.name) {
-        const marketTypeA = getMarketType(a.mt5_group);
-        const marketTypeB = getMarketType(b.mt5_group);
+        const marketTypeA = a.market_type;
+        const marketTypeB = b.market_type;
 
-        if (marketTypeOrder[marketTypeA] !== marketTypeOrder[marketTypeB]) {
-            return marketTypeOrder[marketTypeA] - marketTypeOrder[marketTypeB];
+        if (
+            marketTypeOrder[marketTypeA ?? MT5MarketTypeDetails.all.name] !==
+            marketTypeOrder[marketTypeB ?? MT5MarketTypeDetails.all.name]
+        ) {
+            return (
+                marketTypeOrder[marketTypeA ?? MT5MarketTypeDetails.all.name] -
+                marketTypeOrder[(marketTypeB ?? MT5MarketTypeDetails.all.name) as keyof typeof marketTypeOrder]
+            );
         }
 
         // For 'synthetic' and 'financial' market types, compare landing company name

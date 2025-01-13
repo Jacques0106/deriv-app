@@ -1,73 +1,114 @@
-import React from 'react';
-import classNames from 'classnames';
-import { Formik, Form, FormikHelpers } from 'formik';
-import { BrowserHistory } from 'history';
-import { withRouter } from 'react-router';
+import { ChangeEvent, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useHistory } from 'react-router';
+import clsx from 'clsx';
+import { Form, Formik, FormikHelpers } from 'formik';
+
+import { useInvalidateQuery } from '@deriv/api';
 import {
     Button,
     Checkbox,
-    DesktopWrapper,
-    Dropdown,
     FormSubmitErrorMessage,
     HintBox,
     Input,
     Loading,
-    MobileWrapper,
-    SelectNative,
+    OpenLiveChatLink,
     Text,
 } from '@deriv/components';
-import { GetSettings } from '@deriv/api-types';
-import { AUTH_STATUS_CODES, WS, getBrandWebsiteName, routes, useIsMounted } from '@deriv/shared';
-import { Localize, localize } from '@deriv/translations';
+import {
+    useGetPhoneNumberList,
+    useGrowthbookGetFeatureValue,
+    useIsPhoneNumberVerified,
+    usePhoneNumberVerificationSetTimer,
+    useResidenceList,
+    useStatesList,
+    useTinValidations,
+} from '@deriv/hooks';
+import { AUTH_STATUS_CODES, getBrandWebsiteName, routes, WS } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
-import LeaveConfirm from 'Components/leave-confirm';
-import FormFooter from 'Components/form-footer';
-import FormBody from 'Components/form-body';
-import { DateOfBirthField } from 'Components/forms/form-fields';
-import FormSubHeader from 'Components/form-sub-header';
-import LoadErrorMessage from 'Components/load-error-message';
-import POAAddressMismatchHintBox from 'Components/poa-address-mismatch-hint-box';
-import { getEmploymentStatusList } from 'Sections/Assessment/FinancialAssessment/financial-information-list';
+import { Localize, localize } from '@deriv/translations';
+import { useDevice } from '@deriv-com/ui';
+
+import FormBody from '../../../Components/form-body';
+import FormFooter from '../../../Components/form-footer';
+import FormSubHeader from '../../../Components/form-sub-header';
+import { DateOfBirthField } from '../../../Components/forms/form-fields';
+import AccountOpeningReasonField from '../../../Components/forms/form-fields/account-opening-reason';
+import FormSelectField from '../../../Components/forms/form-select-field';
+import LeaveConfirm from '../../../Components/leave-confirm';
+import LoadErrorMessage from '../../../Components/load-error-message';
+import POAAddressMismatchHintBox from '../../../Components/poa-address-mismatch-hint-box';
+import EmploymentTaxDetailsContainer from '../../../Containers/employment-tax-details-container';
+import { isFieldImmutable } from '../../../Helpers/utils';
+import { useScrollElementToTop } from '../../../hooks';
+import { PersonalDetailsValueTypes } from '../../../Types';
+
+import { account_opening_reason_list } from './constants';
 import InputGroup from './input-group';
 import { getPersonalDetailsInitialValues, getPersonalDetailsValidationSchema, makeSettingsRequest } from './validation';
-import FormSelectField from 'Components/forms/form-select-field';
+import { VerifyButton } from './verify-button';
+
+import './personal-details-form.scss';
 
 type TRestState = {
     show_form: boolean;
-    errors?: boolean;
     api_error?: string;
-    changeable_fields?: string[];
-    form_initial_values?: Record<string, any>;
 };
 
-export const PersonalDetailsForm = observer(({ history }: { history: BrowserHistory }) => {
-    const [is_loading, setIsLoading] = React.useState(true);
-    const [is_state_loading, setIsStateLoading] = React.useState(false);
-    const [is_btn_loading, setIsBtnLoading] = React.useState(false);
-    const [is_submit_success, setIsSubmitSuccess] = React.useState(false);
+const PersonalDetailsForm = observer(() => {
+    const { isDesktop } = useDevice();
+    const [is_loading, setIsLoading] = useState(false);
+    const [is_btn_loading, setIsBtnLoading] = useState(false);
+    const [is_submit_success, setIsSubmitSuccess] = useState(false);
+    const invalidate = useInvalidateQuery();
+    const history = useHistory();
+    const [isPhoneNumberVerificationEnabled, isPhoneNumberVerificationLoaded] = useGrowthbookGetFeatureValue({
+        featureFlag: 'phone_number_verification',
+    });
+    const [isCountryCodeDropdownEnabled, isCountryCodeLoaded] = useGrowthbookGetFeatureValue({
+        featureFlag: 'enable_country_code_dropdown',
+    });
+
+    const { next_email_otp_request_timer, is_email_otp_timer_loading } = usePhoneNumberVerificationSetTimer();
+
+    const { tin_validation_config, mutate } = useTinValidations();
+
+    const scrollToTop = useScrollElementToTop();
 
     const {
         client,
-        notifications,
         ui,
+        notifications,
         common: { is_language_changing },
     } = useStore();
+    const { is_phone_number_verified } = useIsPhoneNumberVerified();
 
     const {
         account_settings,
         account_status,
-        residence_list,
         authentication_status,
-        is_eu,
         is_virtual,
-        states_list,
-        fetchStatesList,
-        fetchResidenceList,
-        has_residence,
         current_landing_company,
         updateAccountStatus,
-        is_social_signup,
+        fetchAccountSettings,
+        residence,
+        is_svg,
+        is_mf_account,
     } = client;
+
+    const { field_ref_to_focus, setFieldRefToFocus } = ui;
+
+    const { data: residence_list, isLoading: is_loading_residence_list } = useResidenceList();
+
+    const {
+        is_global_sms_available,
+        is_global_whatsapp_available,
+        legacy_core_countries_list,
+        selected_phone_code,
+        selected_country_list,
+        updatePhoneSettings,
+    } = useGetPhoneNumberList();
+
+    const { data: states_list, isLoading: is_loading_state_list } = useStatesList(residence);
 
     const {
         refreshNotifications,
@@ -75,16 +116,15 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
         showPOAAddressMismatchFailureNotification,
     } = notifications;
 
-    const { is_mobile } = ui;
     const has_poa_address_mismatch = account_status?.status?.includes('poa_address_mismatch');
-    const [rest_state, setRestState] = React.useState<TRestState>({
+    const [rest_state, setRestState] = useState<TRestState>({
         show_form: true,
-        form_initial_values: {},
     });
 
-    const notification_timeout = React.useRef<NodeJS.Timeout>();
+    const notification_timeout = useRef<NodeJS.Timeout>();
+    const scroll_div_ref = useRef(null);
 
-    const [start_on_submit_timeout, setStartOnSubmitTimeout] = React.useState<{
+    const [start_on_submit_timeout, setStartOnSubmitTimeout] = useState<{
         is_timeout_started: boolean;
         timeout_callback: () => void;
     }>({
@@ -92,38 +132,80 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
         timeout_callback: () => null,
     });
 
-    const isMounted = useIsMounted();
+    useEffect(() => {
+        fetchAccountSettings();
+    }, [fetchAccountSettings]);
 
-    React.useEffect(() => {
-        if (isMounted()) {
-            const getSettings = async () => {
-                // waits for residence to be populated
+    const should_show_loader =
+        is_loading_state_list ||
+        is_loading ||
+        is_loading_residence_list ||
+        !isPhoneNumberVerificationLoaded ||
+        !isCountryCodeLoaded;
+
+    useEffect(() => {
+        const init = async () => {
+            try {
+                // Order of API calls is important
                 await WS.wait('get_settings');
-
-                fetchResidenceList?.();
-
-                if (has_residence) {
-                    if (!is_language_changing) {
-                        setIsStateLoading(true);
-                        fetchStatesList().then(() => {
-                            setIsStateLoading(false);
-                        });
-                    }
-                }
-            };
-            getSettings();
+                await invalidate('residence_list');
+                await invalidate('states_list');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        if (is_language_changing) {
+            setIsLoading(true);
+            init();
         }
-        setIsLoading(false);
-    }, [account_settings, is_eu, is_social_signup]);
+    }, [invalidate, is_language_changing]);
 
-    const onSubmit = async (values: GetSettings, { setStatus, setSubmitting }: FormikHelpers<GetSettings>) => {
+    const checkForInitialCarriersSupported = () => {
+        const is_sms_carrier_available =
+            selected_country_list?.carriers &&
+            (selected_country_list?.carriers as string[]).includes('sms') &&
+            is_global_sms_available;
+
+        const is_whatsapp_carrier_available =
+            selected_country_list?.carriers &&
+            (selected_country_list?.carriers as string[]).includes('whatsapp') &&
+            is_global_whatsapp_available;
+
+        return is_sms_carrier_available || is_whatsapp_carrier_available;
+    };
+
+    const hintMessage = () => {
+        if (isPhoneNumberVerificationEnabled) {
+            if (is_phone_number_verified) {
+                return (
+                    <Localize
+                        i18n_default_text='To change your verified phone number, contact us via <0></0>.'
+                        components={[
+                            <OpenLiveChatLink
+                                text_size='xxs'
+                                key={0}
+                                className='account-form__fieldset--phone-verification-livechat-link'
+                            />,
+                        ]}
+                    />
+                );
+            }
+        } else {
+            return null;
+        }
+    };
+
+    const onSubmit = async (
+        values: PersonalDetailsValueTypes,
+        { setStatus, setSubmitting }: FormikHelpers<PersonalDetailsValueTypes>
+    ) => {
         setStatus({ msg: '' });
         const request = makeSettingsRequest({ ...values }, residence_list, states_list, is_virtual);
         setIsBtnLoading(true);
-        const data = await WS.setSettings(request);
+        const data = await WS.authorized.setSettings(request);
 
         if (data.error) {
-            setStatus({ msg: data.error.message });
+            setStatus({ msg: data.error.message, code: data.error.code });
             setIsBtnLoading(false);
             setSubmitting(false);
         } else {
@@ -139,13 +221,12 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
             // force request to update settings cache since settings have been updated
             const response = await WS.authorized.storage.getSettings();
             if (response.error) {
-                setRestState({ ...rest_state, api_error: response.error.message });
+                setRestState(prev_state => ({ ...prev_state, api_error: response.error.message }));
                 return;
             }
             // Fetches the status of the account after update
+            updatePhoneSettings();
             updateAccountStatus();
-            setRestState({ ...rest_state, ...response.get_settings });
-            setIsLoading(false);
             refreshNotifications();
             setIsBtnLoading(false);
             setIsSubmitSuccess(true);
@@ -165,9 +246,9 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
         }
     };
 
-    React.useEffect(() => () => clearTimeout(notification_timeout.current), []);
+    useEffect(() => () => clearTimeout(notification_timeout.current), []);
 
-    React.useEffect(() => {
+    useEffect(() => {
         let timeout_id: NodeJS.Timeout;
         if (start_on_submit_timeout.is_timeout_started) {
             timeout_id = setTimeout(() => {
@@ -190,11 +271,51 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
         return !!account_settings?.immutable_fields?.includes(name);
     };
 
+    const employment_tax_editable_fields = useMemo(() => {
+        const fields_to_disable = ['employment_status', 'tax_identification_number'].filter(field =>
+            isFieldImmutable(field, account_settings?.immutable_fields)
+        );
+        /*
+            [TODO]: Will be removed once BE enables tax_residence in immutable_fields
+            If Tax_residence value is present in response, then it must not be editable
+        */
+        if (!account_settings?.tax_residence) {
+            fields_to_disable.push('tax_residence');
+        }
+        return fields_to_disable;
+    }, [account_settings?.immutable_fields, account_settings?.tax_residence]);
+
     const { api_error, show_form } = rest_state;
+    const loadTimer = useRef<NodeJS.Timeout>();
+
+    // To facilitate scrolling to the field that is to be focused
+    useLayoutEffect(() => {
+        if (field_ref_to_focus && !should_show_loader && !api_error) {
+            loadTimer.current = setTimeout(() => {
+                const parentRef = isDesktop
+                    ? document.querySelector('.account-form__personal-details .dc-themed-scrollbars')
+                    : document.querySelector('.account__scrollbars_container--grid-layout');
+                const targetRef = document.getElementById(field_ref_to_focus) as HTMLElement;
+                const offset = 24; // 24 is the padding of the container
+                scrollToTop(parentRef as HTMLElement, targetRef, offset);
+            }, 0);
+        }
+        return () => {
+            if (field_ref_to_focus) {
+                clearTimeout(loadTimer.current);
+            }
+        };
+    }, [field_ref_to_focus, isDesktop, should_show_loader, api_error, scrollToTop, setFieldRefToFocus]);
+
+    useEffect(() => {
+        return () => {
+            setFieldRefToFocus(null);
+        };
+    }, [setFieldRefToFocus]);
 
     if (api_error) return <LoadErrorMessage error_message={api_error} />;
 
-    if (is_loading || is_state_loading || !residence_list.length) {
+    if (should_show_loader) {
         return <Loading is_fullscreen={false} className='account__initial-loader' />;
     }
 
@@ -203,7 +324,11 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
 
     const is_account_verified = is_poa_verified && is_poi_verified;
 
-    //Generate Redirection Link to user based on verifiction status
+    const stripped_phone_number = isCountryCodeDropdownEnabled
+        ? account_settings.phone?.replace(/\D/g, '')
+        : `+${account_settings.phone?.replace(/\D/g, '')}`;
+
+    //Generate Redirection Link to user based on verification status
     const getRedirectionLink = () => {
         if (!is_poi_verified) {
             return '/account/proof-of-identity';
@@ -213,9 +338,46 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
         return undefined;
     };
 
-    const PersonalDetailSchema = getPersonalDetailsValidationSchema(is_eu);
+    const is_tin_auto_set = Boolean(account_settings?.tin_skipped);
 
-    const initialValues = getPersonalDetailsInitialValues(account_settings, residence_list, states_list);
+    const is_employment_status_tin_mandatory = Boolean(account_status?.status?.includes('mt5_additional_kyc_required'));
+
+    const PersonalDetailSchema = getPersonalDetailsValidationSchema(
+        is_virtual,
+        is_svg,
+        tin_validation_config,
+        is_tin_auto_set,
+        account_settings?.immutable_fields,
+        is_employment_status_tin_mandatory,
+        isCountryCodeDropdownEnabled
+    );
+    const displayErrorMessage = (status: { code: string; msg: string }) => {
+        if (status?.code === 'PhoneNumberTaken') {
+            return (
+                <FormSubmitErrorMessage
+                    message={
+                        <Localize
+                            i18n_default_text='Number already exists in our system. Enter a new one or contact us via <0></0> for help'
+                            components={[<OpenLiveChatLink text_size='xxs' key={0} />]}
+                        />
+                    }
+                    text_color='loss-danger'
+                    weight='none'
+                />
+            );
+        }
+        return <FormSubmitErrorMessage message={status?.msg} />;
+    };
+
+    const initialValues = getPersonalDetailsInitialValues(
+        account_settings,
+        residence_list,
+        states_list,
+        is_virtual,
+        selected_phone_code,
+        checkForInitialCarriersSupported(),
+        isCountryCodeDropdownEnabled
+    );
 
     return (
         <Formik
@@ -227,8 +389,8 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
             {({
                 values,
                 errors,
+                setStatus,
                 status,
-                touched,
                 handleChange,
                 handleBlur,
                 handleSubmit,
@@ -238,8 +400,8 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
                 setFieldTouched,
                 dirty,
             }) => (
-                <React.Fragment>
-                    <LeaveConfirm onDirty={is_mobile ? showForm : undefined} />
+                <Fragment>
+                    <LeaveConfirm onDirty={isDesktop ? undefined : showForm} />
                     {show_form && (
                         <Form
                             noValidate
@@ -247,11 +409,11 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
                             onSubmit={handleSubmit}
                             data-testid='dt_account_personal_details_section'
                         >
-                            <FormBody scroll_offset={is_mobile ? '199px' : '80px'}>
+                            <FormBody scroll_offset={isDesktop ? '80px' : '199px'}>
                                 <FormSubHeader title={localize('Details')} />
                                 {!is_virtual && (
-                                    <React.Fragment>
-                                        <DesktopWrapper>
+                                    <Fragment>
+                                        {isDesktop ? (
                                             <InputGroup className='account-form__fieldset--2-cols'>
                                                 <Input
                                                     data-lpignore='true'
@@ -282,41 +444,42 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
                                                     data-testid='dt_last_name'
                                                 />
                                             </InputGroup>
-                                        </DesktopWrapper>
-                                        <MobileWrapper>
-                                            <fieldset className='account-form__fieldset'>
-                                                <Input
-                                                    data-lpignore='true'
-                                                    type='text'
-                                                    name='first_name'
-                                                    id='first_name_mobile'
-                                                    label={localize('First name*')}
-                                                    value={values.first_name}
-                                                    onChange={handleChange}
-                                                    onBlur={handleBlur}
-                                                    required
-                                                    disabled={isFieldDisabled('first_name')}
-                                                    error={errors.first_name}
-                                                    data-testid='dt_first_name'
-                                                />
-                                            </fieldset>
-                                            <fieldset className='account-form__fieldset'>
-                                                <Input
-                                                    data-lpignore='true'
-                                                    type='text'
-                                                    name='last_name'
-                                                    id='last_name_mobile'
-                                                    label={localize('Last name*')}
-                                                    value={values.last_name}
-                                                    onChange={handleChange}
-                                                    onBlur={handleBlur}
-                                                    required
-                                                    disabled={isFieldDisabled('last_name')}
-                                                    error={errors.last_name}
-                                                    data-testid='dt_last_name'
-                                                />
-                                            </fieldset>
-                                        </MobileWrapper>
+                                        ) : (
+                                            <Fragment>
+                                                <fieldset className='account-form__fieldset'>
+                                                    <Input
+                                                        data-lpignore='true'
+                                                        type='text'
+                                                        name='first_name'
+                                                        id='first_name_mobile'
+                                                        label={localize('First name*')}
+                                                        value={values.first_name}
+                                                        onChange={handleChange}
+                                                        onBlur={handleBlur}
+                                                        required
+                                                        disabled={isFieldDisabled('first_name')}
+                                                        error={errors.first_name}
+                                                        data-testid='dt_first_name'
+                                                    />
+                                                </fieldset>
+                                                <fieldset className='account-form__fieldset'>
+                                                    <Input
+                                                        data-lpignore='true'
+                                                        type='text'
+                                                        name='last_name'
+                                                        id='last_name_mobile'
+                                                        label={localize('Last name*')}
+                                                        value={values.last_name}
+                                                        onChange={handleChange}
+                                                        onBlur={handleBlur}
+                                                        required
+                                                        disabled={isFieldDisabled('last_name')}
+                                                        error={errors.last_name}
+                                                        data-testid='dt_last_name'
+                                                    />
+                                                </fieldset>
+                                            </Fragment>
+                                        )}
                                         {'place_of_birth' in values && (
                                             <fieldset className='account-form__fieldset'>
                                                 <FormSelectField
@@ -338,245 +501,271 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
                                                 value={values.date_of_birth}
                                             />
                                         </fieldset>
-                                        {'citizen' in values && (
-                                            <fieldset className='account-form__fieldset'>
-                                                <FormSelectField
-                                                    label={localize('Citizenship')}
-                                                    name='citizen'
-                                                    list_items={residence_list}
-                                                    disabled={isFieldDisabled('citizen')}
-                                                />
-                                            </fieldset>
-                                        )}
-                                    </React.Fragment>
-                                )}
-                                <React.Fragment>
-                                    <fieldset className='account-form__fieldset'>
-                                        <Input
-                                            data-lpignore='true'
-                                            type='text'
-                                            name='residence'
-                                            id={'residence'}
-                                            label={localize('Country of residence*')}
-                                            //@ts-expect-error type of residence should not be null: needs to be updated in GetSettings type
-                                            value={values.residence}
-                                            required
-                                            disabled={isFieldDisabled('residence')}
-                                            error={errors.residence}
-                                            onChange={handleChange}
-                                        />
-                                    </fieldset>
-                                    {is_social_signup && (
+
                                         <fieldset className='account-form__fieldset'>
-                                            <Input
-                                                data-lpignore='true'
-                                                type='text'
-                                                name='email'
-                                                id={'email'}
-                                                label={localize('Email address*')}
-                                                value={values.email}
-                                                required
-                                                disabled={isFieldDisabled('email')}
-                                                error={errors.email}
-                                                onChange={handleChange}
+                                            <FormSelectField
+                                                label={localize('Citizenship*')}
+                                                name='citizen'
+                                                list_items={residence_list}
+                                                disabled={isFieldDisabled('citizen')}
                                             />
                                         </fieldset>
-                                    )}
-                                </React.Fragment>
-                                {!is_virtual && (
-                                    <fieldset className='account-form__fieldset'>
-                                        <Input
-                                            data-lpignore='true'
-                                            type='text'
-                                            name='phone'
-                                            id={'phone'}
-                                            label={localize('Phone number*')}
-                                            //@ts-expect-error type of residence should not be null: needs to be updated in GetSettings type
-                                            value={values.phone}
-                                            onChange={handleChange}
-                                            onBlur={handleBlur}
-                                            required
-                                            error={errors.phone}
-                                            disabled={isFieldDisabled('phone')}
-                                            data-testid='dt_phone'
-                                        />
-                                    </fieldset>
+                                    </Fragment>
                                 )}
-                                <React.Fragment>
-                                    {'tax_residence' in values && (
-                                        <React.Fragment>
-                                            <FormSubHeader title={localize('Tax information')} />
-                                            {'tax_residence' in values && (
-                                                <fieldset className='account-form__fieldset'>
-                                                    <FormSelectField
-                                                        label={localize('Tax residence*')}
-                                                        name='tax_residence'
-                                                        list_items={residence_list}
-                                                        disabled={isFieldDisabled('tax_residence')}
-                                                    />
-                                                </fieldset>
-                                            )}
-                                            {'tax_identification_number' in values && (
-                                                <fieldset className='account-form__fieldset'>
-                                                    <Input
-                                                        data-lpignore='true'
-                                                        type='text'
-                                                        id={'tax_identification_number'}
-                                                        name='tax_identification_number'
-                                                        label={localize('Tax identification number*')}
-                                                        //@ts-expect-error type of residence should not be null: needs to be updated in GetSettings type
-                                                        value={values.tax_identification_number}
-                                                        onChange={handleChange}
-                                                        onBlur={handleBlur}
-                                                        error={errors.tax_identification_number}
-                                                        disabled={isFieldDisabled('tax_identification_number')}
-                                                        required
-                                                    />
-                                                </fieldset>
-                                            )}
-                                            {'employment_status' in values && (
-                                                <fieldset className='account-form__fieldset'>
-                                                    <DesktopWrapper>
-                                                        <Dropdown
-                                                            placeholder={localize('Employment status')}
-                                                            is_align_text_left
-                                                            name='employment_status'
-                                                            list={getEmploymentStatusList()}
-                                                            value={values.employment_status}
-                                                            onChange={handleChange}
-                                                            handleBlur={handleBlur}
-                                                            error={
-                                                                touched.employment_status
-                                                                    ? errors.employment_status
-                                                                    : undefined
-                                                            }
-                                                        />
-                                                    </DesktopWrapper>
-                                                    <MobileWrapper>
-                                                        <SelectNative
-                                                            className={'emp-status'}
-                                                            placeholder={localize('Please select')}
-                                                            name='employment_status'
-                                                            label={localize('Employment status')}
-                                                            list_items={getEmploymentStatusList()}
-                                                            value={values.employment_status ?? ''}
-                                                            error={
-                                                                touched.employment_status
-                                                                    ? errors.employment_status
-                                                                    : undefined
-                                                            }
-                                                            onChange={e => {
-                                                                setFieldTouched('employment_status', true);
-                                                                handleChange(e);
-                                                            }}
-                                                        />
-                                                    </MobileWrapper>
-                                                </fieldset>
-                                            )}
-                                        </React.Fragment>
-                                    )}
-                                    {!is_virtual && (
-                                        <React.Fragment>
-                                            {has_poa_address_mismatch && <POAAddressMismatchHintBox />}
-                                            <FormSubHeader title={localize('Address')} />
-                                            <div className='account-address__details-section'>
-                                                <fieldset className='account-form__fieldset'>
-                                                    <Input
-                                                        data-lpignore='true'
-                                                        autoComplete='off' // prevent chrome autocomplete
-                                                        type='text'
-                                                        maxLength={70}
-                                                        name='address_line_1'
-                                                        id='address_line_1'
-                                                        label={localize('First line of address*')}
-                                                        value={values.address_line_1}
-                                                        onChange={handleChange}
-                                                        onBlur={handleBlur}
-                                                        error={errors.address_line_1}
-                                                        required
-                                                        disabled={isFieldDisabled('address_line_1')}
-                                                        data-testid='dt_address_line_1'
-                                                    />
-                                                </fieldset>
-                                                <fieldset className='account-form__fieldset'>
-                                                    <Input
-                                                        data-lpignore='true'
-                                                        autoComplete='off' // prevent chrome autocomplete
-                                                        type='text'
-                                                        maxLength={70}
-                                                        name='address_line_2'
-                                                        id='address_line_2'
-                                                        label={localize('Second line of address (optional)')}
-                                                        value={values.address_line_2}
-                                                        error={errors.address_line_2}
-                                                        onChange={handleChange}
-                                                        onBlur={handleBlur}
-                                                        required
-                                                        disabled={isFieldDisabled('address_line_2')}
-                                                    />
-                                                </fieldset>
-                                                <fieldset className='account-form__fieldset'>
-                                                    <Input
-                                                        data-lpignore='true'
-                                                        autoComplete='off' // prevent chrome autocomplete
-                                                        type='text'
-                                                        name='address_city'
-                                                        id='address_city'
-                                                        label={localize('Town/City*')}
-                                                        value={values.address_city}
-                                                        error={errors.address_city}
-                                                        onChange={handleChange}
-                                                        onBlur={handleBlur}
-                                                        required
-                                                        disabled={isFieldDisabled('address_city')}
-                                                        data-testid='dt_address_city'
-                                                    />
-                                                </fieldset>
-                                                <fieldset className='account-form__fieldset'>
-                                                    {states_list.length ? (
+                                <fieldset className='account-form__fieldset'>
+                                    <Input
+                                        data-lpignore='true'
+                                        type='text'
+                                        name='residence'
+                                        id={'residence'}
+                                        label={localize('Country of residence*')}
+                                        //@ts-expect-error type of residence should not be null: needs to be updated in GetSettings type
+                                        value={values.residence}
+                                        required
+                                        disabled={isFieldDisabled('residence')}
+                                        error={errors.residence}
+                                        onChange={handleChange}
+                                    />
+                                </fieldset>
+                                {!is_virtual && (
+                                    <Fragment>
+                                        <fieldset className='account-form__fieldset'>
+                                            <div
+                                                className={clsx('account-form__fieldset--phone_container', {
+                                                    'account-form__fieldset--phone_container--verified':
+                                                        is_phone_number_verified,
+                                                    'account-form__fieldset--phone_container--with-1-field':
+                                                        !isCountryCodeDropdownEnabled,
+                                                })}
+                                            >
+                                                <div className='account-form__fieldset--phone_input'>
+                                                    {isCountryCodeDropdownEnabled && (
                                                         <FormSelectField
-                                                            label={localize('State/Province (optional)')}
-                                                            name='address_state'
-                                                            list_items={states_list}
-                                                            disabled={isFieldDisabled('address_state')}
-                                                        />
-                                                    ) : (
-                                                        <Input
-                                                            data-lpignore='true'
-                                                            autoComplete='off' // prevent chrome autocomplete
-                                                            type='text'
-                                                            name='address_state'
-                                                            id='address_state'
-                                                            label={localize('State/Province (optional)')}
-                                                            value={values.address_state}
-                                                            error={errors.address_state}
-                                                            onChange={handleChange}
-                                                            onBlur={handleBlur}
-                                                            disabled={isFieldDisabled('address_state')}
+                                                            label={localize('Code*')}
+                                                            name='calling_country_code'
+                                                            list_items={legacy_core_countries_list}
+                                                            is_country_code_dropdown
+                                                            onItemSelection={country_list => {
+                                                                setFieldValue(
+                                                                    'calling_country_code',
+                                                                    country_list.value,
+                                                                    true
+                                                                );
+                                                                const is_sms_carrier_available =
+                                                                    //@ts-expect-error carriers is not defined in TListItem type
+                                                                    country_list.carriers &&
+                                                                    //@ts-expect-error carriers is not defined in TListItem type
+                                                                    (country_list.carriers as string[]).includes(
+                                                                        'sms'
+                                                                    ) &&
+                                                                    is_global_sms_available;
+                                                                const is_whatsapp_carrier_available =
+                                                                    //@ts-expect-error carriers is not defined in TListItem type
+                                                                    country_list.carriers &&
+                                                                    //@ts-expect-error carriers is not defined in TListItem type
+                                                                    (country_list.carriers as string[]).includes(
+                                                                        'whatsapp'
+                                                                    ) &&
+                                                                    is_global_whatsapp_available;
+                                                                setFieldValue(
+                                                                    'is_carriers_available',
+                                                                    is_sms_carrier_available ||
+                                                                        is_whatsapp_carrier_available,
+                                                                    true
+                                                                );
+                                                            }}
+                                                            disabled={
+                                                                isFieldDisabled('calling_country_code') ||
+                                                                !!next_email_otp_request_timer ||
+                                                                is_email_otp_timer_loading
+                                                            }
                                                         />
                                                     )}
-                                                </fieldset>
-                                                <fieldset className='account-form__fieldset'>
+                                                    <Input
+                                                        data-lpignore='true'
+                                                        type='text'
+                                                        inputMode='numeric'
+                                                        name='phone'
+                                                        id={'phone'}
+                                                        label={localize('Phone number*')}
+                                                        //@ts-expect-error type of residence should not be null: needs to be updated in GetSettings type
+                                                        value={values.phone}
+                                                        className='account-form__fieldset--phone-number-input'
+                                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                                            let phone_number = e.target.value.replace(/\D/g, '');
+                                                            if (!isCountryCodeDropdownEnabled) {
+                                                                phone_number =
+                                                                    phone_number.length === 0
+                                                                        ? '+'
+                                                                        : `+${phone_number}`;
+                                                            }
+                                                            setFieldValue('phone', phone_number, true);
+                                                            setStatus('');
+                                                        }}
+                                                        onBlur={handleBlur}
+                                                        required
+                                                        error={errors.phone}
+                                                        disabled={
+                                                            isFieldDisabled('phone') ||
+                                                            !!next_email_otp_request_timer ||
+                                                            is_email_otp_timer_loading
+                                                        }
+                                                        data-testid='dt_phone'
+                                                    />
+                                                </div>
+                                                {isPhoneNumberVerificationEnabled && (
+                                                    <VerifyButton
+                                                        is_verify_button_disabled={
+                                                            isFieldDisabled('phone') ||
+                                                            !isValid ||
+                                                            !stripped_phone_number ||
+                                                            is_email_otp_timer_loading ||
+                                                            (isCountryCodeDropdownEnabled &&
+                                                                //@ts-expect-error is_carriers_available is not defined in GetSettings type
+                                                                !values.is_carriers_available)
+                                                        }
+                                                        // @ts-expect-error This needs to fixed in VerifyButton component
+                                                        values={values}
+                                                        residence_list={residence_list}
+                                                        states_list={states_list}
+                                                        next_email_otp_request_timer={next_email_otp_request_timer}
+                                                        setStatus={setStatus}
+                                                    />
+                                                )}
+                                            </div>
+                                            {is_phone_number_verified && (
+                                                <div className='account-form__fieldset--phone_container--verified-hint'>
+                                                    <Text as='p' color='less-prominent' size='xxs'>
+                                                        {hintMessage()}
+                                                    </Text>
+                                                </div>
+                                            )}
+                                        </fieldset>
+                                        <AccountOpeningReasonField
+                                            account_opening_reason_list={account_opening_reason_list}
+                                            setFieldValue={setFieldValue}
+                                            disabled={
+                                                isFieldDisabled('account_opening_reason') ||
+                                                Boolean(account_settings?.account_opening_reason)
+                                            }
+                                            required
+                                            fieldFocused={
+                                                !account_settings.account_opening_reason &&
+                                                field_ref_to_focus === 'account-opening-reason'
+                                            }
+                                        />
+                                    </Fragment>
+                                )}
+                                {!is_virtual && (
+                                    <div className='employment-tin-section'>
+                                        <FormSubHeader title={localize('Employment and tax information')} />
+                                        <EmploymentTaxDetailsContainer
+                                            editable_fields={employment_tax_editable_fields}
+                                            parent_ref={scroll_div_ref}
+                                            handleChange={mutate}
+                                            tin_validation_config={tin_validation_config}
+                                            should_display_long_message={is_mf_account}
+                                            should_focus_fields={field_ref_to_focus === 'employment-tax-section'}
+                                        />
+                                        {has_poa_address_mismatch && <POAAddressMismatchHintBox />}
+                                        <FormSubHeader title={localize('Address')} />
+                                        <div className='account-address__details-section'>
+                                            <fieldset className='account-form__fieldset'>
+                                                <Input
+                                                    data-lpignore='true'
+                                                    autoComplete='off' // prevent chrome autocomplete
+                                                    type='text'
+                                                    maxLength={70}
+                                                    name='address_line_1'
+                                                    id='address_line_1'
+                                                    label={localize('First line of address*')}
+                                                    value={values.address_line_1}
+                                                    onChange={handleChange}
+                                                    onBlur={handleBlur}
+                                                    error={errors.address_line_1}
+                                                    required
+                                                    disabled={isFieldDisabled('address_line_1')}
+                                                    data-testid='dt_address_line_1'
+                                                />
+                                            </fieldset>
+                                            <fieldset className='account-form__fieldset'>
+                                                <Input
+                                                    data-lpignore='true'
+                                                    autoComplete='off' // prevent chrome autocomplete
+                                                    type='text'
+                                                    maxLength={70}
+                                                    name='address_line_2'
+                                                    id='address_line_2'
+                                                    label={localize('Second line of address (optional)')}
+                                                    value={values.address_line_2}
+                                                    error={errors.address_line_2}
+                                                    onChange={handleChange}
+                                                    onBlur={handleBlur}
+                                                    required
+                                                    disabled={isFieldDisabled('address_line_2')}
+                                                />
+                                            </fieldset>
+                                            <fieldset className='account-form__fieldset'>
+                                                <Input
+                                                    data-lpignore='true'
+                                                    autoComplete='off' // prevent chrome autocomplete
+                                                    type='text'
+                                                    name='address_city'
+                                                    id='address_city'
+                                                    label={localize('Town/City*')}
+                                                    value={values.address_city}
+                                                    error={errors.address_city}
+                                                    onChange={handleChange}
+                                                    onBlur={handleBlur}
+                                                    required
+                                                    disabled={isFieldDisabled('address_city')}
+                                                    data-testid='dt_address_city'
+                                                />
+                                            </fieldset>
+                                            <fieldset className='account-form__fieldset'>
+                                                {states_list.length ? (
+                                                    <FormSelectField
+                                                        label={localize('State/Province (optional)')}
+                                                        name='address_state'
+                                                        list_items={states_list}
+                                                        disabled={isFieldDisabled('address_state')}
+                                                    />
+                                                ) : (
                                                     <Input
                                                         data-lpignore='true'
                                                         autoComplete='off' // prevent chrome autocomplete
                                                         type='text'
-                                                        name='address_postcode'
-                                                        id='address_postcode'
-                                                        label={localize('Postal/ZIP code')}
-                                                        value={values.address_postcode}
-                                                        error={errors.address_postcode}
+                                                        name='address_state'
+                                                        id='address_state'
+                                                        label={localize('State/Province (optional)')}
+                                                        value={values.address_state}
+                                                        error={errors.address_state}
                                                         onChange={handleChange}
                                                         onBlur={handleBlur}
-                                                        disabled={isFieldDisabled('address_postcode')}
+                                                        disabled={isFieldDisabled('address_state')}
                                                     />
-                                                </fieldset>
-                                            </div>
-                                        </React.Fragment>
-                                    )}
-                                </React.Fragment>
+                                                )}
+                                            </fieldset>
+                                            <fieldset className='account-form__fieldset'>
+                                                <Input
+                                                    data-lpignore='true'
+                                                    autoComplete='off' // prevent chrome autocomplete
+                                                    type='text'
+                                                    name='address_postcode'
+                                                    id='address_postcode'
+                                                    label={localize('Postal/ZIP code')}
+                                                    value={values.address_postcode}
+                                                    error={errors.address_postcode}
+                                                    onChange={handleChange}
+                                                    onBlur={handleBlur}
+                                                    disabled={isFieldDisabled('address_postcode')}
+                                                />
+                                            </fieldset>
+                                        </div>
+                                    </div>
+                                )}
                                 {!!current_landing_company?.support_professional_client && (
-                                    <React.Fragment>
+                                    <Fragment>
                                         <div className='account-form__divider' />
                                         <div className='pro-client'>
                                             <FormSubHeader title={localize('Professional Client')} />
@@ -648,12 +837,12 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
                                             </fieldset>
                                         </div>
                                         <div className='account-form__divider' />
-                                    </React.Fragment>
+                                    </Fragment>
                                 )}
                                 <FormSubHeader title={localize('Email preference')} />
-                                <React.Fragment>
+                                <Fragment>
                                     <fieldset
-                                        className={classNames(
+                                        className={clsx(
                                             'account-form__fieldset',
                                             'account-form__fieldset--email-consent'
                                         )}
@@ -671,24 +860,22 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
                                             disabled={isFieldDisabled('email_consent') && !is_virtual}
                                         />
                                     </fieldset>
-                                </React.Fragment>
+                                </Fragment>
                             </FormBody>
                             <FormFooter>
-                                {status?.msg && <FormSubmitErrorMessage message={status?.msg} />}
+                                {status?.msg && displayErrorMessage(status)}
                                 {!is_virtual && !(isSubmitting || is_submit_success || status?.msg) && (
                                     <Text
                                         className='account-form__footer-note'
                                         size='xxs'
                                         color='prominent'
-                                        align={is_mobile ? 'center' : 'right'}
+                                        align={isDesktop ? 'right' : 'center'}
                                     >
-                                        {localize(
-                                            'Please make sure your information is correct or it may affect your trading experience.'
-                                        )}
+                                        <Localize i18n_default_text='Ensure your information is correct.' />
                                     </Text>
                                 )}
                                 <Button
-                                    className={classNames('account-form__footer-btn', {
+                                    className={clsx('account-form__footer-btn', {
                                         'dc-btn--green': is_submit_success,
                                     })}
                                     type='submit'
@@ -698,17 +885,17 @@ export const PersonalDetailsForm = observer(({ history }: { history: BrowserHist
                                     has_effect
                                     is_loading={is_btn_loading}
                                     is_submit_success={is_submit_success}
-                                    text={localize('Submit')}
+                                    text={localize('Save changes')}
                                     large
                                     primary
                                 />
                             </FormFooter>
                         </Form>
                     )}
-                </React.Fragment>
+                </Fragment>
             )}
         </Formik>
     );
 });
 
-export default withRouter(PersonalDetailsForm);
+export default PersonalDetailsForm;

@@ -25,8 +25,7 @@
 
         width: fit-content;
 
-        @include mobile {
-            margin-bottom: 0.8rem;
+        @include mobile-or-tablet-screen {
             padding: 0.2rem 1rem;
         }
     }

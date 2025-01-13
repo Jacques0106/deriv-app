@@ -2,8 +2,9 @@ import classNames from 'classnames';
 import PropTypes from 'prop-types';
 import React from 'react';
 import { withRouter } from 'react-router-dom';
+import { useDevice } from '@deriv-com/ui';
 import { Div100vhContainer, Icon } from '@deriv/components';
-import { routes, isDesktop, isMobile } from '@deriv/shared';
+import { routes } from '@deriv/shared';
 import { EXPERIAN, getExperianResult } from './helpers/constants';
 import { DialogHeading } from './helpers/dialog-heading.jsx';
 import { DialogMessage } from './helpers/dialog-message.jsx';
@@ -21,11 +22,9 @@ const CloseIcon = ({ closeModal }) => (
 );
 
 const StatusDialogContainer = observer(({ closeModal, currency, history, icon_size }) => {
+    const { isDesktop } = useDevice();
     const { client } = useStore();
-    const { country_standpoint, landing_company_shortcode, is_fully_authenticated, is_age_verified } = client;
-    const is_isle_of_man_residence = client.residence === 'im'; // TODO: [deriv-eu] refactor this once more residence checks are required
-    const is_belgium_residence = client.residence === 'be'; // TODO: [deriv-eu] refactor this once more residence checks are required
-    const switchToVirtual = () => client.switchAccount(client.virtual_account_loginid);
+    const { landing_company_shortcode, is_fully_authenticated } = client;
     const closeModalAndOpenCashier = () => {
         closeModal();
         history.push(routes.cashier_deposit);
@@ -50,15 +49,11 @@ const StatusDialogContainer = observer(({ closeModal, currency, history, icon_si
     const getStatus = () =>
         getExperianResult({
             landing_company_shortcode,
-            is_fully_authenticated,
-            is_age_verified,
-            is_isle_of_man_residence,
-            is_belgium_residence,
         });
 
     return (
-        <Div100vhContainer className='status-dialog' is_disabled={isDesktop()} height_offset='40px'>
-            {isDesktop() && <CloseIcon closeModal={closeModal} />}
+        <Div100vhContainer className='status-dialog' is_disabled={isDesktop} height_offset='40px'>
+            {isDesktop && <CloseIcon closeModal={closeModal} />}
             <div
                 className={classNames('status-dialog__header', {
                     'status-dialog__header--large': icon_size === 'large',
@@ -72,13 +67,11 @@ const StatusDialogContainer = observer(({ closeModal, currency, history, icon_si
             </div>
             <div
                 className={classNames('status-dialog__body', {
-                    'status-dialog__body--no-grow': isMobile(),
+                    'status-dialog__body--no-grow': !isDesktop,
                 })}
             >
-                <DialogHeading status={getStatus()} landing_company_shortcode={landing_company_shortcode} />
+                <DialogHeading />
                 <DialogMessage
-                    country_standpoint={country_standpoint}
-                    currency={currency}
                     is_fully_authenticated={is_fully_authenticated}
                     landing_company_shortcode={landing_company_shortcode}
                     status={getStatus()}
@@ -92,7 +85,6 @@ const StatusDialogContainer = observer(({ closeModal, currency, history, icon_si
                 is_fully_authenticated={is_fully_authenticated}
                 landing_company_shortcode={landing_company_shortcode}
                 status={getStatus()}
-                switchToVirtual={switchToVirtual}
             />
         </Div100vhContainer>
     );

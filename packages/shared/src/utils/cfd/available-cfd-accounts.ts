@@ -16,26 +16,20 @@ export interface AvailableAccount {
 
 export const getCFDAvailableAccount = () => [
     {
-        name: 'Derived',
-        description: localize('This account offers CFDs on derived instruments.'),
-        platform: CFD_PLATFORMS.MT5,
-        market_type: 'synthetic',
-        icon: 'Derived',
-        availability: 'Non-EU',
-    },
-    {
         name: 'Deriv X',
-        description: localize('This account offers CFDs on a highly customisable CFD trading platform.'),
+        description: localize('CFDs on financial and derived instruments, powered by TradingView.'),
         platform: CFD_PLATFORMS.DXTRADE,
         market_type: 'all',
+        product: 'derivx',
         icon: 'DerivX',
         availability: 'Non-EU',
     },
     {
         name: 'Deriv cTrader',
-        description: localize('This account offers CFDs on a feature-rich trading platform.'),
+        description: localize('CFDs on financial and derived instruments with copy trading.'),
         platform: CFD_PLATFORMS.CTRADER,
         market_type: 'all',
+        product: 'ctrader',
         icon: 'CTrader',
         availability: 'Non-EU',
     },

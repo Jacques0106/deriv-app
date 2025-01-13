@@ -3,12 +3,13 @@ import { Form, Formik } from 'formik';
 import PropTypes from 'prop-types';
 
 import { Button, Checkbox, Dialog, Loading, Text } from '@deriv/components';
-import { getLocation, SessionStore, shuffleArray } from '@deriv/shared';
+import { useGrowthbookGetFeatureValue } from '@deriv/hooks';
+import { cacheTrackEvents, getLocation, SessionStore, setPerformanceValue, shuffleArray } from '@deriv/shared';
+import { observer, useStore } from '@deriv/stores';
 import { getLanguage, localize } from '@deriv/translations';
 import { Analytics } from '@deriv-com/analytics';
 
 import { WS } from 'Services';
-import { observer, useStore } from '@deriv/stores';
 
 import CitizenshipForm from '../CitizenshipModal/set-citizenship-form.jsx';
 import PasswordSelectionModal from '../PasswordSelectionModal/password-selection-modal.jsx';
@@ -18,7 +19,6 @@ import ResidenceForm from '../SetResidenceModal/set-residence-form.jsx';
 import validateSignupFields from './validate-signup-fields.jsx';
 
 import 'Sass/app/modules/account-signup.scss';
-import { useGrowthbookFeatureFlag } from '@deriv/hooks';
 
 const AccountSignup = ({
     enableApp,
@@ -36,16 +36,17 @@ const AccountSignup = ({
     const history_value = React.useRef();
     const [pw_input, setPWInput] = React.useState('');
     const [is_password_modal, setIsPasswordModal] = React.useState(false);
+    const isPasswordModalRef = React.useRef(false);
+    const isCountryScreenLoggedOnceRef = React.useRef(false);
     const [is_disclaimer_accepted, setIsDisclaimerAccepted] = React.useState(false);
     const [is_questionnaire, setIsQuestionnaire] = React.useState(false);
     const [ab_questionnaire, setABQuestionnaire] = React.useState();
     const [modded_state, setModdedState] = React.useState({});
     const language = getLanguage();
 
-    // Growthbook ab/test experiment with onboarding flow
-    const growthbook_ab_test_skip_onboarding_flow = useGrowthbookFeatureFlag({
-        featureFlag: 'skip-onboarding-flow',
-        defaultValue: false,
+    const [is_tracking_signup_errors] = useGrowthbookGetFeatureValue({
+        featureFlag: 'signup_flow_error',
+        defaultValue: true,
     });
 
     const checkResidenceIsBrazil = selected_country =>
@@ -64,6 +65,38 @@ const AccountSignup = ({
 
     // didMount lifecycle hook
     React.useEffect(() => {
+        // eslint-disable-next-line no-console
+
+        cacheTrackEvents.loadEvent([
+            {
+                event: {
+                    name: 'ce_virtual_signup_form',
+                    properties: {
+                        action: 'country_selection_screen_opened',
+                        form_name: is_mobile
+                            ? 'virtual_signup_web_mobile_default'
+                            : 'virtual_signup_web_desktop_default',
+                    },
+                },
+                cache: true,
+            },
+        ]);
+
+        cacheTrackEvents.loadEvent([
+            {
+                event: {
+                    name: 'ce_virtual_signup_form',
+                    properties: {
+                        action: 'signup_confirmed',
+                        form_name: is_mobile
+                            ? 'virtual_signup_web_mobile_default'
+                            : 'virtual_signup_web_desktop_default',
+                    },
+                },
+                cache: true,
+            },
+        ]);
+
         WS.wait('website_status', 'residence_list').then(() => {
             if (clients_country && residence_list) {
                 setCountry(getLocation(residence_list, clients_country, 'text'));
@@ -87,17 +120,52 @@ const AccountSignup = ({
             return ab_value;
         };
         setABQuestionnaire(fetchQuestionnarieData());
-
-        Analytics.trackEvent('ce_virtual_signup_form', {
-            action: 'signup_confirmed',
-            form_name: is_mobile ? 'virtual_signup_web_mobile_default' : 'virtual_signup_web_desktop_default',
-        });
-
-        Analytics.trackEvent('ce_virtual_signup_form', {
-            action: 'country_selection_screen_opened',
-            form_name: is_mobile ? 'virtual_signup_web_mobile_default' : 'virtual_signup_web_desktop_default',
-        });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const trackSignupErrorEvent = (action, errorMessage, screen_name) => {
+        const form_name = is_mobile ? 'virtual_signup_web_mobile_default' : 'virtual_signup_web_desktop_default';
+        cacheTrackEvents.loadEvent([
+            {
+                event: {
+                    name: 'ce_virtual_signup_form',
+                    properties: {
+                        action,
+                        form_name,
+                        error_message: errorMessage,
+                        screen_name,
+                    },
+                },
+            },
+        ]);
+    };
+
+    React.useEffect(() => {
+        isPasswordModalRef.current = is_password_modal; // Sync ref with state
+    }, [is_password_modal]);
+
+    React.useEffect(() => {
+        cacheTrackEvents.trackConsoleErrors(errorMessage => {
+            if (is_tracking_signup_errors) {
+                if (errorMessage) {
+                    const screen_name = !isPasswordModalRef.current
+                        ? 'country_selection_screen'
+                        : 'password_screen_opened';
+
+                    if (screen_name === 'country_selection_screen') {
+                        if (
+                            !isCountryScreenLoggedOnceRef.current ||
+                            isCountryScreenLoggedOnceRef.current !== errorMessage
+                        ) {
+                            trackSignupErrorEvent('signup_flow_error', errorMessage, screen_name);
+                            isCountryScreenLoggedOnceRef.current = errorMessage;
+                        }
+                    } else if (screen_name === 'password_screen_opened') {
+                        trackSignupErrorEvent('signup_flow_error', errorMessage, screen_name);
+                    }
+                }
+            }
+        });
+    }, [is_tracking_signup_errors]);
 
     const validateSignupPassthrough = values => validateSignupFields(values, residence_list);
 
@@ -131,17 +199,11 @@ const AccountSignup = ({
                 action: 'signup_flow_error',
                 form_name: is_mobile ? 'virtual_signup_web_mobile_default' : 'virtual_signup_web_desktop_default',
                 error_message: error,
+                screen_name: 'password_screen_opened',
             });
         } else {
-            // ======== Growthbook ab/test experiment with onboarding flow ========
-            const searchParams = new URLSearchParams(window.location.search);
-            searchParams.set('skip-onboarding-flow', growthbook_ab_test_skip_onboarding_flow);
-
-            window.history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
-            // ====================================================================
-
-            isModalVisible(false);
             setIsFromSignupAccount(true);
+            isModalVisible(false);
             SessionStore.remove('signup_query_param');
             enableApp();
 
@@ -151,6 +213,8 @@ const AccountSignup = ({
             });
         }
     };
+
+    if (!is_loading) setPerformanceValue('signup_time');
 
     return (
         <div className='account-signup'>

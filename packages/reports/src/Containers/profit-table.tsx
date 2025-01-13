@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import React from 'react';
 import { withRouter } from 'react-router';
-import { DesktopWrapper, MobileWrapper, DataList, DataTable, usePrevious } from '@deriv/components';
+import { DataList, DataTable, usePrevious } from '@deriv/components';
 import { extractInfoFromShortcode, formatDate, getContractPath, getUnsupportedContracts } from '@deriv/shared';
 import { localize, Localize } from '@deriv/translations';
 import { Analytics } from '@deriv-com/analytics';
@@ -14,6 +14,7 @@ import { ReportsMeta } from '../Components/reports-meta';
 import { getProfitTableColumnsTemplate } from 'Constants/data-table-constants';
 import { observer, useStore } from '@deriv/stores';
 import { useReportsStore } from 'Stores/useReportsStores';
+import { useDevice } from '@deriv-com/ui';
 
 type TProfitTable = {
     component_icon: string;
@@ -23,7 +24,7 @@ type TDataListCell = React.ComponentProps<typeof DataList.Cell>;
 
 type TGetProfitTableColumnsTemplate = ReturnType<typeof getProfitTableColumnsTemplate>;
 
-const getRowAction = (row_obj: { [key: string]: unknown }) => {
+export const getRowAction = (row_obj: { [key: string]: unknown }) => {
     const contract_type = extractInfoFromShortcode(row_obj?.shortcode as string)
         ?.category?.toString()
         .toUpperCase();
@@ -61,6 +62,7 @@ const ProfitTable = observer(({ component_icon }: TProfitTable) => {
     } = profit_table;
     const prev_date_from = usePrevious(date_from);
     const prev_date_to = usePrevious(date_to);
+    const { isDesktop } = useDevice();
 
     React.useEffect(() => {
         onMount();
@@ -93,7 +95,7 @@ const ProfitTable = observer(({ component_icon }: TProfitTable) => {
 
     const filter_component = <CompositeCalendar onChange={handleDateChange} from={date_from} to={date_to} />;
 
-    const columns: TGetProfitTableColumnsTemplate = getProfitTableColumnsTemplate(currency, data.length);
+    const columns: TGetProfitTableColumnsTemplate = getProfitTableColumnsTemplate(currency, data.length, isDesktop);
 
     const columns_map = Object.fromEntries(columns.map(column => [column.col_index, column])) as Record<
         TGetProfitTableColumnsTemplate[number]['col_index'],
@@ -162,8 +164,7 @@ const ProfitTable = observer(({ component_icon }: TProfitTable) => {
             </>
         );
     };
-    // TODO: Uncomment and update this when DTrader 2.0 development starts:
-    // if (useFeatureFlags().is_dtrader_v2_enabled) return <Text size='l'>I am Profit Table for DTrader 2.0.</Text>;
+
     return (
         <React.Fragment>
             <ReportsMeta filter_component={filter_component} className='profit-table__filter' />
@@ -185,7 +186,7 @@ const ProfitTable = observer(({ component_icon }: TProfitTable) => {
                         />
                     ) : (
                         <div className='reports__content'>
-                            <DesktopWrapper>
+                            {isDesktop ? (
                                 <DataTable
                                     className='profit-table'
                                     data_source={data}
@@ -198,8 +199,7 @@ const ProfitTable = observer(({ component_icon }: TProfitTable) => {
                                 >
                                     <PlaceholderComponent is_loading={is_loading} />
                                 </DataTable>
-                            </DesktopWrapper>
-                            <MobileWrapper>
+                            ) : (
                                 <DataList
                                     className='profit-table'
                                     data_source={data}
@@ -211,7 +211,7 @@ const ProfitTable = observer(({ component_icon }: TProfitTable) => {
                                 >
                                     <PlaceholderComponent is_loading={is_loading} />
                                 </DataList>
-                            </MobileWrapper>
+                            )}
                         </div>
                     )}
                 </React.Fragment>

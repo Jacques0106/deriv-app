@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { ObjectUtils } from '@deriv-com/utils';
 import initData from '../remote_config.json';
 
 const remoteConfigQuery = async function () {
@@ -14,12 +15,36 @@ const remoteConfigQuery = async function () {
     return response.json();
 };
 
-function useRemoteConfig() {
-    return useQuery({
-        queryKey: ['remoteConfig'],
-        queryFn: remoteConfigQuery,
-        initialData: initData,
-    });
+function useRemoteConfig(enabled = false) {
+    const [data, setData] = useState(initData);
+    const isMounted = useRef(false);
+
+    useEffect(() => {
+        isMounted.current = true;
+
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (enabled) {
+            remoteConfigQuery()
+                .then(async res => {
+                    const resHash = await ObjectUtils.hashObject(res);
+                    const dataHash = await ObjectUtils.hashObject(data);
+                    if (resHash !== dataHash && isMounted.current) {
+                        setData(res);
+                    }
+                })
+                .catch(error => {
+                    // eslint-disable-next-line no-console
+                    console.log('Remote Config error: ', error);
+                });
+        }
+    }, [enabled, data]);
+
+    return { data };
 }
 
 export default useRemoteConfig;

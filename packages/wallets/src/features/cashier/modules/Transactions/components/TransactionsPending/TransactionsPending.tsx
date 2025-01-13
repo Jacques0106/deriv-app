@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import moment from 'moment';
 import { useCryptoTransactions } from '@deriv/api-v2';
-import { Loader } from '../../../../../../components';
-import { WalletText } from '../../../../../../components/Base';
+import { Text } from '@deriv-com/ui';
+import { FormatUtils } from '@deriv-com/utils';
+import { WalletLoader } from '../../../../../../components';
 import { TransactionsNoDataState } from '../TransactionsNoDataState';
 import { TransactionsPendingRow } from '../TransactionsPendingRow';
 import { TransactionsTable } from '../TransactionsTable';
@@ -24,7 +24,7 @@ const TransactionsPending: React.FC<TProps> = ({ filter = 'all' }) => {
         return () => unsubscribe();
     }, [filter, resetData, subscribe, unsubscribe]);
 
-    if (!isSubscribed || isLoading) return <Loader />;
+    if (!isSubscribed || isLoading) return <WalletLoader />;
 
     if (!transactions) return <TransactionsNoDataState />;
 
@@ -33,7 +33,12 @@ const TransactionsPending: React.FC<TProps> = ({ filter = 'all' }) => {
             <TransactionsTable
                 columns={[
                     {
-                        accessorFn: row => moment.unix(row.submit_date).format('DD MMM YYYY'),
+                        accessorFn: row =>
+                            FormatUtils.getFormattedDateString(row.submit_date, {
+                                dateOptions: { day: '2-digit', month: 'short', year: 'numeric' },
+                                format: 'DD MMM YYYY',
+                                unix: true,
+                            }),
                         accessorKey: 'date',
                         header: 'Date',
                     },
@@ -42,9 +47,14 @@ const TransactionsPending: React.FC<TProps> = ({ filter = 'all' }) => {
                 groupBy={['date']}
                 rowGroupRender={transaction => (
                     <div className='wallets-transactions-pending__group-title'>
-                        <WalletText color='primary' size='2xs'>
-                            {transaction.submit_date && moment.unix(transaction.submit_date).format('DD MMM YYYY')}
-                        </WalletText>
+                        <Text color='primary' size='2xs'>
+                            {transaction.submit_date &&
+                                FormatUtils.getFormattedDateString(transaction.submit_date, {
+                                    dateOptions: { day: '2-digit', month: 'short', year: 'numeric' },
+                                    format: 'DD MMM YYYY',
+                                    unix: true,
+                                })}
+                        </Text>
                     </div>
                 )}
                 rowRender={transaction => <TransactionsPendingRow transaction={transaction} />}

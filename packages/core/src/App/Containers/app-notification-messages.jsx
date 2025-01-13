@@ -92,11 +92,11 @@ const AppNotificationMessages = observer(
             const is_non_hidden_notification = isMobile()
                 ? [
                       ...maintenance_notifications,
+                      'account_currency_closure',
                       'authenticate',
                       'deriv_go',
                       'document_needs_action',
                       'dp2p',
-                      'flutter_chart',
                       'contract_sold',
                       'has_changed_two_fa',
                       'identity',
@@ -104,6 +104,7 @@ const AppNotificationMessages = observer(
                       'need_fa',
                       'needs_poinc',
                       'notify_financial_assessment',
+                      'phone_number_verification',
                       'poi_name_mismatch',
                       'poa_address_mismatch_failure',
                       'poa_address_mismatch_success',
@@ -118,6 +119,7 @@ const AppNotificationMessages = observer(
                       'poinc_upload_limited',
                       'p2p_advertiser_nickname_added',
                       'p2p_daily_limit_increase',
+                      'reaccept_tnc',
                       'resticted_mt5_with_failed_poa',
                       'resticted_mt5_with_pending_poa',
                       'svg_needs_poa',
@@ -130,7 +132,7 @@ const AppNotificationMessages = observer(
                       'trustpilot',
                       'unwelcome',
                       'additional_kyc_info',
-                      'mt5_notification',
+                      'notify_account_is_to_be_closed_by_residence',
                   ].includes(message.key) || message.type === 'p2p_completed_order'
                 : true;
 

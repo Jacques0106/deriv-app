@@ -63,7 +63,9 @@
         position: relative;
         overflow: hidden;
         background-color: var(--general-main-2);
-        box-shadow: 0 16px 16px 0 var(--shadow-menu), 0 0 16px 0 var(--shadow-menu);
+        box-shadow:
+            0 16px 16px 0 var(--shadow-menu),
+            0 0 16px 0 var(--shadow-menu);
     }
 
     &-header {
@@ -238,6 +240,14 @@
         color: var(--text-prominent);
         overflow-y: auto;
         overflow-x: hidden;
+
+        &.no-padding {
+            padding-top: 0;
+        }
+
+        &.tradershub-os-header {
+            padding-top: 2.4rem;
+        }
     }
     &__item {
         padding: 0 1.6rem 0 4.8rem;

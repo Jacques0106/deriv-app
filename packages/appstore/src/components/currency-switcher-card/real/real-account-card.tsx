@@ -1,10 +1,11 @@
 import React from 'react';
 import { useHistory } from 'react-router';
 import { Button, Text } from '@deriv/components';
-import { getCurrencyName, routes } from '@deriv/shared';
+import { getCurrencyName, routes, isCryptocurrency, startPerformanceEventTimer, cacheTrackEvents } from '@deriv/shared';
 import { Localize } from '@deriv/translations';
 import BalanceText from 'Components/elements/text/balance-text';
 import CurrencySwitcherContainer from 'Components/containers/currency-switcher-container';
+import { useGrowthbookGetFeatureValue } from '@deriv/hooks';
 import { useStore, observer } from '@deriv/stores';
 import { IsIconCurrency } from 'Assets/svgs/currency';
 
@@ -18,7 +19,7 @@ const RealAccountCard = observer(() => {
     const { accounts, loginid } = client;
     const { current_language } = common;
     const { current_list } = modules.cfd;
-    const { openModal, is_eu_user } = traders_hub;
+    const { openModal, is_eu_user, selected_account_type } = traders_hub;
 
     const { balance, currency } = loginid ? accounts[loginid] : default_balance;
 
@@ -29,12 +30,17 @@ const RealAccountCard = observer(() => {
     const uppercase_currency = currency?.toUpperCase();
     const get_currency = IsIconCurrency(uppercase_currency) ? uppercase_currency : 'Unknown';
 
+    const [is_traders_dashboard_tracking_enabled] = useGrowthbookGetFeatureValue({
+        featureFlag: 'ce_tradershub_dashboard_tracking',
+        defaultValue: false,
+    });
+
     return (
         <CurrencySwitcherContainer
             className='demo-account-card'
             title={
                 currency ? (
-                    <BalanceText currency={get_currency} balance={Number(balance)} size='xs' />
+                    <BalanceText currency={currency} balance={Number(balance)} size='xs' />
                 ) : (
                     'No currency assigned'
                 )
@@ -50,6 +56,24 @@ const RealAccountCard = observer(() => {
                 currency && (
                     <Button
                         onClick={(e: MouseEvent) => {
+                            if (is_traders_dashboard_tracking_enabled) {
+                                cacheTrackEvents.loadEvent([
+                                    {
+                                        event: {
+                                            name: 'ce_tradershub_dashboard_form',
+                                            properties: {
+                                                action: 'deposit_balance',
+                                                form_name: 'traders_hub_default',
+                                                account_mode: selected_account_type,
+                                            },
+                                        },
+                                    },
+                                ]);
+                            }
+
+                            if (isCryptocurrency(currency))
+                                startPerformanceEventTimer('load_crypto_deposit_cashier_time');
+                            else startPerformanceEventTimer('load_fiat_deposit_cashier_time');
                             e.stopPropagation();
                             history.push(`${routes.cashier_deposit}#deposit`);
                         }}

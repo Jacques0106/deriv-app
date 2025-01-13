@@ -1,24 +1,38 @@
 import React from 'react';
-import { Text, Popover } from '@deriv/components';
+
+import { Popover, Text } from '@deriv/components';
 import { localize } from '@deriv/translations';
-import TradigPlatformIconProps from '../../Assets/svgs/trading-platform';
+import { useDevice } from '@deriv-com/ui';
+
 import { TCompareAccountsCard } from 'Components/props.types';
-import { getAccountCardTitle, getMarketType, getAccountIcon } from '../../Helpers/compare-accounts-config';
+
+import TradigPlatformIconProps from '../../Assets/svgs/trading-platform';
 import { CFD_PLATFORMS, MARKET_TYPE_SHORTCODE } from '../../Helpers/cfd-config';
+import {
+    generateMarketTypeShortcode,
+    getAccountCardTitle,
+    getAccountIcon,
+    getMarketType,
+} from '../../Helpers/compare-accounts-config';
 
 const CFDCompareAccountsTitleIcon = ({ trading_platforms, is_eu_user, is_demo }: TCompareAccountsCard) => {
+    const { isDesktop } = useDevice();
     const market_type = !is_eu_user ? getMarketType(trading_platforms) : 'CFDs';
-    const market_type_shortcode = market_type.concat('_', trading_platforms.shortcode ?? '');
+
+    const market_type_shortcode = generateMarketTypeShortcode(trading_platforms, market_type);
+
     const jurisdiction_card_icon =
         trading_platforms.platform === CFD_PLATFORMS.DXTRADE || trading_platforms.platform === CFD_PLATFORMS.CTRADER
             ? getAccountIcon(trading_platforms.platform)
-            : getAccountIcon(market_type);
+            : getAccountIcon(market_type, trading_platforms.product);
     const jurisdiction_card_title =
         trading_platforms.platform === CFD_PLATFORMS.DXTRADE || trading_platforms.platform === CFD_PLATFORMS.CTRADER
             ? getAccountCardTitle(trading_platforms.platform, is_demo)
             : getAccountCardTitle(market_type_shortcode, is_demo);
-    const labuan_jurisdiction_message = localize(
-        'Choosing this jurisdiction will give you a Financial STP account. Your trades will go directly to the market and have tighter spreads.'
+    const labuan_jurisdiction_message = (
+        <Text as='p' size={isDesktop ? 'xxs' : 'xxxs'} align='left'>
+            {localize('This account gives you direct market price access and tighter spreads.')}
+        </Text>
     );
 
     return (
@@ -43,7 +57,7 @@ const CFDCompareAccountsTitleIcon = ({ trading_platforms, is_eu_user, is_demo }:
                     )}
                 </div>
             </div>
-            <hr className='compare-cfd-account-underline' />
+            <div className='compare-cfd-account-underline' />
         </React.Fragment>
     );
 };

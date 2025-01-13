@@ -29,8 +29,10 @@ module.exports = function (env) {
             publicPath: base,
         },
         devServer: {
-            publicPath: '/dist/',
-            disableHostCheck: true,
+            static: {
+                publicPath: '/dist/',
+            },
+            allowedHosts: 'all',
         },
         mode: IS_RELEASE ? 'production' : 'development',
         devtool: IS_RELEASE ? 'source-map' : 'eval-cheap-module-source-map',
@@ -120,15 +122,7 @@ module.exports = function (env) {
                 'process.env.GD_CLIENT_ID': JSON.stringify(process.env.GD_CLIENT_ID),
                 'process.env.GD_API_KEY': JSON.stringify(process.env.GD_API_KEY),
                 'process.env.GD_APP_ID': JSON.stringify(process.env.GD_APP_ID),
-                'process.env.DATADOG_APPLICATION_ID': JSON.stringify(process.env.DATADOG_APPLICATION_ID),
-                'process.env.DATADOG_CLIENT_TOKEN_LOGS': JSON.stringify(process.env.DATADOG_CLIENT_TOKEN_LOGS),
                 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
-                'process.env.DATADOG_SESSION_REPLAY_SAMPLE_RATE': JSON.stringify(
-                    process.env.DATADOG_SESSION_REPLAY_SAMPLE_RATE
-                ),
-                'process.env.DATADOG_SESSION_SAMPLE_RATE_LOGS': JSON.stringify(
-                    process.env.DATADOG_SESSION_SAMPLE_RATE_LOGS
-                ),
                 'process.env.REF_NAME': JSON.stringify(process.env.REF_NAME),
                 'process.env.REMOTE_CONFIG_URL': JSON.stringify(process.env.REMOTE_CONFIG_URL),
             }),
@@ -139,7 +133,12 @@ module.exports = function (env) {
             }),
             new StyleLintPlugin({ fix: true }),
             new CopyWebpackPlugin({
-                patterns: [{ from: 'node_modules/@deriv/bot-skeleton/dist/media', to: 'bot/media' }],
+                patterns: [
+                    {
+                        from: path.resolve(__dirname, '../../', 'node_modules/@deriv/bot-skeleton/dist/media'),
+                        to: 'bot/media',
+                    },
+                ],
             }),
             new SpriteLoaderPlugin(),
         ],
@@ -153,10 +152,11 @@ module.exports = function (env) {
                 formik: 'formik',
                 react: 'react',
                 mobx: 'mobx',
-                'mobx-react': 'mobx-react',
+                'mobx-react-lite': 'mobx-react-lite',
                 'react-dom': 'react-dom',
+                '@deriv/utils': '@deriv/utils',
                 '@deriv/deriv-charts': '@deriv/deriv-charts',
-                '@deriv-com/analytics': `@deriv-com/analytics`,
+                '@deriv-com/analytics': '@deriv-com/analytics',
             },
             /^@deriv\/shared\/.+$/,
             /^@deriv\/components\/.+$/,

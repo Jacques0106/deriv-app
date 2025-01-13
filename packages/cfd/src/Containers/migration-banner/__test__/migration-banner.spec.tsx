@@ -13,6 +13,12 @@ jest.mock('@deriv/hooks', () => ({
     useMT5SVGEligibleToMigrate: jest.fn(),
 }));
 
+jest.mock('@deriv-com/analytics', () => ({
+    Analytics: {
+        trackEvent: jest.fn(),
+    },
+}));
+
 const mock_store = mockStore({});
 
 const mockUseMT5SVGEligibleToMigrate = useMT5SVGEligibleToMigrate as jest.MockedFunction<
@@ -51,20 +57,20 @@ describe('MigrationBanner', () => {
         };
     });
 
-    it('should render MigrationBanner with both MT5 Derived SVG and MT5 Financial SVG text', () => {
+    it('should render MigrationBanner with both MT5 Standard SVG and MT5 Financial SVG text', () => {
         renderComponent();
 
-        const texts = [/Upgrade your/i, /Derived/i, /and/i, /Financial MT5/i, /account\(s\)/i];
+        const texts = [/Upgrade your/i, /Standard/i, /Financial MT5/i, /account\(s\)/i];
         texts.forEach(text => {
             expect(screen.getByText(text)).toBeInTheDocument();
         });
         expect(screen.getByRole('button', { name: /upgrade/i })).toBeInTheDocument();
     });
 
-    it('should render MigrationBanner with MT5 Derived SVG', () => {
+    it('should render MigrationBanner with MT5 Standard SVG', () => {
         response.has_derived_and_financial_mt5 = false;
         renderComponent();
-        const texts = [/Upgrade your/i, /Derived MT5/i, /account\(s\)/i];
+        const texts = [/Upgrade your/i, /Standard MT5/i, /account\(s\)/i];
         texts.forEach(text => {
             expect(screen.getByText(text)).toBeInTheDocument();
         });
@@ -81,11 +87,11 @@ describe('MigrationBanner', () => {
         });
     });
 
-    it('should call upgrade button tracking event on clicking upgrade now button ', () => {
+    it('should call upgrade button tracking event on clicking upgrade now button ', async () => {
         renderComponent();
         const upgrade_button = screen.getByRole('button', { name: /upgrade/i });
         expect(upgrade_button).toBeInTheDocument();
-        userEvent.click(upgrade_button);
+        await userEvent.click(upgrade_button);
         expect(Analytics.trackEvent).toHaveBeenCalledWith('ce_upgrade_mt5_banner', {
             action: 'push_cta_upgrade',
         });

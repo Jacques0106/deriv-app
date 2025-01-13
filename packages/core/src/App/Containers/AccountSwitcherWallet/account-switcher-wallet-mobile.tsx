@@ -1,11 +1,11 @@
 import React from 'react';
 import { useHistory } from 'react-router';
 import { Button, Icon, MobileDialog, Text } from '@deriv/components';
-import { routes } from '@deriv/shared';
+import { platforms, routes } from '@deriv/shared';
 import { Localize } from '@deriv/translations';
 import { AccountSwitcherWalletList } from './account-switcher-wallet-list';
-import { useStoreWalletAccountsList } from '@deriv/hooks';
-import { observer } from '@deriv/stores';
+import { useIsHubRedirectionEnabled, useIsRtl, useStoreWalletAccountsList } from '@deriv/hooks';
+import { observer, useStore } from '@deriv/stores';
 import './account-switcher-wallet-mobile.scss';
 
 type TAccountSwitcherWalletMobile = {
@@ -16,17 +16,26 @@ type TAccountSwitcherWalletMobile = {
 
 export const AccountSwitcherWalletMobile = observer(({ is_visible, toggle, loginid }: TAccountSwitcherWalletMobile) => {
     const history = useHistory();
+    const isRtl = useIsRtl();
     const { data: wallet_list } = useStoreWalletAccountsList();
+    const { client } = useStore();
+    const { account_settings } = client;
+    const { trading_hub } = account_settings;
 
     const dtrade_account_wallets = wallet_list?.filter(wallet => wallet.dtrade_loginid);
+    const { isHubRedirectionEnabled } = useIsHubRedirectionEnabled();
 
     const closeAccountsDialog = React.useCallback(() => {
         toggle(false);
     }, [toggle]);
 
     const handleTradersHubRedirect = () => {
+        if (isHubRedirectionEnabled || !!trading_hub) {
+            window.location.assign(platforms.tradershub_os.url);
+            return;
+        }
         closeAccountsDialog();
-        history.push(routes.wallets);
+        history.push(routes.traders_hub);
     };
 
     const handleManageFundsRedirect = () => {
@@ -35,12 +44,15 @@ export const AccountSwitcherWalletMobile = observer(({ is_visible, toggle, login
     };
 
     const footer = (
-        <button className='account-switcher-wallet-mobile__footer' onClick={handleTradersHubRedirect} type='button'>
-            <Text weight='normal' size='xs'>
-                <Localize i18n_default_text='Looking for CFDs? Go to Trader’s Hub' />
-            </Text>
-            <Icon icon='IcChevronRightBold' />
-        </button>
+        <React.Fragment>
+            <hr className='account-switcher-wallet-mobile__divider' />
+            <button className='account-switcher-wallet-mobile__footer' onClick={handleTradersHubRedirect} type='button'>
+                <Text weight='normal' size='xs'>
+                    <Localize i18n_default_text='Looking for CFDs? Go to Trader’s Hub' />
+                </Text>
+                <Icon icon={isRtl ? 'IcChevronLeftBold' : 'IcChevronRightBold'} />
+            </button>
+        </React.Fragment>
     );
 
     return (

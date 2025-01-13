@@ -1,8 +1,8 @@
 import React from 'react';
-import { WalletText } from '../../../../components';
-import { THooks, TPlatforms } from '../../../../types';
-import { CFD_PLATFORMS } from '../../constants';
-import CompareAccountsButton from './CompareAccountsButton';
+import { Localize } from '@deriv-com/translations';
+import { Text } from '@deriv-com/ui';
+import { THooks } from '../../../../types';
+import { PRODUCT } from '../../constants';
 import CompareAccountsDescription from './CompareAccountsDescription';
 import CompareAccountsPlatformLabel from './CompareAccountsPlatformLabel';
 import CompareAccountsTitleIcon from './CompareAccountsTitleIcon';
@@ -10,66 +10,45 @@ import InstrumentsLabelHighlighted from './InstrumentsLabelHighlighted';
 import './CompareAccountsCard.scss';
 
 type TCompareAccountsCard = {
-    isAccountAdded: boolean;
+    account:
+        | NonNullable<THooks.CompareCFDAccounts['ctraderAccount']>
+        | NonNullable<THooks.CompareCFDAccounts['dxtradeAccount']>
+        | NonNullable<THooks.CompareCFDAccounts['mt5Accounts']>[number];
     isDemo: boolean;
     isEuRegion: boolean;
-    isEuUser: boolean;
-    marketType: THooks.AvailableMT5Accounts['market_type'];
-    platform: TPlatforms.All;
-    shortCode: THooks.AvailableMT5Accounts['shortcode'];
 };
 
-const CompareAccountsCard = ({
-    isAccountAdded,
-    isDemo,
-    isEuRegion,
-    isEuUser,
-    marketType,
-    platform,
-    shortCode,
-}: TCompareAccountsCard) => {
+const CompareAccountsCard = ({ account, isDemo, isEuRegion }: TCompareAccountsCard) => {
+    const product = account.platform === 'mt5' ? account.product : undefined;
+    //@ts-expect-error need update api-types
+    const productDetails = account.platform === 'mt5' ? account.product_details : undefined;
+    //@ts-expect-error need update api-types
+    const instruments = account.platform === 'mt5' ? account.instruments : undefined;
+    //@ts-expect-error need update api-types
+    const isNewBadgeVisible = product === PRODUCT.ZEROSPREAD || product === PRODUCT.GOLD;
+
     return (
         <div>
             <div className='wallets-compare-accounts-card'>
-                <CompareAccountsPlatformLabel platform={platform} />
-                {platform === CFD_PLATFORMS.CTRADER && (
+                <CompareAccountsPlatformLabel platform={account.platform} />
+                {isNewBadgeVisible && (
                     <div className='wallets-compare-accounts-card__banner'>
-                        <WalletText color='white' size='xs' weight='bold'>
-                            New!
-                        </WalletText>
+                        <Text color='white' size='xs' weight='bold'>
+                            <Localize i18n_default_text='NEW' />
+                        </Text>
                     </div>
                 )}
                 <CompareAccountsTitleIcon
                     isDemo={isDemo}
-                    marketType={marketType}
-                    platform={platform}
-                    shortCode={shortCode}
-                />
-                <CompareAccountsDescription
-                    isDemo={isDemo}
                     isEuRegion={isEuRegion}
-                    marketType={marketType}
-                    shortCode={shortCode}
+                    platform={account.platform}
+                    product={product}
                 />
+                <CompareAccountsDescription isEuRegion={isEuRegion} product={product} productDetails={productDetails} />
                 <InstrumentsLabelHighlighted
-                    isDemo={isDemo}
+                    instruments={instruments}
                     isEuRegion={isEuRegion}
-                    marketType={marketType}
-                    platform={platform}
-                    shortCode={shortCode}
-                />
-                {isEuUser && (
-                    <div className='wallets-compare-accounts-card__eu-clients'>
-                        <WalletText color='red' size='2xs' weight='bold'>
-                            *Boom 300 and Crash 300 Index
-                        </WalletText>
-                    </div>
-                )}
-                <CompareAccountsButton
-                    isAccountAdded={isAccountAdded}
-                    marketType={marketType}
-                    platform={platform}
-                    shortCode={shortCode}
+                    platform={account.platform}
                 />
             </div>
         </div>

@@ -1,60 +1,52 @@
-import React, { ComponentType, SVGAttributes } from 'react';
-import CTraderIcon from '../../public/images/ctrader.svg';
-import DerivAppIcon from '../../public/images/deriv-apps.svg';
-import DerivXIcon from '../../public/images/derivx.svg';
-import DerivedMT5Icon from '../../public/images/mt5-derived.svg';
-import FinancialMT5Icon from '../../public/images/mt5-financial.svg';
-import SwapFreeMT5Icon from '../../public/images/mt5-swap-free.svg';
+import React, { ComponentProps, FC } from 'react';
+import { CFDPlatformIcons, MT5GoldIcon, MT5MarketIcons } from '../../constants/icons';
+import { CFD_PLATFORMS, MARKET_TYPE } from '../../features/cfd/constants';
 import { THooks, TPlatforms } from '../../types';
-import { WalletCardIcon } from '../WalletCardIcon';
-import { WalletGradientBackground } from '../WalletGradientBackground';
+import { WalletCurrencyCard } from '../WalletCurrencyCard';
+import { WalletMarketIcon } from '../WalletMarketIcon';
 import './WalletMarketCurrencyIcon.scss';
-
-const marketTypeToIconMapper: Record<string, ComponentType<SVGAttributes<SVGElement>>> = {
-    all: SwapFreeMT5Icon,
-    financial: FinancialMT5Icon,
-    synthetic: DerivedMT5Icon,
-};
-
-const marketTypeToPlatformIconMapper: Record<string, ComponentType<SVGAttributes<SVGElement>>> = {
-    ctrader: CTraderIcon,
-    dxtrade: DerivXIcon,
-};
 
 type TWalletMarketCurrencyIconProps = {
     currency: Exclude<THooks.ActiveWalletAccount['currency'], undefined>;
     isDemo: THooks.ActiveWalletAccount['is_virtual'];
-    marketType?: THooks.SortedMT5Accounts['market_type'];
+    marketType?: keyof typeof MT5MarketIcons;
     platform?: TPlatforms.All;
+    product?: THooks.AvailableMT5Accounts['product'] | 'gold';
+    size?: ComponentProps<typeof WalletCurrencyCard>['size'];
 };
 
-const WalletMarketCurrencyIcon: React.FC<TWalletMarketCurrencyIconProps> = ({
+const WalletMarketCurrencyIcon: FC<TWalletMarketCurrencyIconProps> = ({
     currency,
     isDemo,
     marketType,
-    platform,
+    platform = 'ctrader',
+    product,
+    size = 'sm',
 }) => {
-    let MarketTypeIcon: ComponentType<SVGAttributes<SVGElement>>;
-    if (marketType && platform) {
-        MarketTypeIcon =
-            marketType === 'all' && Object.keys(marketTypeToPlatformIconMapper).includes(platform)
-                ? marketTypeToPlatformIconMapper[platform]
-                : marketTypeToIconMapper[marketType];
-    } else {
-        MarketTypeIcon = DerivAppIcon;
-    }
+    const marketTypeAllkey = product ? `${marketType}_${product}` : platform;
+    let MarketTypeIcon;
+    if (marketType === MARKET_TYPE.ALL && platform && marketTypeAllkey in CFDPlatformIcons) {
+        MarketTypeIcon = marketTypeAllkey;
+    } else if (platform === CFD_PLATFORMS.MT5 && product && product in MT5GoldIcon) {
+        MarketTypeIcon = product;
+    } else if (platform === CFD_PLATFORMS.MT5 && marketType && marketType in MT5MarketIcons) {
+        MarketTypeIcon = marketType;
+    } else MarketTypeIcon = 'standard';
 
     return (
-        <div className='wallets-market-currency-icon'>
-            <MarketTypeIcon className='wallets-market-currency-icon__after' />
-            <div
-                className={`wallets-market-currency-icon__before wallets-market-currency-icon__before-${
-                    isDemo ? 'demo' : 'real'
-                }`}
-            >
-                <WalletGradientBackground currency={currency} hasShine isDemo={isDemo} type='card'>
-                    <WalletCardIcon device='desktop' size='lg' type={isDemo ? 'Demo' : currency} />
-                </WalletGradientBackground>
+        <div className='wallets-market-currency-icon' data-testid='dt_wallet_market_icon'>
+            <div className='wallets-market-currency-icon__container'>
+                <WalletMarketIcon
+                    className='wallets-market-currency-icon__market-icon'
+                    icon={MarketTypeIcon as ComponentProps<typeof WalletMarketIcon>['icon']}
+                    size={size}
+                />
+                <WalletCurrencyCard
+                    className='wallets-market-currency-icon__currency-icon'
+                    currency={currency}
+                    isDemo={isDemo}
+                    size={size}
+                />
             </div>
         </div>
     );

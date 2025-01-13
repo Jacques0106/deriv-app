@@ -1,3 +1,5 @@
+const webpackConfig = require('./webpack.config.js');
+
 module.exports = {
     env: { es6: true },
     extends: ['../../.eslintrc.js', 'eslint:recommended', 'plugin:react/recommended'],
@@ -25,6 +27,7 @@ module.exports = {
         'lines-around-comment': ['error', { allowObjectStart: true }],
         'local-rules/no-react-namespace': 'error',
         'no-unneeded-ternary': 'error',
+        'no-unsafe-optional-chaining': 'warn',
         'no-useless-return': 'error',
         'object-shorthand': 'error',
         'prefer-const': 'error',
@@ -63,5 +66,10 @@ module.exports = {
         'sort-keys': 'error',
         'typescript-sort-keys/interface': 'error',
         'typescript-sort-keys/string-enum': 'error',
+    },
+    settings: {
+        'import/resolver': {
+            webpack: { config: webpackConfig({}) },
+        },
     },
 };

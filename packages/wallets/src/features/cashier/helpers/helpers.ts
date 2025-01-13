@@ -1,5 +1,7 @@
+import { localize } from '@deriv-com/translations';
 import { THooks, TMarketTypes, TWalletLandingCompanyName } from '../../../types';
-import { LandingCompanyDetails, MT5MarketTypeDetails, PlatformDetails, walletIconMapper } from '../constants';
+import { PRODUCT } from '../../cfd/constants';
+import { LandingCompanyDetails, MT5MarketTypeDetails, PlatformDetails } from '../constants';
 
 type TGetAccountNameProps = {
     accountCategory: THooks.TransferAccount['account_category'];
@@ -7,14 +9,7 @@ type TGetAccountNameProps = {
     displayCurrencyCode?: THooks.CurrencyConfig['display_code'];
     landingCompanyName: TWalletLandingCompanyName;
     mt5MarketType?: TMarketTypes.SortedMT5Accounts;
-};
-
-//TODO: remove this function when market_type will be added to transfer_between_accounts response in API
-export const getMarketType = (mt5Group?: string) => {
-    if (mt5Group?.includes(MT5MarketTypeDetails.financial.name)) return MT5MarketTypeDetails.financial.name;
-    if (mt5Group?.includes(MT5MarketTypeDetails.synthetic.name)) return MT5MarketTypeDetails.synthetic.name;
-    if (mt5Group?.includes(MT5MarketTypeDetails.all.name)) return MT5MarketTypeDetails.all.name;
-    return MT5MarketTypeDetails.all.name;
+    product?: THooks.AvailableMT5Accounts['product'] | 'gold' | 'stp';
 };
 
 //TODO: remove this function when landing_company_name will be added to transfer_between_accounts response in API for mt5 accounts
@@ -26,43 +21,30 @@ export const getLandingCompanyNameOfMT5Account = (mt5Group?: string) => {
     return LandingCompanyDetails.svg.name;
 };
 
-export const getWalletIcon = (currency: string, isDemo: boolean) => {
-    return isDemo ? walletIconMapper.Demo?.light : walletIconMapper[currency as keyof typeof walletIconMapper]?.light;
-};
-
-export const getTradingAppIcon = (
-    accountType: string,
-    landingCompanyName: TWalletLandingCompanyName,
-    mt5Group?: string
-) => {
-    const marketType = getMarketType(mt5Group);
-    const mt5Platform = PlatformDetails.mt5;
-
-    if (accountType === mt5Platform.name) {
-        if (marketType === mt5Platform.marketType.financial.name) {
-            return mt5Platform.marketType.financial.landingCompany?.[landingCompanyName].icon.light;
-        } else if (marketType === mt5Platform.marketType.synthetic.name) {
-            return mt5Platform.marketType.synthetic.icon?.light;
-        }
-        return mt5Platform.marketType.all.icon?.light;
-    }
-    //@ts-expect-error needs backend typing
-    return PlatformDetails[accountType]?.icon.light;
-};
-
 export const getAccountName = ({
     accountCategory,
     accountType,
     displayCurrencyCode,
     landingCompanyName,
     mt5MarketType,
+    product,
 }: TGetAccountNameProps) => {
+    const getMT5FinancialTitle = () => {
+        switch (product) {
+            case 'stp':
+                return MT5MarketTypeDetails.financial.product?.stp?.title;
+            case 'gold':
+                return MT5MarketTypeDetails.financial.product?.gold?.title;
+            default:
+                return MT5MarketTypeDetails.financial.landingCompany?.svg.title;
+        }
+    };
+
     switch (accountCategory) {
         case 'wallet':
-            return `${displayCurrencyCode} Wallet`;
+            return localize('{{currency}} Wallet', { currency: displayCurrencyCode });
         case 'trading': {
             switch (accountType) {
-                case PlatformDetails.binary.name:
                 case PlatformDetails.standard.name:
                     return PlatformDetails.standard.title;
                 case PlatformDetails.dxtrade.name:
@@ -81,11 +63,14 @@ export const getAccountName = ({
                                     'svg' | 'virtual'
                                 >
                             )
-                                ? MT5MarketTypeDetails.financial.landingCompany?.svg.title
+                                ? getMT5FinancialTitle()
                                 : MT5MarketTypeDetails.financial.landingCompany?.malta.title;
                         case MT5MarketTypeDetails.synthetic.name:
                             return MT5MarketTypeDetails.synthetic.title;
                         case MT5MarketTypeDetails.all.name:
+                            if (product === PRODUCT.ZEROSPREAD) {
+                                return MT5MarketTypeDetails.all.product?.zero_spread?.title;
+                            }
                             return MT5MarketTypeDetails.all.title;
                         default:
                             return '';

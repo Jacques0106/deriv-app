@@ -1,7 +1,8 @@
 import React from 'react';
 import { useHistory } from 'react-router';
-import { routes } from '@deriv/shared';
+import { routes, isTabletOs } from '@deriv/shared';
 import { Button, Icon, Popover } from '@deriv/components';
+import { useDevice } from '@deriv-com/ui';
 import { localize, Localize } from '@deriv/translations';
 import { observer, useStore } from '@deriv/stores';
 import { LoginButton } from '../login-button.jsx';
@@ -14,7 +15,8 @@ import 'Sass/app/_common/components/account-switcher.scss';
 const AccountActionsWallets = observer(() => {
     const { client, ui, notifications } = useStore();
     const { is_logged_in, accounts, loginid } = client;
-    const { openRealAccountSignup, toggleAccountsDialog, is_mobile, is_accounts_switcher_on } = ui;
+    const { openRealAccountSignup, toggleAccountsDialog, is_accounts_switcher_on } = ui;
+    const { isDesktop } = useDevice();
     const { is_notifications_visible, notifications: notificationsArray, toggleNotificationsModal } = notifications;
 
     const notifications_count = notificationsArray?.length;
@@ -29,6 +31,12 @@ const AccountActionsWallets = observer(() => {
         history.push(routes.wallets_transfer, { toAccountLoginId: loginid });
     };
 
+    const accountSettings = (
+        <BinaryLink className='account-settings-toggle' to={routes.personal_details}>
+            <Icon icon='IcUserOutline' />
+        </BinaryLink>
+    );
+
     if (!is_logged_in) {
         return (
             <React.Fragment>
@@ -38,7 +46,7 @@ const AccountActionsWallets = observer(() => {
         );
     }
 
-    if (is_mobile) {
+    if (!isDesktop) {
         return (
             <React.Fragment>
                 <AccountInfoWallets is_dialog_on={is_accounts_switcher_on} toggleDialog={toggleAccountsDialog} />
@@ -62,18 +70,21 @@ const AccountActionsWallets = observer(() => {
                 toggleDialog={toggleNotificationsModal}
                 tooltip_message={<Localize i18n_default_text='View notifications' />}
                 should_disable_pointer_events
+                showPopover={!isTabletOs}
             />
-            <Popover
-                classNameBubble='account-settings-toggle__tooltip'
-                alignment='bottom'
-                message={<Localize i18n_default_text='Manage account settings' />}
-                should_disable_pointer_events
-                zIndex='9999'
-            >
-                <BinaryLink className='account-settings-toggle' to={routes.personal_details}>
-                    <Icon icon='IcUserOutline' />
-                </BinaryLink>
-            </Popover>
+            {isTabletOs ? (
+                accountSettings
+            ) : (
+                <Popover
+                    classNameBubble='account-settings-toggle__tooltip'
+                    alignment='bottom'
+                    message={<Localize i18n_default_text='Manage account settings' />}
+                    should_disable_pointer_events
+                    zIndex='9999'
+                >
+                    {accountSettings}
+                </Popover>
+            )}
             <AccountInfoWallets is_dialog_on={is_accounts_switcher_on} toggleDialog={toggleAccountsDialog} />
             {!is_virtual && !currency && (
                 <div className='set-currency'>

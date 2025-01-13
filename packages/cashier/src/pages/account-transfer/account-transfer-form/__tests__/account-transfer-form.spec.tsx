@@ -1,16 +1,16 @@
 import React from 'react';
-import { MT5_ACCOUNT_STATUS, isMobile } from '@deriv/shared';
+import { MT5_ACCOUNT_STATUS, routes } from '@deriv/shared';
 import { fireEvent, render, screen } from '@testing-library/react';
 import CashierProviders from '../../../../cashier-providers';
-import { mockStore, ExchangeRatesProvider } from '@deriv/stores';
+import { mockStore } from '@deriv/stores';
 import { TError } from '../../../../types';
 import AccountTransferForm from '../account-transfer-form';
 import userEvent from '@testing-library/user-event';
 import { useMFAccountStatus } from '@deriv/hooks';
 
-jest.mock('@deriv/shared/src/utils/screen/responsive', () => ({
-    ...jest.requireActual('@deriv/shared/src/utils/screen/responsive'),
-    isMobile: jest.fn(),
+jest.mock('@deriv-com/ui', () => ({
+    ...jest.requireActual('@deriv-com/ui'),
+    useDevice: jest.fn(() => ({ isDesktop: true })),
 }));
 
 jest.mock('@deriv/hooks', () => ({
@@ -109,32 +109,32 @@ describe('<AccountTransferForm />', () => {
             },
         });
     });
+    let modal_root_el: HTMLDivElement;
     beforeAll(() => {
-        const modal_root_el = document.createElement('div');
+        modal_root_el = document.createElement('div');
         modal_root_el.setAttribute('id', 'modal_root');
         document.body.appendChild(modal_root_el);
     });
     afterAll(() => {
-        const modal_root_el = document.createElement('div');
-        modal_root_el.setAttribute('id', 'modal_root');
         document.body.removeChild(modal_root_el);
     });
 
     const props = {
-        setSideNotes: jest.fn(),
         error: {
             code: 'testCode',
             message: 'testMessage',
         } as TError,
+        onClose: jest.fn(),
     };
 
     const renderAccountTransferForm = () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { pathname: routes.cashier },
+        });
+
         render(<AccountTransferForm {...props} />, {
-            wrapper: ({ children }) => (
-                <CashierProviders store={mockRootStore}>
-                    <ExchangeRatesProvider>{children}</ExchangeRatesProvider>
-                </CashierProviders>
-            ),
+            wrapper: ({ children }) => <CashierProviders store={mockRootStore}>{children}</CashierProviders>,
         });
     };
 
@@ -203,14 +203,13 @@ describe('<AccountTransferForm />', () => {
 
         renderAccountTransferForm();
 
-        userEvent.type(screen.getByTestId('dt_account_transfer_form_input'), '1');
+        await userEvent.type(screen.getByTestId('dt_account_transfer_form_input'), '1');
 
         expect(await screen.findByText('Unavailable as your documents are still under review')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Transfer' })).toBeDisabled();
     });
 
     it('should not allow to do transfer if accounts from and to are same', () => {
-        (isMobile as jest.Mock).mockReturnValue(true);
         mockRootStore.modules.cashier.account_transfer.accounts_list[0].is_mt = true;
         mockRootStore.modules.cashier.account_transfer.selected_from.is_mt = true;
         mockRootStore.modules.cashier.account_transfer.selected_from.balance = 200;
@@ -252,7 +251,6 @@ describe('<AccountTransferForm />', () => {
     });
 
     it('should show proper hint about mt5 remained transfers', () => {
-        (isMobile as jest.Mock).mockReturnValue(true);
         mockRootStore.client.account_limits = {
             daily_transfers: {
                 dxtrade: {},
@@ -271,8 +269,6 @@ describe('<AccountTransferForm />', () => {
     });
 
     it('should show proper hint about dxtrade remained transfers', () => {
-        (isMobile as jest.Mock).mockReturnValue(true);
-
         mockRootStore.client.account_limits = {
             daily_transfers: {
                 dxtrade: {
@@ -293,7 +289,6 @@ describe('<AccountTransferForm />', () => {
     });
 
     it('should show proper hint about internal remained transfers', () => {
-        (isMobile as jest.Mock).mockReturnValue(true);
         mockRootStore.client.account_limits = {
             daily_transfers: {
                 dxtrade: {},
@@ -356,7 +351,7 @@ describe('<AccountTransferForm />', () => {
                 text: 'USD',
                 currency: 'USD',
                 value: 'MTR40013177',
-                platform_icon: 'Derived',
+                platform_icon: 'Standard',
                 is_crypto: false,
                 is_mt: true,
                 is_dxtrade: false,
@@ -412,7 +407,7 @@ describe('<AccountTransferForm />', () => {
                     .mockReturnValue(100.0);
 
                 renderAccountTransferForm();
-                expect(screen.getByTestId('Derived')).toBeInTheDocument();
+                expect(screen.getByTestId('Standard')).toBeInTheDocument();
             });
 
             it('should check for DerivX icon when DerivX is selected in from_dropdown', () => {

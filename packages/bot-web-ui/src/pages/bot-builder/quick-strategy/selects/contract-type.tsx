@@ -15,16 +15,16 @@ type TContractTypes = {
 
 const ContractTypes: React.FC<TContractTypes> = observer(({ name }) => {
     const { ui } = useStore();
-    const { is_mobile } = ui;
+    const { is_desktop } = ui;
     const [list, setList] = React.useState<TDropdownItems[]>([]);
     const { quick_strategy } = useDBotStore();
     const { setValue } = quick_strategy;
-    const { setFieldValue, validateForm, values } = useFormikContext<TFormData>();
+    const { setFieldValue, values } = useFormikContext<TFormData>();
     const { symbol, tradetype } = values;
-    const selected = values?.type;
 
     React.useEffect(() => {
-        if (tradetype && symbol && selected !== '') {
+        if (tradetype && symbol) {
+            const selected = values?.type;
             const getContractTypes = async () => {
                 const { contracts_for } = ApiHelpers.instance as unknown as TApiHelpersInstance;
                 const categories = await contracts_for.getContractTypes(tradetype);
@@ -33,13 +33,12 @@ const ContractTypes: React.FC<TContractTypes> = observer(({ name }) => {
                 if (!has_selected) {
                     setFieldValue?.(name, categories?.[0]?.value);
                     setValue(name, categories?.[0]?.value);
-                    validateForm();
                 }
             };
             getContractTypes();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [symbol, tradetype, selected]);
+    }, [symbol, tradetype]);
 
     const handleChange = (value: string) => {
         setFieldValue?.(name, value);
@@ -53,7 +52,7 @@ const ContractTypes: React.FC<TContractTypes> = observer(({ name }) => {
             <Field name={name} key={key} id={key}>
                 {({ field }: FieldProps) => {
                     const selected_item = list?.find(item => item?.value === field?.value);
-                    if (is_mobile) {
+                    if (!is_desktop) {
                         return (
                             <ul className='qs__form__field__list' data-testid='dt_qs_contract_types'>
                                 {list.map(item => {
@@ -82,7 +81,7 @@ const ContractTypes: React.FC<TContractTypes> = observer(({ name }) => {
                             {...field}
                             readOnly
                             inputMode='none'
-                            data-testid='dt_qs_autocomplete_contract_type'
+                            data-testid='dt_qs_contract_type'
                             autoComplete='off'
                             className='qs__select contract-type'
                             value={selected_item?.text || ''}

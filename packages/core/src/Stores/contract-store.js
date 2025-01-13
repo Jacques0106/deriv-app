@@ -1,15 +1,20 @@
 import { action, extendObservable, observable, makeObservable, runInAction } from 'mobx';
 import {
+    ChartBarrierStore,
     isAccumulatorContract,
     isDigitContract,
+    isDtraderV2DesktopEnabled,
+    isDtraderV2MobileEnabled,
     isEnded,
     isEqualObject,
     isMultiplierContract,
     isResetContract,
+    isSmartTraderContract,
     isOpen,
     isTurbosContract,
     getDigitInfo,
     getDisplayStatus,
+    getLimitOrder,
     WS,
     getContractUpdateConfig,
     getContractValidationRules,
@@ -21,10 +26,9 @@ import {
     getEndTime,
     BARRIER_COLORS,
     getContractStatus,
+    setLimitOrderBarriers,
 } from '@deriv/shared';
 import { getChartConfig } from './Helpers/logic';
-import { setLimitOrderBarriers, getLimitOrder } from './Helpers/limit-orders';
-import { ChartBarrierStore } from './chart-barrier-store';
 import { createChartMarkers, calculateMarker, getAccumulatorMarkers } from './Helpers/chart-markers';
 import BaseStore from './base-store';
 
@@ -284,6 +288,12 @@ export default class ContractStore extends BaseStore {
             ) {
                 main_barrier?.updateBarriers(barrier || high_barrier, low_barrier);
             }
+            if (isBarrierSupported(contract_type) && !isSmartTraderContract(contract_type)) {
+                // Barrier color will depend on pnl (except old SmartTrader contracts)
+                main_barrier?.updateColor({
+                    barrier_color: contract_info.profit >= 0 ? BARRIER_COLORS.GREEN : BARRIER_COLORS.RED,
+                });
+            }
             if (
                 contract_info.contract_id &&
                 contract_info.contract_id === this.root_store.contract_replay.contract_id
@@ -292,7 +302,7 @@ export default class ContractStore extends BaseStore {
                     barriers: this.barriers_array,
                     contract_info,
                     contract_type,
-                    is_over: true,
+                    is_over: !contract_info.sell_time,
                 });
             }
         }
@@ -311,10 +321,11 @@ export default class ContractStore extends BaseStore {
                 reset_barrier,
             } = contract_info;
             const high_barrier = this.accu_high_barrier || barrier || high;
+            const updated_color = contract_info.profit >= 0 ? BARRIER_COLORS.GREEN : BARRIER_COLORS.RED;
             const common_props = {
                 not_draggable: true,
                 shade: DEFAULT_SHADES['2'],
-                color: BARRIER_COLORS.BLUE,
+                color: isSmartTraderContract(contract_type) ? BARRIER_COLORS.BLUE : updated_color,
             };
             if (
                 isBarrierSupported(contract_type) &&
@@ -380,24 +391,30 @@ export default class ContractStore extends BaseStore {
                 ? { take_profit: getLimitOrder(this).take_profit }
                 : getLimitOrder(this);
 
-        WS.contractUpdate(this.contract_id, limit_order).then(response => {
-            if (response.error) {
-                this.root_store.common.setServicesError({
-                    type: response.msg_type,
-                    ...response.error,
-                });
-                return;
-            }
+        Object.keys(limit_order).length !== 0 &&
+            WS.contractUpdate(this.contract_id, limit_order).then(response => {
+                if (response.error) {
+                    this.root_store.common.setServicesError(
+                        {
+                            type: response.msg_type,
+                            ...response.error,
+                        },
+                        // Temporary switching off old snackbar for DTrader-V2
+                        isDtraderV2MobileEnabled(this.root_store.ui.is_mobile) ||
+                            isDtraderV2DesktopEnabled(this.root_store.ui.is_desktop)
+                    );
+                    return;
+                }
 
-            // Update contract store
-            this.populateContractUpdateConfig(response);
-            if (this.root_store.ui.is_history_tab_active) {
-                WS.contractUpdateHistory(this.contract_id).then(this.populateContractUpdateHistory);
-            }
+                // Update contract store
+                this.populateContractUpdateConfig(response);
+                if (this.root_store.ui.is_history_tab_active) {
+                    WS.contractUpdateHistory(this.contract_id).then(this.populateContractUpdateHistory);
+                }
 
-            // Update portfolio store
-            this.root_store.portfolio.populateContractUpdate(response, this.contract_id);
-        });
+                // Update portfolio store
+                this.root_store.portfolio.populateContractUpdate(response, this.contract_id);
+            });
     }
 
     getContractsArray() {

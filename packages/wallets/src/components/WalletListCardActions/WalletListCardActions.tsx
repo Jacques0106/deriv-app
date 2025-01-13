@@ -7,97 +7,107 @@ import {
     LabelPairedMinusMdBoldIcon,
     LabelPairedPlusMdBoldIcon,
 } from '@deriv/quill-icons';
-import useDevice from '../../hooks/useDevice';
-import { IconButton, WalletButton, WalletText } from '../Base';
+import { useTranslations } from '@deriv-com/translations';
+import { Button, Text, useDevice } from '@deriv-com/ui';
+import { IconButton } from '../Base';
 import './WalletListCardActions.scss';
 
-const getWalletHeaderButtons = (isDemo?: boolean) => {
+type TProps = {
+    accountsActiveTabIndex?: number;
+};
+
+const getWalletHeaderButtons = (localize: ReturnType<typeof useTranslations>['localize'], isDemo?: boolean) => {
     const buttons = [
         {
             className: isDemo ? 'wallets-mobile-actions-content-icon' : 'wallets-mobile-actions-content-icon--primary',
-            color: isDemo ? 'transparent' : 'primary',
+            color: isDemo ? 'black' : 'primary',
             icon: isDemo ? <LabelPairedArrowsRotateMdBoldIcon /> : <LabelPairedPlusMdBoldIcon fill='#FFF' />,
+            iconColor: isDemo ? 'white' : 'primary',
             name: isDemo ? 'reset-balance' : 'deposit',
-            text: isDemo ? 'Reset balance' : 'Deposit',
+            text: isDemo ? localize('Reset balance') : localize('Deposit'),
             variant: isDemo ? 'outlined' : 'contained',
+            weight: isDemo ? 'normal' : 'bold',
         },
         {
             className: 'wallets-mobile-actions-content-icon',
-            color: 'white',
+            color: 'black',
             icon: <LabelPairedMinusMdBoldIcon />,
-            name: 'withdraw',
-            text: 'Withdraw',
+            iconColor: 'white',
+            name: 'withdrawal',
+            text: localize('Withdraw'),
             variant: 'outlined',
+            weight: 'normal',
         },
         {
             className: 'wallets-mobile-actions-content-icon',
-            color: 'white',
+            color: 'black',
             icon: <LabelPairedArrowUpArrowDownMdBoldIcon />,
-            name: 'transfer',
-            text: 'Transfer',
+            iconColor: 'white',
+            name: 'account-transfer',
+            text: localize('Transfer'),
             variant: 'outlined',
+            weight: 'normal',
         },
     ] as const;
 
     // Filter out the "Withdraw" button when is_demo is true
-    const filteredButtons = isDemo ? buttons.filter(button => button.name !== 'withdraw') : buttons;
+    const filteredButtons = isDemo ? buttons.filter(button => button.name !== 'withdrawal') : buttons;
 
-    const orderForDemo = ['reset-balance', 'transfer'];
-
-    const sortedButtons = isDemo
-        ? [...filteredButtons].sort((a, b) => orderForDemo.indexOf(a.name) - orderForDemo.indexOf(b.name))
-        : filteredButtons;
-
-    return sortedButtons;
+    return filteredButtons;
 };
 
-const WalletListCardActions = () => {
+const WalletListCardActions: React.FC<TProps> = ({ accountsActiveTabIndex }) => {
     const { data: activeWallet } = useActiveWalletAccount();
-    const { isMobile } = useDevice();
+    const { isDesktop } = useDevice();
     const history = useHistory();
+    const { localize } = useTranslations();
 
     const isActive = activeWallet?.is_active;
     const isDemo = activeWallet?.is_virtual;
 
-    if (isMobile)
+    if (isDesktop)
         return (
-            <div className='wallets-mobile-actions__container'>
-                <div className='wallets-mobile-actions'>
-                    {getWalletHeaderButtons(isDemo).map(button => (
-                        <div className='wallets-mobile-actions-content' key={button.name}>
-                            <IconButton
-                                aria-label={button.name}
-                                className={button.className}
-                                color={button.color}
-                                icon={button.icon}
-                                onClick={() => {
-                                    history.push(`/wallets/cashier/${button.name}`);
-                                }}
-                                size='lg'
-                            />
-                            <WalletText size='sm'>{button.text}</WalletText>
-                        </div>
-                    ))}
-                </div>
+            <div className='wallets-header__actions'>
+                {getWalletHeaderButtons(localize, isDemo).map(button => (
+                    <Button
+                        aria-label={button.name}
+                        borderWidth='sm'
+                        color={button.color}
+                        icon={button.icon}
+                        key={button.name}
+                        onClick={() => {
+                            history.push(`/wallet/${button.name}`);
+                        }}
+                        rounded='lg'
+                        variant={button.variant}
+                    >
+                        {isActive ? button.text : ''}
+                    </Button>
+                ))}
             </div>
         );
 
     return (
-        <div className='wallets-header__actions'>
-            {getWalletHeaderButtons(isDemo).map(button => (
-                <WalletButton
-                    ariaLabel={button.name}
-                    icon={button.icon}
-                    key={button.name}
-                    onClick={() => {
-                        history.push(`/wallets/cashier/${button.name}`);
-                    }}
-                    rounded='lg'
-                    variant={button.variant}
-                >
-                    {isActive ? button.text : ''}
-                </WalletButton>
-            ))}
+        <div className='wallets-mobile-actions__container'>
+            <div className='wallets-mobile-actions'>
+                {getWalletHeaderButtons(localize, isDemo).map(button => (
+                    <div className='wallets-mobile-actions-content' key={button.name}>
+                        <IconButton
+                            aria-label={button.name}
+                            className={button.className}
+                            color={button.iconColor}
+                            icon={button.icon}
+                            onClick={() => {
+                                history.push(`/wallet/${button.name}`, { accountsActiveTabIndex });
+                            }}
+                            size='lg'
+                        />
+                        <Text align='center' size='xs' weight={button.text === localize('Deposit') ? 'bold' : 'normal'}>
+                            {button.text}
+                        </Text>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };

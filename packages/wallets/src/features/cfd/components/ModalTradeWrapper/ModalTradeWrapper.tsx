@@ -1,37 +1,42 @@
 import React, { FC, PropsWithChildren } from 'react';
 import QRCode from 'qrcode.react';
-import { WalletText } from '../../../../components/Base';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Text, useDevice } from '@deriv-com/ui';
 import { ModalStepWrapper } from '../../../../components/Base/ModalStepWrapper';
-import useDevice from '../../../../hooks/useDevice';
 import InstallationAppleIcon from '../../../../public/images/ic-installation-apple.svg';
 import InstallationGoogleIcon from '../../../../public/images/ic-installation-google.svg';
 import InstallationHuaweiIcon from '../../../../public/images/ic-installation-huawei.svg';
-import { TPlatforms } from '../../../../types';
+import { TAddedMT5Account, TPlatforms } from '../../../../types';
 import { PlatformDetails } from '../../constants';
+import {
+    ctraderLinks,
+    dxtradeLinks,
+    whiteLabelLinks as internalWhiteLabelLinks,
+} from '../../screens/MT5TradeScreen/MT5TradeLink/urlConfig';
 import './ModalTradeWrapper.scss';
 
 type TAppLinks = {
-    android: string;
+    android?: string;
     huawei?: string;
-    ios: string;
+    ios?: string;
 };
 
-const LinksMapper: Record<TPlatforms.All, TAppLinks> = {
+const LinksMapper = (whiteLabelLinks?: TAddedMT5Account['white_label_links']): Record<TPlatforms.All, TAppLinks> => ({
     ctrader: {
-        android: 'https://play.google.com/store/apps/details?id=com.deriv.ct',
-        ios: 'https://apps.apple.com/cy/app/ctrader/id767428811',
+        android: ctraderLinks.android,
+        ios: ctraderLinks.ios,
     },
     dxtrade: {
-        android: 'https://play.google.com/store/apps/details?id=com.deriv.dx',
-        huawei: 'https://appgallery.huawei.com/app/C104633219',
-        ios: 'https://apps.apple.com/us/app/deriv-x/id1563337503',
+        android: dxtradeLinks.android,
+        huawei: dxtradeLinks.huawei,
+        ios: dxtradeLinks.ios,
     },
     mt5: {
-        android: 'https://download.mql5.com/cdn/mobile/mt5/android?server=Deriv-Demo,Deriv-Server,Deriv-Server-02',
-        huawei: 'https://appgallery.huawei.com/#/app/C102015329',
-        ios: 'https://download.mql5.com/cdn/mobile/mt5/ios?server=Deriv-Demo,Deriv-Server,Deriv-Server-02',
+        android: whiteLabelLinks?.android,
+        huawei: internalWhiteLabelLinks.huawei,
+        ios: whiteLabelLinks?.ios,
     },
-};
+});
 
 // TODO: Implement App Icon once icons are available.
 const AppToIconMapper = {
@@ -41,11 +46,13 @@ const AppToIconMapper = {
 } as const;
 
 type TModalTradeWrapper = {
+    mt5Account?: TAddedMT5Account;
     platform: TPlatforms.All;
 };
 
-const ModalTradeWrapper: FC<PropsWithChildren<TModalTradeWrapper>> = ({ children, platform }) => {
+const ModalTradeWrapper: FC<PropsWithChildren<TModalTradeWrapper>> = ({ children, mt5Account, platform }) => {
     const { isDesktop } = useDevice();
+    const { localize } = useTranslations();
     const appOrder = ['ios', 'android', 'huawei'];
     const { link, title } = PlatformDetails[platform];
 
@@ -54,35 +61,49 @@ const ModalTradeWrapper: FC<PropsWithChildren<TModalTradeWrapper>> = ({ children
             renderFooter={() => {
                 return (
                     <div className='wallets-modal-trade-wrapper__footer'>
-                        <WalletText align='center' size='sm' weight='bold'>
-                            Download {title} on your phone to trade with the {title} account
-                        </WalletText>
+                        <Text align='center' size='sm' weight='bold'>
+                            <Localize
+                                i18n_default_text='Download {{title}} on your phone to trade with the {{title}} account'
+                                values={{ title }}
+                            />
+                        </Text>
                         <div className='wallets-modal-trade-wrapper__footer-installations'>
                             <div className='wallets-modal-trade-wrapper__footer-installations-icons'>
                                 {appOrder.map(app => {
-                                    const AppsLinkMapper = LinksMapper[platform][app as keyof TAppLinks];
+                                    const AppsLinkMapper = LinksMapper(mt5Account?.white_label_links)[platform][
+                                        app as keyof TAppLinks
+                                    ];
                                     if (AppsLinkMapper) {
                                         const AppIcon = AppToIconMapper[app as keyof typeof AppToIconMapper];
                                         const appLink = AppsLinkMapper;
-                                        return <AppIcon key={app} onClick={() => window.open(appLink)} />;
+                                        return (
+                                            <AppIcon
+                                                data-testid={`dt_modal_trade_wrapper_${app}_icon`}
+                                                key={app}
+                                                onClick={() => window.open(appLink)}
+                                            />
+                                        );
                                     }
                                     return null;
                                 })}
                             </div>
-                            {isDesktop && (
-                                <div className='wallets-modal-trade-wrapper__footer-installations-qr'>
-                                    <QRCode size={80} value={link} />
-                                    <WalletText align='center' size='xs'>
-                                        Scan the QR code to download {title}
-                                    </WalletText>
-                                </div>
-                            )}
+
+                            <div className='wallets-modal-trade-wrapper__footer-installations-qr'>
+                                <QRCode size={80} value={link} />
+                                <Text align='center' size='xs'>
+                                    <Localize
+                                        i18n_default_text='Scan the QR code to download {{title}}'
+                                        values={{ title }}
+                                    />
+                                </Text>
+                            </div>
                         </div>
                     </div>
                 );
             }}
             shouldFixedFooter={isDesktop}
-            title='Trade'
+            shouldHideFooter={!isDesktop}
+            title={localize('Trade')}
         >
             {children}
         </ModalStepWrapper>

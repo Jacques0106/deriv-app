@@ -3,7 +3,7 @@
 /* -------------------------------------------------------------------------- */
 import { DetailsOfEachMT5Loginid, TransferBetweenAccountsResponse } from '@deriv/api-types';
 
-export type TPlatformIcon = 'Derived' | 'Financial' | 'Options' | 'CFDs';
+export type TPlatformIcon = 'Standard' | 'Financial' | 'Options' | 'CFDs';
 
 export type TAccount = {
     balance?: string | number;
@@ -12,6 +12,7 @@ export type TAccount = {
     error?: JSX.Element | string;
     is_crypto?: boolean;
     is_ctrader?: boolean;
+    is_derivez?: boolean;
     is_dxtrade?: boolean;
     is_mt?: boolean;
     market_type?: string;
@@ -35,6 +36,8 @@ export type TAccountsList = {
     is_selected_from?: boolean;
     is_verification_failed?: boolean;
     is_verification_needed?: boolean;
+    is_account_unavailable?: boolean;
+    is_server_maintenance?: boolean;
     loginid?: string;
     mt5_login_list?: DetailsOfEachMT5Loginid[];
     title?: string;

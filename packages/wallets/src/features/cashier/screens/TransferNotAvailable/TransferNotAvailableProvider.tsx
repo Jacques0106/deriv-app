@@ -1,6 +1,7 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
-import { WalletButton } from '../../../../components';
+import { Localize } from '@deriv-com/translations';
+import { Button, Text } from '@deriv-com/ui';
 import { THooks } from '../../../../types';
 
 type TGetMessageProps = {
@@ -19,18 +20,26 @@ const getMessage = ({
     isVirtual,
 }: TGetMessageProps) => {
     if (!hasAccountsForTransfer) {
-        const title = isVirtual
-            ? 'No trading accounts are available to receive funds'
-            : 'No trading accounts or other wallets are available to receive funds';
-        const description = isVirtual
-            ? "Add a demo trading account in Trader's hub to receive funds from this Wallet to start trading."
-            : "Add a trading account or Wallet in Trader's hub to receive funds from this Wallet.";
+        const title = isVirtual ? (
+            <Localize i18n_default_text='No trading accounts are available to receive funds' />
+        ) : (
+            <Localize i18n_default_text='No trading accounts or other wallets are available to receive funds' />
+        );
+        const description = isVirtual ? (
+            <Text align='center' size='md'>
+                <Localize i18n_default_text="Add a demo trading account in Trader's hub to receive funds from this Wallet to start trading." />
+            </Text>
+        ) : (
+            <Text align='center' size='md'>
+                <Localize i18n_default_text="Add a trading account or Wallet in Trader's hub to receive funds from this Wallet." />
+            </Text>
+        );
 
         return {
-            actionButton: () => (
-                <WalletButton onClick={() => history.push('/wallets')} size='lg'>
-                    Back to Trader&apos;s hub
-                </WalletButton>
+            actionButton: (
+                <Button borderWidth='sm' onClick={() => history.push('/')} size='lg' textSize='md'>
+                    <Localize i18n_default_text="Back to Trader's hub" />
+                </Button>
             ),
             description,
             title,
@@ -38,20 +47,35 @@ const getMessage = ({
     }
 
     if (!hasTransferAccountsWithFunds) {
-        const title = isVirtual
-            ? 'No funds in Demo wallet and demo trading accounts'
-            : 'No funds in any trading accounts or wallets';
-        const description = isVirtual
-            ? 'Please reset the balance of your Demo Wallet to make a transfer.'
-            : `Please make a deposit to your ${currency} Wallet to make a transfer.`;
-        const locationPathName = `/wallets/cashier/${isVirtual ? 'reset-balance' : 'deposit'}` as const;
-        const buttonText = isVirtual ? 'Reset balance' : 'Deposit';
+        const title = isVirtual ? (
+            <Localize i18n_default_text='No funds in Demo wallet and demo trading accounts' />
+        ) : (
+            <Localize i18n_default_text='No funds in any trading accounts or wallets' />
+        );
+        const description = isVirtual ? (
+            <Text align='center' size='md'>
+                <Localize i18n_default_text='Please reset the balance of your Demo Wallet to make a transfer.' />
+            </Text>
+        ) : (
+            <Text align='center' size='md'>
+                <Localize
+                    i18n_default_text='Please make a deposit to your {{currency}} Wallet to make a transfer.'
+                    values={{ currency }}
+                />
+            </Text>
+        );
+        const locationPathName = `/wallet/${isVirtual ? 'reset-balance' : 'deposit'}` as const;
+        const buttonText = isVirtual ? (
+            <Localize i18n_default_text='Reset balance' />
+        ) : (
+            <Localize i18n_default_text='Deposit' />
+        );
 
         return {
-            actionButton: () => (
-                <WalletButton onClick={() => history.push(locationPathName)} size='lg'>
+            actionButton: (
+                <Button borderWidth='sm' onClick={() => history.push(locationPathName)} size='lg' textSize='md'>
                     {buttonText}
-                </WalletButton>
+                </Button>
             ),
             description,
             title,

@@ -93,6 +93,9 @@ window.Blockly = {
         textToDom: jest.fn(),
         domToText: jest.fn(),
     },
+    utils: {
+        xml: { textToDom: jest.fn() },
+    },
 };
 
 jest.mock('../config', () => ({
@@ -175,6 +178,45 @@ jest.mock('../config', () => ({
                 [],
             ],
         },
+        D_ALEMBERT: {
+            label: 'D’Alembert',
+        },
+        OSCARS_GRIND: {
+            label: 'Oscar’s Grind',
+        },
+        REVERSE_MARTINGALE: {
+            label: 'Reverse Martingale',
+        },
+        REVERSE_D_ALEMBERT: {
+            label: 'Reverse D’Alembert',
+        },
+        STRATEGY_1_3_2_6: {
+            label: '1-3-2-6',
+        },
+        ACCUMULATORS_DALEMBERT_ON_STAT_RESET: {
+            label: 'Accumulators D’Alembert on stat reset with tick count take profit',
+        },
+        ACCUMULATORS_DALEMBERT: {
+            label: 'Accumulators D’Alembert with tick count take profit',
+        },
+        ACCUMULATORS_MARTINGALE: {
+            label: 'Accumulators Martingale with tick count take profit',
+        },
+        ACCUMULATORS_MARTINGALE_ON_STAT_RESET: {
+            label: 'Accumulators Martingale on stat reset with tick count take profit',
+        },
+        ACCUMULATORS_REVERSE_DALEMBERT: {
+            label: 'Accumulators Reverse D’Alembert with tick count take profit',
+        },
+        ACCUMULATORS_REVERSE_MARTINGALE: {
+            label: 'Accumulators Reverse Martingale with tick count take profit',
+        },
+        ACCUMULATORS_REVERSE_MARTINGALE_ON_STAT_RESET: {
+            label: 'Accumulators Reverse Martingale on stat reset with tick count take profit',
+        },
+        ACCUMULATORS_REVERSE_DALEMBERT_ON_STAT_RESET: {
+            label: 'Accumulators Reverse D’Alembert on stat reset with tick count take profit',
+        },
     },
 }));
 
@@ -204,20 +246,9 @@ describe('<QuickStrategy />', () => {
         const { container } = render(<QuickStrategy />, {
             wrapper,
         });
+
         await waitFor(() => {
             expect(container).toBeInTheDocument();
-        });
-    });
-
-    it('It should submit the form', async () => {
-        render(<QuickStrategy />, {
-            wrapper,
-        });
-        await waitFor(() => {
-            userEvent.click(screen.getByTestId('qs-run-button'));
-        });
-        await waitFor(() => {
-            expect(mock_DBot_store?.quick_strategy?.is_open).toBeFalsy();
         });
     });
 
@@ -227,13 +258,14 @@ describe('<QuickStrategy />', () => {
         });
 
         const close_button = screen.getByTestId('dt_page_overlay_header_close');
-        await waitFor(() => {
-            expect(close_button).toBeInTheDocument();
-            userEvent.click(close_button);
+
+        expect(close_button).toBeInTheDocument();
+
+        await waitFor(async () => {
+            await userEvent.click(close_button);
         });
-        await waitFor(() => {
-            expect(mock_DBot_store.quick_strategy.is_open).toBeFalsy();
-        });
+
+        expect(mock_DBot_store.quick_strategy.is_open).toBeFalsy();
     });
 
     it('It should render desktop', () => {

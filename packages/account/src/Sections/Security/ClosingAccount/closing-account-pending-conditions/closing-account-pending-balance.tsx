@@ -1,25 +1,20 @@
-import React from 'react';
 import { Money } from '@deriv/components';
-import {
-    CFD_PLATFORMS,
-    formatMoney,
-    getCFDAccount,
-    getCFDAccountDisplay,
-    getCFDPlatformLabel,
-    getMT5Icon,
-} from '@deriv/shared';
+import { CFD_PLATFORMS, getCFDAccount, getCFDAccountDisplay, getCFDPlatformLabel, getMT5Icon } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
-import { Localize } from '@deriv/translations';
-import { TCFDPlatform, TDetailsOfDerivXAccount, TDetailsOfMT5Account } from 'Types';
-import ClosingAccountPendingWrapper from './closing-account-pending-wrapper';
+import { Localize } from '@deriv-com/translations';
+import { CurrencyConstants, FormatUtils } from '@deriv-com/utils';
+
+import { TCFDPlatform, TDetailsOfDerivXAccount, TDetailsOfMT5Account } from '../../../../Types';
+
 import ClosingAccountPendingContent from './closing-account-pending-content';
+import ClosingAccountPendingWrapper from './closing-account-pending-wrapper';
 
 type TClosingAccountPendingBalanceProps = {
     platform: TCFDPlatform;
     account_balance: TDetailsOfMT5Account[] | TDetailsOfDerivXAccount[];
 };
 
-type TShortcode = Parameters<typeof getCFDAccountDisplay>[0]['shortcode'];
+type TShortcode = Exclude<TDetailsOfMT5Account['landing_company_short'], 'seychelles'>;
 
 const ClosingAccountPendingBalance = observer(({ platform, account_balance }: TClosingAccountPendingBalanceProps) => {
     const { traders_hub } = useStore();
@@ -43,6 +38,7 @@ const ClosingAccountPendingBalance = observer(({ platform, account_balance }: TC
                             return `IcMt5-${getMT5Icon({
                                 market_type: account.market_type,
                                 is_eu: is_eu_user,
+                                product: account.product,
                             })}`;
                         case CFD_PLATFORMS.DXTRADE:
                             return `IcDxtrade-${getCFDAccount({
@@ -69,13 +65,16 @@ const ClosingAccountPendingBalance = observer(({ platform, account_balance }: TC
                                 platform,
                                 shortcode: is_mt5_platform ? (account.landing_company_short as TShortcode) : undefined,
                                 is_eu: is_eu_user,
+                                product: account.product,
                             }) ?? ''
                         }
                         value={
                             account.currency && (
                                 <Money
                                     currency={account.currency}
-                                    amount={formatMoney(account.currency, account.balance ?? 0, true)}
+                                    amount={FormatUtils.formatMoney(account.balance ?? 0, {
+                                        currency: account.currency as CurrencyConstants.Currency,
+                                    })}
                                     should_format={false}
                                 />
                             )

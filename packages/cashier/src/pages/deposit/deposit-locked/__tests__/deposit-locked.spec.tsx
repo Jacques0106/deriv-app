@@ -4,6 +4,12 @@ import { Checklist } from '@deriv/components';
 import DepositLocked from '../deposit-locked';
 import { mockStore } from '@deriv/stores';
 import CashierProviders from '../../../../cashier-providers';
+import { useIsTNCNeeded } from '@deriv/hooks';
+
+jest.mock('@deriv/hooks', () => ({
+    ...jest.requireActual('@deriv/hooks'),
+    useIsTNCNeeded: jest.fn(),
+}));
 
 jest.mock('Components/cashier-locked', () => {
     const CashierLocked = () => (
@@ -20,6 +26,8 @@ jest.mock('Components/cashier-locked', () => {
 
 describe('<DepositLocked />', () => {
     it('should show the proof of identity document verification message', () => {
+        (useIsTNCNeeded as jest.Mock).mockReturnValue(false);
+
         const mock_root_store = mockStore({
             client: {
                 account_status: {
@@ -34,8 +42,6 @@ describe('<DepositLocked />', () => {
                         needs_verification: ['identity'],
                     },
                 },
-                standpoint: { iom: undefined },
-                is_tnc_needed: false,
                 is_financial_information_incomplete: false,
                 is_trading_experience_incomplete: false,
                 is_financial_account: false,
@@ -51,6 +57,8 @@ describe('<DepositLocked />', () => {
     });
 
     it('should show the proof of address document verification message', () => {
+        (useIsTNCNeeded as jest.Mock).mockReturnValue(false);
+
         const mock_root_store = mockStore({
             client: {
                 account_status: {
@@ -65,8 +73,6 @@ describe('<DepositLocked />', () => {
                         needs_verification: ['document'],
                     },
                 },
-                standpoint: { iom: undefined },
-                is_tnc_needed: false,
                 is_financial_information_incomplete: false,
                 is_trading_experience_incomplete: false,
                 is_financial_account: false,
@@ -82,14 +88,14 @@ describe('<DepositLocked />', () => {
     });
 
     it('should show the terms and conditions accept button', () => {
+        (useIsTNCNeeded as jest.Mock).mockReturnValue(true);
+
         const mock_root_store = mockStore({
             client: {
                 account_status: {
                     cashier_validation: [],
                     authentication: {},
                 },
-                standpoint: { iom: undefined },
-                is_tnc_needed: true,
                 is_financial_information_incomplete: false,
                 is_trading_experience_incomplete: false,
                 is_financial_account: false,
@@ -109,14 +115,14 @@ describe('<DepositLocked />', () => {
     });
 
     it('should show the financial assessment completion message', () => {
+        (useIsTNCNeeded as jest.Mock).mockReturnValue(false);
+
         const mock_root_store = mockStore({
             client: {
                 account_status: {
                     cashier_validation: [],
                     authentication: {},
                 },
-                standpoint: { iom: 'true' },
-                is_tnc_needed: false,
                 is_financial_information_incomplete: true,
                 is_trading_experience_incomplete: false,
                 is_financial_account: false,

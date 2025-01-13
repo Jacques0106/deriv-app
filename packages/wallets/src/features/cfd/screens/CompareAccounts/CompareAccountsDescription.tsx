@@ -1,77 +1,56 @@
 import React from 'react';
-import classNames from 'classnames';
-import { WalletText } from '../../../../components';
-import { THooks } from '../../../../types';
-import { getJurisdictionDescription } from './compareAccountsConfig';
+import { LegacyInfo1pxIcon } from '@deriv/quill-icons';
+import { useTranslations } from '@deriv-com/translations';
+import { Text, Tooltip, useDevice } from '@deriv-com/ui';
+import { THooks, TProductDetails } from '../../../../types';
+import { MT5_PRODUCT } from './constants';
 import './CompareAccountsDescription.scss';
 
 type TCompareAccountsDescription = {
-    isDemo: boolean;
     isEuRegion: boolean;
-    marketType: THooks.AvailableMT5Accounts['market_type'];
-    shortCode: THooks.AvailableMT5Accounts['shortcode'];
+    product?: THooks.AvailableMT5Accounts['product'];
+    productDetails?: TProductDetails;
 };
 
-const CompareAccountsDescription = ({ isDemo, isEuRegion, marketType, shortCode }: TCompareAccountsDescription) => {
-    const marketTypeShortCode = marketType?.concat('_', shortCode ?? '');
-    const jurisdictionData = getJurisdictionDescription(marketTypeShortCode ?? '');
+const CompareAccountsDescription = ({ isEuRegion, product, productDetails }: TCompareAccountsDescription) => {
+    const { localize } = useTranslations();
+    const { isTablet } = useDevice();
+
+    const leverage = localize('Up to {{leverage}}', { leverage: productDetails?.max_leverage ?? '1:1000' });
+    const spread = localize('{{spread}} pips', { spread: productDetails?.min_spread ?? '0.5' });
 
     return (
-        <div
-            className={classNames('wallets-compare-accounts-text-container', {
-                'wallets-compare-accounts-text-container--demo': isDemo,
-            })}
-        >
+        <div className='wallets-compare-accounts-text-container'>
             <div className='wallets-compare-accounts-text-container__separator'>
-                <WalletText align='center' as='h1' size='xl' weight='bold'>
-                    {'Up to'} {jurisdictionData.leverage}
-                </WalletText>
-                <WalletText align='center' as='p' size='2xs'>
-                    {!isEuRegion ? jurisdictionData.leverage_description : 'Leverage'}
-                </WalletText>
+                <Text align='center' as='h1' size={isTablet ? 'md' : 'xl'} weight='bold'>
+                    {leverage}
+                </Text>
+                <Text align='center' as='p' size='2xs'>
+                    {!isEuRegion ? localize('Maximum leverage') : localize('Leverage')}
+                </Text>
             </div>
             {!isEuRegion && (
                 <div className='wallets-compare-accounts-text-container__separator'>
-                    <WalletText align='center' as='h1' size='xl' weight='bold'>
-                        {jurisdictionData.spread}
-                    </WalletText>
-                    <WalletText align='center' as='p' size='2xs'>
-                        {jurisdictionData.spread_description}
-                    </WalletText>
-                </div>
-            )}
-            {!isDemo && (
-                <React.Fragment>
-                    <div className='wallets-compare-accounts-text-container__separator'>
-                        <WalletText align='center' as='h1' size='sm' weight='bold'>
-                            {jurisdictionData.counterparty_company}
-                        </WalletText>
-                        <WalletText align='center' as='p' size='2xs'>
-                            {jurisdictionData.counterparty_company_description}
-                        </WalletText>
-                    </div>
-                    <div className='wallets-compare-accounts-text-container__separator'>
-                        <WalletText align='center' as='h1' size='sm' weight='bold'>
-                            {jurisdictionData.jurisdiction}
-                        </WalletText>
-                        <WalletText align='center' as='p' size='2xs'>
-                            {jurisdictionData.jurisdiction_description}
-                        </WalletText>
-                    </div>
-                    <div className='wallets-compare-accounts-text-container__separator'>
-                        <WalletText align='center' as='h1' size='sm' weight='bold'>
-                            {jurisdictionData.regulator}
-                        </WalletText>
-                        {jurisdictionData.regulator_license && (
-                            <WalletText align='center' as='p' size='2xs'>
-                                {jurisdictionData.regulator_license}
-                            </WalletText>
+                    <div className='wallets-compare-accounts-title__separator'>
+                        <Text align='center' as='h1' size={isTablet ? 'md' : 'xl'} weight='bold'>
+                            {spread}
+                        </Text>
+                        {product === MT5_PRODUCT.ZERO_SPREAD && (
+                            <Tooltip
+                                as='div'
+                                data-testid='wallets-compare-accounts-text-container__tooltip'
+                                tooltipContent={localize('Commissions apply')}
+                                tooltipOffset={20}
+                                tooltipPosition='top'
+                            >
+                                <LegacyInfo1pxIcon width={16} />
+                            </Tooltip>
                         )}
-                        <WalletText align='center' as='p' size='2xs'>
-                            {jurisdictionData.regulator_description}
-                        </WalletText>
                     </div>
-                </React.Fragment>
+                    <Text align='center' as='p' size='2xs'>
+                        {localize('Spreads from')}
+                    </Text>
+                </div>
             )}
         </div>
     );

@@ -1,43 +1,32 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import QRCode from 'qrcode.react';
-import { useAuthorize, useDepositCryptoAddress } from '@deriv/api-v2';
-import { WalletsDepositCryptoAddressLoader } from '../../../../../../components';
-import { WalletClipboard, WalletText } from '../../../../../../components/Base';
-import useDevice from '../../../../../../hooks/useDevice';
+import { Text, useDevice } from '@deriv-com/ui';
+import { WalletClipboard } from '../../../../../../components/Base';
+import useIsRtl from '../../../../../../hooks/useIsRtl';
 import './DepositCryptoAddress.scss';
 
-const DepositCryptoAddress = () => {
-    const { data: depositCryptoAddress, isLoading, mutate } = useDepositCryptoAddress();
-    const { isSuccess: isAuthorizeSuccess } = useAuthorize();
-    const { isMobile } = useDevice();
+type TProps = {
+    depositCryptoAddress?: string;
+};
 
-    useEffect(() => {
-        if (isAuthorizeSuccess) {
-            mutate();
-        }
-    }, [isAuthorizeSuccess, mutate]);
-
-    if (isLoading)
-        return (
-            <div className='wallets-deposit-crypto-address__loader' data-testid='dt_deposit-crypto-address-loader'>
-                <WalletsDepositCryptoAddressLoader />
-            </div>
-        );
+const DepositCryptoAddress: React.FC<TProps> = ({ depositCryptoAddress }) => {
+    const { isDesktop } = useDevice();
+    const isRtl = useIsRtl();
+    const mobileAlignment = isRtl ? 'right' : 'left';
 
     return (
         <div className='wallets-deposit-crypto-address'>
             <QRCode data-testid='dt_deposit-crypto-address-qr-code' size={128} value={depositCryptoAddress || ''} />
             <div className='wallets-deposit-crypto-address__hash'>
                 <div className='wallets-deposit-crypto-address__hash-text'>
-                    <WalletText size='sm' weight='bold'>
+                    <Text size='sm' weight='bold'>
                         {depositCryptoAddress}
-                    </WalletText>
+                    </Text>
                 </div>
                 <div className='wallets-deposit-crypto-address__hash-clipboard'>
                     <WalletClipboard
-                        infoMessage={isMobile ? undefined : 'copy'}
-                        popoverAlignment={isMobile ? 'left' : 'bottom'}
-                        successMessage='copied'
+                        className='wallets-deposit-crypto-address__clipboard'
+                        popoverAlignment={isDesktop ? 'bottom' : mobileAlignment}
                         textCopy={depositCryptoAddress || ''}
                     />
                 </div>

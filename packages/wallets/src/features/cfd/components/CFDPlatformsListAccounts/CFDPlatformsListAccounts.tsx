@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo } from 'react';
+import React from 'react';
 import {
-    useActiveWalletAccount,
     useCtraderAccountsList,
     useDxtradeAccountsList,
+    useIsEuRegion,
+    useLandingCompany,
     useSortedMT5Accounts,
 } from '@deriv/api-v2';
 import { TradingAppCardLoader } from '../../../../components/SkeletonLoader';
+import { TAddedMT5Account, TAvailableMT5Account } from '../../../../types';
 import {
     AddedCTraderAccountsList,
     AddedDxtradeAccountsList,
@@ -14,51 +16,73 @@ import {
     AvailableDxtradeAccountsList,
     AvailableMT5AccountsList,
 } from '../../flows';
-import { GetMoreMT5Accounts } from '../../screens';
 import './CFDPlatformsListAccounts.scss';
 
-type TProps = {
-    onMT5PlatformListLoaded?: (value: boolean) => void;
-};
+const CFDPlatformsListAccounts: React.FC = () => {
+    const {
+        data: mt5AccountsList,
+        isFetchedAfterMount: isMT5FetchedAfterMount,
+        isLoading: isMT5Loading,
+    } = useSortedMT5Accounts();
+    const {
+        data: ctraderAccountsList,
+        isFetchedAfterMount: isCtraderFetchedAfterMount,
+        isLoading: isCTraderLoading,
+    } = useCtraderAccountsList();
+    const {
+        data: dxtradeAccountsList,
+        isFetchedAfterMount: isDxtradeFetchedAfterMount,
+        isLoading: isDxtradeLoading,
+    } = useDxtradeAccountsList();
+    const { data: landingCompany, isLoading: isLandingCompanyLoading } = useLandingCompany();
+    const { data: isEuRegion } = useIsEuRegion();
 
-const CFDPlatformsListAccounts: React.FC<TProps> = ({ onMT5PlatformListLoaded }) => {
-    const { areAllAccountsCreated, data: mt5AccountsList, isLoading: isMT5Loading } = useSortedMT5Accounts();
-    const { data: ctraderAccountsList } = useCtraderAccountsList();
-    const { data: dxtradeAccountsList } = useDxtradeAccountsList();
-    const { data: activeWallet } = useActiveWalletAccount();
+    const isLoading = isMT5Loading || isCTraderLoading || isDxtradeLoading || isLandingCompanyLoading;
+    const isFetchedAfterMount = isMT5FetchedAfterMount || isCtraderFetchedAfterMount || isDxtradeFetchedAfterMount;
 
-    const hasMT5Account = useMemo(() => {
-        return mt5AccountsList?.some(account => account.is_added);
-    }, [mt5AccountsList]);
     const hasCTraderAccount = !!ctraderAccountsList?.length;
     const hasDxtradeAccount = !!dxtradeAccountsList?.length;
 
-    useEffect(() => {
-        onMT5PlatformListLoaded?.(!isMT5Loading);
-        return () => onMT5PlatformListLoaded?.(false);
-    }, [isMT5Loading, onMT5PlatformListLoaded]);
+    const financialRestrictedCountry =
+        landingCompany?.financial_company?.shortcode === 'svg' && !landingCompany?.gaming_company;
+    const cfdRestrictedCountry =
+        landingCompany?.gaming_company?.shortcode === 'svg' && !landingCompany.financial_company;
+    const isRestricted = financialRestrictedCountry || cfdRestrictedCountry;
+
+    if (isLoading || !isFetchedAfterMount) {
+        return (
+            <div className='wallets-cfd-list-accounts__content'>
+                {Array.from({ length: 3 }).map((_, idx) => (
+                    <TradingAppCardLoader key={`wallets-carousel-loader-action-${idx}`} />
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className='wallets-cfd-list-accounts__content'>
-            {/* TODO: Update loader with updated skeleton loader design */}
-            {isMT5Loading && <TradingAppCardLoader />}
-            {!isMT5Loading &&
-                mt5AccountsList?.map((account, index) => {
-                    if (account.is_added)
-                        return (
-                            <AddedMT5AccountsList account={account} key={`added-mt5-list${account.loginid}-${index}`} />
-                        );
-
+            {mt5AccountsList?.map((account, index) => {
+                if (account.is_added)
                     return (
-                        <AvailableMT5AccountsList
-                            account={account}
-                            key={`available-mt5-list${account.name}-${index}`}
+                        <AddedMT5AccountsList
+                            account={account as TAddedMT5Account}
+                            key={`added-mt5-list${(account as TAddedMT5Account).loginid}-${index}`}
                         />
                     );
-                })}
-            {hasCTraderAccount ? <AddedCTraderAccountsList /> : <AvailableCTraderAccountsList />}
-            {hasDxtradeAccount ? <AddedDxtradeAccountsList /> : <AvailableDxtradeAccountsList />}
-            {hasMT5Account && !activeWallet?.is_virtual && !areAllAccountsCreated && <GetMoreMT5Accounts />}
+
+                return (
+                    <AvailableMT5AccountsList
+                        account={account as TAvailableMT5Account}
+                        key={`available-mt5-list${account.name}-${index}`}
+                    />
+                );
+            })}
+            {!isRestricted && !isEuRegion && (
+                <>
+                    {hasCTraderAccount ? <AddedCTraderAccountsList /> : <AvailableCTraderAccountsList />}
+                    {hasDxtradeAccount ? <AddedDxtradeAccountsList /> : <AvailableDxtradeAccountsList />}
+                </>
+            )}
         </div>
     );
 };

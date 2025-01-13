@@ -43,8 +43,9 @@ describe('<TermsOfUse/>', () => {
         onSubmit: jest.fn(),
         onSave: jest.fn(),
         real_account_signup_target: 'svg',
-        value: { agreed_tos: false, agreed_tnc: false },
+        value: { agreed_tos: false, tnc_acceptance: false },
         residence: 'id',
+        is_multi_account: false,
     };
 
     const commonFieldsCheck = () => {

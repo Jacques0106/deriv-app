@@ -13,6 +13,7 @@ import {
 } from '@deriv/shared';
 import { useCfdStore } from '../../Stores/Modules/CFD/Helpers/useCfdStores';
 import MigrationBannerImage from './migration-banner-image';
+import './migration-banner.scss';
 
 type TMigrationBannerProps = {
     is_trade_modal?: boolean;
@@ -31,6 +32,7 @@ const MigrationBanner = observer(({ is_trade_modal = false }: TMigrationBannerPr
         toggleMT5MigrationModal(true);
     };
     const is_desktop_trade_modal = is_trade_modal && !is_mobile;
+    const banner_img = is_dark_mode_on ? 'migrate_card_dark' : 'migrate_card';
     return (
         <div
             className={classNames('mt5-migration-banner', {
@@ -42,7 +44,7 @@ const MigrationBanner = observer(({ is_trade_modal = false }: TMigrationBannerPr
                     'mt5-migration-banner__description--trade-modal': is_desktop_trade_modal,
                 })}
             >
-                <div className='mt5-migration-banne__description-text'>
+                <div className='mt5-migration-banner__description-text'>
                     {has_derived_and_financial_mt5 ? (
                         <Text size='xs'>
                             <Localize
@@ -76,7 +78,7 @@ const MigrationBanner = observer(({ is_trade_modal = false }: TMigrationBannerPr
                     <Localize i18n_default_text='Upgrade' />
                 </Button>
             </div>
-            <MigrationBannerImage image={is_dark_mode_on ? 'migrate_card_dark' : 'migrate_card'} />
+            <MigrationBannerImage image={banner_img} />
         </div>
     );
 });

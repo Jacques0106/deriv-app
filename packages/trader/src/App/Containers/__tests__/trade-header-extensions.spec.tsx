@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import TraderProviders from '../../../trader-providers';
 import TradeHeaderExtensions from '../trade-header-extensions';
 import { mockStore } from '@deriv/stores';
+import { useDevice } from '@deriv-com/ui';
 
 jest.mock('@deriv/shared', () => ({
     ...jest.requireActual('@deriv/shared'),
@@ -46,6 +47,14 @@ describe('<TradeHeaderExtensions />', () => {
         );
     };
     it('populateHeaderExtensions should not be called with null if show_component is true', async () => {
+        (useDevice as jest.Mock).mockReturnValue({
+            isDesktop: false,
+            isMobile: true,
+            isTablet: false,
+            isTabletPortrait: false,
+            isMobileOrTabletLandscape: false,
+        });
+
         renderTraderFooterExtensions(mock_store);
         expect(mock_store.ui.populateHeaderExtensions).not.toHaveBeenCalledWith(null);
     });

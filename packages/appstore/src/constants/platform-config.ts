@@ -1,4 +1,4 @@
-import { getUrlBinaryBot, getUrlSmartTrader, getPlatformSettingsAppstore, routes, getStaticUrl } from '@deriv/shared';
+import { getUrlSmartTrader, getPlatformSettingsAppstore, routes, getStaticUrl } from '@deriv/shared';
 import { localize } from '@deriv/translations';
 import { PlatformIcons } from 'Assets/svgs/trading-platform';
 import { TAccountCategory, TRegionAvailability } from 'Types';
@@ -34,30 +34,24 @@ export interface MfPlatformConfig extends PlatformConfig {
 export const getAppstorePlatforms = (): PlatformConfig[] => [
     {
         name: getPlatformSettingsAppstore('trader').name,
-        app_desc: localize('Options and multipliers trading platform.'),
+        app_desc: localize('The options and multipliers trading platform.'),
         link_to: routes.trade,
     },
     {
         name: getPlatformSettingsAppstore('dbot').name,
-        app_desc: localize('Automate your trading, no coding needed.'),
+        app_desc: localize('The ultimate bot trading platform.'),
         link_to: routes.bot,
         is_external: true,
     },
     {
         name: getPlatformSettingsAppstore('smarttrader').name,
-        app_desc: localize('Our legacy options trading platform.'),
+        app_desc: localize('The legacy options trading platform.'),
         link_to: getUrlSmartTrader(),
         is_external: true,
     },
     {
-        name: getPlatformSettingsAppstore('bbot').name,
-        app_desc: localize('Our legacy automated trading platform.'),
-        link_to: getUrlBinaryBot(),
-        is_external: true,
-    },
-    {
         name: getPlatformSettingsAppstore('go').name,
-        app_desc: localize('Trade on the go with our mobile app.'),
+        app_desc: localize('The mobile app for trading multipliers and accumulators.'),
         link_to: getStaticUrl('/deriv-go'),
         is_external: true,
         new_tab: true,
@@ -69,7 +63,7 @@ export const getMFAppstorePlatforms = (): MfPlatformConfig[] => [
         app_icon: getPlatformSettingsAppstore('trader').icon,
         app_title: getPlatformSettingsAppstore('trader').name,
         name: getPlatformSettingsAppstore('trader').name,
-        app_desc: localize('Multipliers trading platform.'),
+        app_desc: localize('The multipliers trading platform.'),
         link_to: routes.trade,
     },
 ];
@@ -79,6 +73,5 @@ export const DERIV_PLATFORM_NAMES = {
     TRADER: 'Deriv Trader',
     DBOT: 'Deriv Bot',
     SMARTTRADER: 'SmartTrader',
-    BBOT: 'Binary Bot',
     GO: 'Deriv GO',
 } as const;

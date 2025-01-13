@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Modal, Text, Icon, Loading } from '@deriv/components';
 import { localize, Localize, getLanguage } from '@deriv/translations';
-import { redirectToLogin } from '@deriv/shared';
+import { redirectToLogin, removeActionParam } from '@deriv/shared';
 import { WS } from 'Services';
 import { observer, useStore } from '@deriv/stores';
 
@@ -17,6 +17,7 @@ const UpdateEmailModal = observer(() => {
 
     const onClickButton = () => {
         toggleUpdateEmailModal(false);
+        removeActionParam('system_email_change');
         if (is_logged_in) {
             logoutClient().then(() => {
                 redirectToLogin(false, getLanguage(), false);
@@ -64,7 +65,7 @@ const UpdateEmailModal = observer(() => {
             {is_email_updated ? (
                 <div className='change-email-update'>
                     {!update_email_error && (
-                        <Icon className='change-email-update__modal-icon' icon={`IcEmailVerified`} size={128} />
+                        <Icon className='change-email-update__modal-icon' icon={'IcEmailVerified'} size={128} />
                     )}
                     <Text className='change-email-update__modal-title' weight='bold' size='s'>
                         {update_email_error ? (

@@ -5,11 +5,10 @@
         padding-bottom: 2.4rem;
 
         @include desktop {
-            gap: 1.6rem 4.8rem;
+            gap: 1.6rem;
         }
 
-        @include mobile {
-            grid-template-rows: repeat(3, 1fr);
+        @include mobile-or-tablet-screen {
             grid-template-columns: auto;
             padding-bottom: 1.6rem;
         }

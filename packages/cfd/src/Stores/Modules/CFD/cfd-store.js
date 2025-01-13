@@ -1,4 +1,4 @@
-import { action, computed, observable, reaction, runInAction, makeObservable, override } from 'mobx';
+import { action, computed, observable, runInAction, makeObservable, override } from 'mobx';
 import {
     getAccountListKey,
     getAccountTypeFields,
@@ -6,17 +6,20 @@ import {
     WS,
     Jurisdiction,
     JURISDICTION_MARKET_TYPES,
+    setPerformanceValue,
+    startPerformanceEventTimer,
 } from '@deriv/shared';
 import BaseStore from '../../base-store';
 
 import { getDxCompanies, getMtCompanies } from './Helpers/cfd-config';
 
 export default class CFDStore extends BaseStore {
-    is_compare_accounts_visible = false;
-    is_cfd_personal_details_modal_visible = false;
+    is_ctrader_transfer_modal_visible = false;
     is_jurisdiction_modal_visible = false;
-    is_mt5_trade_modal_visible = false;
     jurisdiction_selected_shortcode = '';
+    is_compare_accounts_visible = false;
+    is_mt5_trade_modal_visible = false;
+    product = '';
 
     account_type = {
         category: '',
@@ -37,12 +40,13 @@ export default class CFDStore extends BaseStore {
     is_mt5_password_invalid_format_modal_visible = false;
     is_mt5_password_changed_modal_visible = false;
     is_from_mt5_migration_modal = false;
+    is_server_maintenance_modal_visible = false;
+    is_account_unavailable_modal_visible = false;
     mt5_migration_error = '';
     current_account = undefined; // this is a tmp value, don't rely on it, unless you set it first.
 
     error_type = undefined;
 
-    is_cfd_verification_modal_visible = false;
     dxtrade_tokens = {
         demo: '',
         real: '',
@@ -55,6 +59,7 @@ export default class CFDStore extends BaseStore {
     real_synthetic_accounts_existing_data = [];
     real_financial_accounts_existing_data = [];
     real_swapfree_accounts_existing_data = [];
+    real_zerospread_accounts_existing_data = [];
 
     migrated_mt5_accounts = [];
 
@@ -63,9 +68,9 @@ export default class CFDStore extends BaseStore {
 
         makeObservable(this, {
             is_compare_accounts_visible: observable,
-            is_cfd_personal_details_modal_visible: observable,
             is_jurisdiction_modal_visible: observable,
             is_mt5_trade_modal_visible: observable,
+            is_ctrader_transfer_modal_visible: observable,
             jurisdiction_selected_shortcode: observable,
             account_type: observable,
             mt5_trade_account: observable,
@@ -80,18 +85,18 @@ export default class CFDStore extends BaseStore {
             is_cfd_password_modal_enabled: observable,
             is_sent_email_modal_enabled: observable,
             current_account: observable,
-            is_cfd_verification_modal_visible: observable,
             error_type: observable,
+            product: observable,
             dxtrade_tokens: observable,
             ctrader_tokens: observable,
             migrated_mt5_accounts: observable,
             is_mt5_password_invalid_format_modal_visible: observable,
             is_mt5_password_changed_modal_visible: observable,
             is_from_mt5_migration_modal: observable,
+            is_server_maintenance_modal_visible: observable,
+            is_account_unavailable_modal_visible: observable,
             account_title: computed,
             current_list: computed,
-            has_created_account_for_selected_jurisdiction: computed,
-            has_submitted_cfd_personal_details: computed,
             onMount: action.bound,
             onUnmount: override,
             checkShouldOpenAccount: action.bound,
@@ -108,6 +113,7 @@ export default class CFDStore extends BaseStore {
             beginRealSignupForMt5: action.bound,
             enableMt5FinancialStpModal: action.bound,
             setAccountType: action.bound,
+            setProduct: action.bound,
             setCurrentAccount: action.bound,
             setMT5TradeAccount: action.bound,
             setIsAccountBeingCreated: action.bound,
@@ -118,12 +124,15 @@ export default class CFDStore extends BaseStore {
             setMigratedMT5Accounts: action.bound,
             setSentEmailModalStatus: action.bound,
             setIsFromMt5MigrationModal: action.bound,
+            setServerMaintenanceModal: action.bound,
+            setAccountUnavailableModal: action.bound,
             getAccountStatus: action.bound,
             creatMT5Password: action.bound,
             submitMt5Password: action.bound,
             createCFDPassword: action.bound,
             submitCFDPassword: action.bound,
             toggleCompareAccountsModal: action.bound,
+            toggleCTraderTransferModal: action.bound,
             getRealSyntheticAccountsExistingData: action.bound,
             getRealFinancialAccountsExistingData: action.bound,
             getRealSwapfreeAccountsExistingData: action.bound,
@@ -133,7 +142,6 @@ export default class CFDStore extends BaseStore {
             topUpVirtual: action.bound,
             sendVerifyEmail: action.bound,
             setJurisdictionSelectedShortcode: action.bound,
-            toggleCFDVerificationModal: action.bound,
             setDxtradeToken: action.bound,
             setCTraderToken: action.bound,
             loadDxtradeTokens: action.bound,
@@ -141,44 +149,21 @@ export default class CFDStore extends BaseStore {
             setIsMt5PasswordInvalidFormatModalVisible: action.bound,
             setIsMt5PasswordChangedModalVisible: action.bound,
         });
-
-        // reaction(
-        //     () => [this.root_store.client.dxtrade_accounts_list],
-        //     () => {
-        //         if (this.root_store.client.dxtrade_accounts_list.length > 0) {
-        //             this.loadDxtradeTokens();
-        //         }
-        //     }
-        // );
-
-        reaction(
-            () => [this.root_store.client.ctrader_accounts_list],
-            () => {
-                if (this.root_store.client.ctrader_accounts_list.length > 0) {
-                    this.loadCTraderTokens();
-                }
-            }
-        );
     }
 
     get account_title() {
         return this.account_type.category
-            ? getMtCompanies(this.root_store.traders_hub.show_eu_related_content)[this.account_type.category][
-                  this.account_type.type
-              ].title
+            ? getMtCompanies(this.root_store.traders_hub.show_eu_related_content, this.product)[
+                  this.account_type.category
+              ][this.account_type.type].title
             : '';
-    }
-
-    get has_submitted_cfd_personal_details() {
-        const { citizen, place_of_birth, tax_residence, tax_identification_number, account_opening_reason } =
-            this.root_store.client.account_settings;
-        return !!(citizen && place_of_birth && tax_residence && tax_identification_number && account_opening_reason);
     }
 
     get current_list() {
         const list = {};
         const show_eu_related_content = this.root_store.traders_hub.show_eu_related_content;
         this.root_store.client.mt5_login_list
+            // eslint-disable-next-line no-confusing-arrow
             .filter(acc =>
                 show_eu_related_content
                     ? acc.landing_company_short === 'maltainvest'
@@ -202,35 +187,17 @@ export default class CFDStore extends BaseStore {
                 ...account,
             };
         });
-
         return list;
     }
 
     // eslint-disable-next-line class-methods-use-this
     get mt5_companies() {
-        return getMtCompanies(this.root_store.client.is_eu);
+        return getMtCompanies(this.root_store.client.is_eu, this.product);
     }
 
     // eslint-disable-next-line class-methods-use-this
     get dxtrade_companies() {
         return getDxCompanies();
-    }
-
-    get has_created_account_for_selected_jurisdiction() {
-        switch (this.account_type.type) {
-            case 'synthetic':
-                return this.real_synthetic_accounts_existing_data?.some(
-                    account => account.landing_company_short === this.jurisdiction_selected_shortcode
-                );
-            case 'all':
-                return this.real_swapfree_accounts_existing_data?.some(
-                    account => account.landing_company_short === this.jurisdiction_selected_shortcode
-                );
-            default:
-                return this.real_financial_accounts_existing_data?.some(
-                    account => account.landing_company_short === this.jurisdiction_selected_shortcode
-                );
-        }
     }
 
     onMount() {
@@ -292,6 +259,9 @@ export default class CFDStore extends BaseStore {
                 this.demoCFDSignup();
             }
         } else if (platform === CFD_PLATFORMS.CTRADER) {
+            startPerformanceEventTimer('create_ctrader_account_time');
+            this.root_store.client.setIsLandingCompanyLoaded(false);
+
             this.setJurisdictionSelectedShortcode('svg');
             if (this.account_type.category === 'demo') {
                 this.setIsAccountBeingCreated(true);
@@ -302,22 +272,35 @@ export default class CFDStore extends BaseStore {
                 market_type: this.account_type.type,
                 company: this.jurisdiction_selected_shortcode,
             };
+
             const response = await this.openCFDAccount(account_creation_values);
             if (!response.error) {
                 this.setError(false);
-                this.enableCFDPasswordModal();
-                this.setCFDSuccessDialog(true);
 
-                const trading_platform_accounts_list_response = await WS.tradingPlatformAccountsList(
+                const account_list = {
+                    echo_req: response.echo_req,
+                    trading_platform_accounts: [
+                        ...this.root_store.client.ctrader_accounts_list,
+                        response.trading_platform_new_account,
+                    ],
+                };
+                this.root_store.client.responseTradingPlatformAccountsList(account_list);
+                WS.transferBetweenAccounts();
+                const trading_platform_available_accounts_list_response = await WS.tradingPlatformAvailableAccounts(
                     CFD_PLATFORMS.CTRADER
                 );
-                this.root_store.client.responseTradingPlatformAccountsList(trading_platform_accounts_list_response);
-                WS.transferBetweenAccounts();
+                this.root_store.client.responseCTraderTradingPlatformAvailableAccounts(
+                    trading_platform_available_accounts_list_response
+                );
+                this.setCFDSuccessDialog(true);
                 this.setIsAccountBeingCreated(false);
+                WS.tradingPlatformAccountsList(CFD_PLATFORMS.CTRADER);
+                setPerformanceValue('create_ctrader_account_time');
             } else {
                 this.setError(true, response.error);
                 this.setIsAccountBeingCreated(false);
             }
+            this.root_store.client.setIsLandingCompanyLoaded(true);
         } else if (platform === CFD_PLATFORMS.MT5) {
             if (category === 'real') {
                 this.toggleJurisdictionModal();
@@ -462,9 +445,11 @@ export default class CFDStore extends BaseStore {
             phone,
             state: address_state,
             zipCode: address_postcode,
-            ...(this.account_type.type === 'all' ? { sub_account_category: 'swap_free' } : {}),
+            product: this.product,
             ...(values.server ? { server: values.server } : {}),
-            ...(this.jurisdiction_selected_shortcode ? { company: this.jurisdiction_selected_shortcode } : {}),
+            ...(this.jurisdiction_selected_shortcode && this.account_type.category === 'real'
+                ? { company: this.jurisdiction_selected_shortcode }
+                : {}),
             ...(this.jurisdiction_selected_shortcode !== Jurisdiction.LABUAN
                 ? type_request
                 : {
@@ -520,6 +505,10 @@ export default class CFDStore extends BaseStore {
 
     setAccountType(account_type) {
         this.account_type = account_type;
+    }
+
+    setProduct(product) {
+        this.product = product;
     }
 
     setCurrentAccount(data, meta) {
@@ -585,6 +574,8 @@ export default class CFDStore extends BaseStore {
     }
 
     async submitMt5Password(values, actions) {
+        startPerformanceEventTimer('create_mt5_account_time');
+
         if (this.root_store.client.is_mt5_password_not_set) {
             const has_error = await this.creatMT5Password(values, actions);
             if (has_error) return;
@@ -609,6 +600,7 @@ export default class CFDStore extends BaseStore {
                 WS.transferBetweenAccounts(); // get the list of updated accounts for transfer in cashier
                 this.root_store.client.responseMT5TradingServers(await WS.tradingServers(CFD_PLATFORMS.MT5));
                 this.setCFDNewAccount(response.mt5_new_account);
+                setPerformanceValue('create_mt5_account_time');
             } else {
                 await this.getAccountStatus(CFD_PLATFORMS.MT5);
                 this.setError(true, response.error);
@@ -636,6 +628,8 @@ export default class CFDStore extends BaseStore {
     }
 
     async submitCFDPassword(values, actions) {
+        startPerformanceEventTimer('create_dxtrade_account_time');
+
         if (CFD_PLATFORMS.DXTRADE && this.root_store.client.is_dxtrade_password_not_set) {
             const has_error = await this.createCFDPassword(values, actions);
             if (has_error) return;
@@ -663,10 +657,15 @@ export default class CFDStore extends BaseStore {
 
         WS.transferBetweenAccounts(); // get the list of updated accounts for transfer in cashier
         this.setCFDNewAccount(response.trading_platform_new_account);
+        setPerformanceValue('create_dxtrade_account_time');
     }
 
     toggleCompareAccountsModal() {
         this.is_compare_accounts_visible = !this.is_compare_accounts_visible;
+    }
+
+    toggleCTraderTransferModal() {
+        this.is_ctrader_transfer_modal_visible = !this.is_ctrader_transfer_modal_visible;
     }
 
     getRealSyntheticAccountsExistingData(real_synthetic_accounts_existing_data) {
@@ -807,17 +806,18 @@ export default class CFDStore extends BaseStore {
         });
     }
 
-    loadCTraderTokens() {
-        ['demo', 'real'].forEach(account_type => {
-            const has_existing_account = this.root_store.client.ctrader_accounts_list.some(
-                account => account.account_type === account_type
-            );
-            if (!this.ctrader_tokens[account_type] && has_existing_account) {
-                WS.getServiceToken(CFD_PLATFORMS.CTRADER, account_type).then(response =>
-                    this.setCTraderToken(response, account_type)
-                );
-            }
-        });
+    loadCTraderTokens(url, account_type) {
+        const has_existing_account = this.root_store.client.ctrader_accounts_list.some(
+            account => account.account_type === account_type
+        );
+        if (has_existing_account) {
+            WS.getServiceToken(CFD_PLATFORMS.CTRADER, account_type)
+                .then(response => {
+                    this.setCTraderToken(response, account_type);
+                    return window.open(`${url}?token=${response.service_token.ctrader.token}`, '_blank');
+                })
+                .catch(() => window.open(`${url}`, '_blank'));
+        }
     }
 
     static async changePassword({ login, old_password, new_password, password_type }) {
@@ -846,15 +846,19 @@ export default class CFDStore extends BaseStore {
         this.jurisdiction_selected_shortcode = shortcode;
     }
 
-    toggleCFDVerificationModal() {
-        this.is_cfd_verification_modal_visible = !this.is_cfd_verification_modal_visible;
-    }
-
     setMigratedMT5Accounts(accounts) {
         this.migrated_mt5_accounts = accounts;
     }
 
     setIsFromMt5MigrationModal(is_from_mt5_migration_modal) {
         this.is_from_mt5_migration_modal = is_from_mt5_migration_modal;
+    }
+
+    setServerMaintenanceModal(is_server_maintenance_modal_visible) {
+        this.is_server_maintenance_modal_visible = is_server_maintenance_modal_visible;
+    }
+
+    setAccountUnavailableModal(is_account_unavailable_modal_visible) {
+        this.is_account_unavailable_modal_visible = is_account_unavailable_modal_visible;
     }
 }

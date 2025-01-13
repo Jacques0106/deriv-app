@@ -19,7 +19,8 @@ jest.mock('@deriv/api-v2', () => ({
 }));
 
 jest.mock('../../../../../../../components', () => ({
-    Loader: jest.fn(() => <div>Loading...</div>),
+    ...jest.requireActual('../../../../../../../components'),
+    WalletLoader: () => <div>Loading...</div>,
 }));
 
 jest.mock('../../TransactionsNoDataState', () => ({

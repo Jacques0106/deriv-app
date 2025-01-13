@@ -6,7 +6,7 @@ import WalletTransfer from '../WalletTransfer';
 
 jest.mock('../../../../../components', () => ({
     ...jest.requireActual('../../../../../components'),
-    Loader: jest.fn(() => <div>Loading</div>),
+    WalletLoader: () => <div>Loading...</div>,
 }));
 
 jest.mock('../../../modules', () => ({
@@ -52,7 +52,7 @@ describe('WalletTransfer', () => {
         });
 
         render(<WalletTransfer />, { wrapper });
-        expect(screen.getByText('Loading')).toBeInTheDocument();
+        expect(screen.getByText('Loading...')).toBeInTheDocument();
     });
 
     it('should render the TransferNotAvailable screen and its children as the API response is received', () => {

@@ -1,6 +1,7 @@
 import React from 'react';
-import { useActiveWalletAccount } from '@deriv/api-v2';
-import { InlineMessage, WalletText } from '../../../../../../components/Base';
+import { useActiveWalletAccount, useCryptoConfig } from '@deriv/api-v2';
+import { Localize } from '@deriv-com/translations';
+import { InlineMessage, Text } from '@deriv-com/ui';
 import './DepositCryptoDisclaimers.scss';
 
 // Check with BE to see if we can get the network name from the API.
@@ -16,49 +17,71 @@ const cryptoCurrencyToNetworkMapper: Record<string, string> = {
 
 const DepositCryptoDisclaimers = () => {
     const { data } = useActiveWalletAccount();
+    const { data: cryptoConfig } = useCryptoConfig();
     const { currency } = data || {};
-    const formattedMinimumDepositValue = data?.currency_config?.minimum_deposit?.toFixed(
+    const formattedMinimumDepositValue = cryptoConfig?.minimum_deposit?.toFixed(
         data?.currency_config?.fractional_digits
     );
 
     const minimumDepositDisclaimer = data?.currency_config?.is_tUSDT ? (
         <li>
-            A minimum deposit value of <strong>{formattedMinimumDepositValue}</strong> {currency} is required.
-            Otherwise, a fee is applied.
+            <Localize
+                components={[<strong key={0} />]}
+                i18n_default_text='A minimum deposit value of <0>{{formattedMinimumDepositValue}}</0> {{currency}} is required. Otherwise, a fee is applied.'
+                values={{ currency, formattedMinimumDepositValue }}
+            />
         </li>
     ) : (
         <li>
-            A minimum deposit value of <strong>{formattedMinimumDepositValue}</strong> {currency} is required.
-            Otherwise, the funds will be lost and cannot be recovered.
+            <Localize
+                components={[<strong key={0} />]}
+                i18n_default_text='A minimum deposit value of <0>{{formattedMinimumDepositValue}}</0> {{currency}} is required. Otherwise, the funds will be lost and cannot be recovered.'
+                values={{ currency, formattedMinimumDepositValue }}
+            />
         </li>
     );
 
     return (
         <div className='wallets-deposit-crypto-disclaimers'>
-            <InlineMessage>
+            <InlineMessage iconPosition='top' variant='warning'>
                 <div className='wallets-deposit-crypto-disclaimers__content'>
-                    <WalletText size='2xs' weight='bold'>
-                        To avoid loss of funds:
-                    </WalletText>
+                    <Text size='2xs' weight='bold'>
+                        <Localize i18n_default_text='To avoid loss of funds:' />
+                    </Text>
                     <ul className='wallets-deposit-crypto-disclaimers__points'>
-                        {data?.currency_config?.minimum_deposit && minimumDepositDisclaimer}
-                        <li>Do not send other cryptocurrencies to this address.</li>
-                        <li>Make sure to copy your Deriv account address correctly into your crypto wallet.</li>
+                        {cryptoConfig?.minimum_deposit && minimumDepositDisclaimer}
                         <li>
-                            In your cryptocurrency wallet, make sure to select{' '}
-                            <strong>{currency && cryptoCurrencyToNetworkMapper[currency]} network</strong> when you
-                            transfer funds to Deriv.
+                            <Localize
+                                i18n_default_text='Only send {{currencyConfigName}} ({{currencyConfigCode}}) to this address.'
+                                values={{
+                                    currencyConfigCode: data?.currency_config?.display_code,
+                                    currencyConfigName: data?.currency_config?.name,
+                                }}
+                            />
+                        </li>
+                        <li>
+                            <Localize
+                                i18n_default_text='Make sure to copy the Deriv {{currency}} Wallet address above and paste it into your crypto wallet.'
+                                values={{ currency }}
+                            />
+                        </li>
+                        <li>
+                            <Localize
+                                components={[<strong key={0} />]}
+                                i18n_default_text='In your crypto wallet, select the <0>{{currency}} network</0> when transferring to Deriv. Incorrect transfers may result in the loss of funds.'
+                                values={{ currency: currency && cryptoCurrencyToNetworkMapper[currency] }}
+                            />
                         </li>
                     </ul>
                 </div>
             </InlineMessage>
             <div className='wallets-deposit-crypto-disclaimers__note'>
-                <WalletText size='xs' weight='bold'>
-                    Note:
-                </WalletText>
-                <WalletText size='xs'>
-                    &nbsp;You’ll receive an email when your deposit starts being processed.
-                </WalletText>
+                <Text size='xs'>
+                    <Localize
+                        components={[<strong key={0} />]}
+                        i18n_default_text="<0>Note:</0> You'll receive an email when your deposit starts being processed."
+                    />
+                </Text>
             </div>
         </div>
     );

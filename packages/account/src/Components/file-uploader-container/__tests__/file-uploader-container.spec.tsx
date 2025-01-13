@@ -1,8 +1,9 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { isDesktop } from '@deriv/shared';
 import FileUploaderContainer from '../file-uploader-container';
-import { StoreProvider, mockStore } from '@deriv/stores';
+import { useDevice } from '@deriv-com/ui';
+import { mockStore, StoreProvider } from '@deriv/stores';
+import { Formik } from 'formik';
 
 jest.mock('@deriv/components', () => {
     const original_module = jest.requireActual('@deriv/components');
@@ -11,33 +12,39 @@ jest.mock('@deriv/components', () => {
         Icon: jest.fn(() => 'mockedIcon'),
     };
 });
-jest.mock('@deriv/shared', () => ({
-    ...jest.requireActual('@deriv/shared'),
-    isDesktop: jest.fn(),
-    WS: {
-        getSocket: jest.fn(),
+
+jest.mock('@deriv-com/ui', () => ({
+    ...jest.requireActual('@deriv-com/ui'),
+    useDevice: jest.fn(),
+}));
+
+const mock_kyc_auth_status_response = {
+    kyc_auth_status: {
+        address: {
+            supported_documents: ['utility_bill', 'affidavit', 'poa_others'],
+        },
     },
+    isLoading: false,
+    isSuccess: false,
+};
+
+jest.mock('../../../hooks', () => ({
+    useKycAuthStatus: jest.fn(() => mock_kyc_auth_status_response),
 }));
 
 describe('<FileUploaderContainer />', () => {
-    let mock_props: React.ComponentProps<typeof FileUploaderContainer>;
+    const mock_props: React.ComponentProps<typeof FileUploaderContainer> = {
+        examples: '',
+        files_description: '',
+        onFileDrop: jest.fn(),
+        country_of_residence: 'in',
+    };
+    const store = mockStore({});
 
     beforeEach(() => {
-        mock_props = {
-            examples: '',
-            files_description: '',
-            onFileDrop: jest.fn(),
-        };
-
-        (isDesktop as jest.Mock).mockReturnValue(true);
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: true });
         jest.clearAllMocks();
     });
-
-    const mock_store = mockStore({});
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <StoreProvider store={mock_store}>{children}</StoreProvider>
-    );
-
     const file_size_msg = /maximum size: 8MB/i;
     const file_type_msg = /supported formats: JPEG, JPG, PNG, PDF, and GIF only/i;
     const file_warning_msg = /remember, selfies, pictures of houses, or non-related images will be rejected./i;
@@ -52,13 +59,22 @@ describe('<FileUploaderContainer />', () => {
         expect(screen.getByText(file_warning_msg)).toBeInTheDocument();
     };
 
-    it('should render FileUploaderContainer component and show descriptions', () => {
-        render(<FileUploaderContainer {...mock_props} />, { wrapper });
-        runCommonTests();
-    });
+    const renderComponent = (props = mock_props) =>
+        render(
+            <StoreProvider store={store}>
+                <Formik
+                    initialValues={{
+                        document_type: { text: '', value: '' },
+                    }}
+                    onSubmit={jest.fn()}
+                >
+                    <FileUploaderContainer {...props} />
+                </Formik>
+            </StoreProvider>
+        );
 
-    it('should render FileUploaderContainer component if getSocket is not passed as prop', () => {
-        render(<FileUploaderContainer {...mock_props} />, { wrapper });
+    it('should render FileUploaderContainer component and show descriptions', () => {
+        renderComponent();
         runCommonTests();
     });
 
@@ -66,29 +82,21 @@ describe('<FileUploaderContainer />', () => {
         mock_props.files_description = <div>Files description</div>;
         mock_props.examples = <div>Files failure examples</div>;
 
-        render(<FileUploaderContainer {...mock_props} />, { wrapper });
+        renderComponent(mock_props);
         expect(screen.getByText('Files description')).toBeInTheDocument();
         expect(screen.getByText('Files failure examples')).toBeInTheDocument();
     });
 
     it('should show hint message for desktop', () => {
-        render(<FileUploaderContainer {...mock_props} />, { wrapper });
+        renderComponent();
         expect(screen.getByText(hint_msg_desktop)).toBeInTheDocument();
         expect(screen.queryByText(hint_msg_mobile)).not.toBeInTheDocument();
     });
 
     it('should show hint message for mobile', () => {
-        (isDesktop as jest.Mock).mockReturnValue(false);
+        (useDevice as jest.Mock).mockReturnValue({ isMobile: true });
 
-        const mock_store = mockStore({
-            ui: {
-                is_mobile: true,
-            },
-        });
-
-        render(<FileUploaderContainer {...mock_props} />, {
-            wrapper: ({ children }) => <StoreProvider store={mock_store}>{children}</StoreProvider>,
-        });
+        renderComponent();
         expect(screen.getByText(hint_msg_mobile)).toBeInTheDocument();
         expect(screen.queryByText(hint_msg_desktop)).not.toBeInTheDocument();
     });

@@ -29,11 +29,14 @@ describe('WalletFiatOnRamp', () => {
         jest.clearAllMocks();
     });
 
-    it('should redirect to /wallets/cashier/deposit when isCrypto is false', () => {
+    it('redirects to /wallet/deposit if onramp is not available for current currency', () => {
         mockUseActiveWalletAccount.mockReturnValue({
             data: {
                 currency_config: {
-                    is_crypto: false,
+                    platform: {
+                        cashier: ['doughflow'],
+                        ramp: [],
+                    },
                 },
             },
         });
@@ -43,14 +46,17 @@ describe('WalletFiatOnRamp', () => {
 
         render(<WalletFiatOnRamp />, { wrapper });
 
-        expect(pushMock).toHaveBeenCalledWith('/wallets/cashier/deposit');
+        expect(pushMock).toHaveBeenCalledWith('/wallet/deposit');
     });
 
-    it('should render FiatOnRampModule when isCrypto is true', () => {
+    it('renders FiatOnRampModule when if onramp is available for current currency', () => {
         mockUseActiveWalletAccount.mockReturnValue({
             data: {
                 currency_config: {
-                    is_crypto: true,
+                    platform: {
+                        cashier: ['crypto'],
+                        ramp: ['ramp'],
+                    },
                 },
             },
         });

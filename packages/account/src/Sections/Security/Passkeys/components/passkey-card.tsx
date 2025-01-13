@@ -1,26 +1,30 @@
-import React from 'react';
-import { Icon, Text } from '@deriv/components';
+import { Dropdown, Icon, Text } from '@deriv/components';
 import { getLongDate } from '@deriv/shared';
-import { Localize } from '@deriv/translations';
+import { useTranslations, Localize } from '@deriv-com/translations';
+import { TOnPasskeyMenuClick, TPasskey } from '../passkeys';
+import { PASSKEY_STATUS_CODES, passkeysMenuActionEventTrack } from '../passkeys-configs';
 
-// TODO: remove here types and grab from API after implementation
-type TPasskeyCard = {
-    id?: number;
-    name: string;
-    last_used: number;
-    created_at?: number;
-    stored_on?: string;
-    passkey_id?: string;
-    icon?: string;
-};
+type TPasskeyCard = TPasskey & { onPasskeyMenuClick: TOnPasskeyMenuClick };
 
-const PasskeyCard = ({ name, last_used, stored_on, icon }: TPasskeyCard) => {
-    // TODO: add revoke and rename flow as the next step. 'IcContextMenu' is supposed to be used here
+export const PasskeyCard = ({ name, last_used, stored_on, id, icon, passkey_id, onPasskeyMenuClick }: TPasskeyCard) => {
+    const { localize } = useTranslations();
+
+    const current_passkey_data = { id, name, passkey_id };
+
+    const handleManagePasskey = (event: { target: { value: string } }) => {
+        if (event.target.value === 'rename') {
+            onPasskeyMenuClick(PASSKEY_STATUS_CODES.RENAMING, current_passkey_data);
+            passkeysMenuActionEventTrack('passkey_rename_started');
+        } else if (event.target.value === 'remove') {
+            onPasskeyMenuClick(PASSKEY_STATUS_CODES.REMOVING, current_passkey_data);
+            passkeysMenuActionEventTrack('passkey_remove_started');
+        }
+    };
 
     return (
-        <div className='passkeys-card__wrapper'>
+        <div className='passkeys-card'>
             <Icon icon='IcPasskey' size={24} />
-            <div>
+            <div className='passkeys-card__passkey-name'>
                 <Text as='p' weight='bold' line_height='l'>
                     {name}
                 </Text>
@@ -39,8 +43,23 @@ const PasskeyCard = ({ name, last_used, stored_on, icon }: TPasskeyCard) => {
                 </div>
                 {icon && <Icon icon={icon} size={24} className='passkeys-card__passkey-type-icon' />}
             </div>
+            <Dropdown
+                test_id={`dt_passkey_card_menu_${id}`}
+                is_align_text_left
+                list={[
+                    {
+                        text: localize('Rename'),
+                        value: 'rename',
+                    },
+                    {
+                        text: localize('Remove'),
+                        value: 'remove',
+                    },
+                ]}
+                onChange={handleManagePasskey}
+                suffix_icon='IcMenuDots'
+                suffix_icon_size={24}
+            />
         </div>
     );
 };
-
-export default PasskeyCard;

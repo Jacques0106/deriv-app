@@ -23,9 +23,7 @@
                 &.ciq-disabled {
                     display: none;
                 }
-                @include mobile {
-                    min-width: 17rem;
-                    max-width: 26rem;
+                @include mobile-screen {
                     width: auto;
 
                     .cq-menu-btn {
@@ -39,10 +37,7 @@
                             margin-left: auto;
                         }
                         .cq-symbol {
-                            font-size: 1.2rem;
-                        }
-                        .cq-chart-price {
-                            display: none;
+                            font-size: 1.4rem;
                         }
                     }
                 }
@@ -61,7 +56,7 @@
         .sc-toolbar-widget {
             transition: transform 0.25s ease;
 
-            @include mobile {
+            @include mobile-screen {
                 background: transparent;
                 border-width: 0;
                 bottom: 20.8vh;

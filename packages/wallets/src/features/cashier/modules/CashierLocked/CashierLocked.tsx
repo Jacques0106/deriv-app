@@ -1,27 +1,39 @@
 import React from 'react';
-import { Trans } from 'react-i18next';
-import { useAccountStatus, useActiveWalletAccount, useAuthentication, useCashierValidation } from '@deriv/api-v2';
-import { WalletsActionScreen } from '../../../../components';
+import {
+    useAccountStatus,
+    useActiveWalletAccount,
+    useCashierValidation,
+    useIsEuRegion,
+    usePOA,
+    usePOI,
+} from '@deriv/api-v2';
+import { Localize } from '@deriv-com/translations';
+import { ActionScreen } from '@deriv-com/ui';
+import { WalletLoader } from '../../../../components';
 import getCashierLockedDesc, { getSystemMaintenanceContent } from './CashierLockedContent';
 import './CashierLocked.scss';
 
 type TCashierLockedProps = {
     children?: React.ReactNode;
-    module?: 'deposit' | 'withdrawal';
+    module?: 'deposit' | 'transfer' | 'withdrawal';
 };
 
 const CashierLocked: React.FC<TCashierLockedProps> = ({ children, module }) => {
     const { data: activeWallet } = useActiveWalletAccount();
-    const { data: authentication } = useAuthentication();
+    const { data: poiStatus } = usePOI();
+    const { data: poaStatus } = usePOA();
     const { data: cashierValidation } = useCashierValidation();
-    const { data: status } = useAccountStatus();
+    const { data: accountStatus, isLoading: isAccountStatusLoading } = useAccountStatus();
+    const { data: isEuRegion, isLoading: isEuRegionLoading } = useIsEuRegion();
+
+    const isLoading = isAccountStatusLoading || isEuRegionLoading;
 
     const currency = activeWallet?.currency || 'USD';
     const isVirtual = activeWallet?.is_virtual;
     const isCrypto = activeWallet?.is_crypto;
 
-    const poaNeedsVerification = authentication?.is_poa_needed;
-    const poiNeedsVerification = authentication?.is_poa_needed;
+    const poaNeedsVerification = poaStatus?.poa_needs_verification;
+    const poiNeedsVerification = poiStatus?.poi_needs_verification;
 
     const askAuthenticate = cashierValidation?.ask_authenticate;
     const askCurrency = cashierValidation?.ask_currency;
@@ -36,9 +48,9 @@ const CashierLocked: React.FC<TCashierLockedProps> = ({ children, module }) => {
     const noResidence = cashierValidation?.no_residence;
 
     const isSystemMaintenance = cashierValidation?.system_maintenance && !isVirtual;
-    const isCashierLocked = status?.is_cashier_locked && !isVirtual;
-    const isDepositLocked = status?.is_deposit_locked && module === 'deposit';
-    const isWithdrawalLocked = status?.is_withdrawal_locked && module === 'withdrawal';
+    const isCashierLocked = accountStatus?.is_cashier_locked && !isVirtual;
+    const isDepositLocked = accountStatus?.is_deposit_locked && module === 'deposit';
+    const isWithdrawalLocked = accountStatus?.is_withdrawal_locked && module === 'withdrawal';
 
     const systemMaintenanceContent = getSystemMaintenanceContent({
         currency,
@@ -60,17 +72,23 @@ const CashierLocked: React.FC<TCashierLockedProps> = ({ children, module }) => {
         disabledStatus,
         documentsExpired,
         financialAssessmentRequired,
+        isEuRegion,
+        module,
         noResidence,
         poaNeedsVerification,
         poiNeedsVerification,
     });
 
+    if (isLoading) {
+        return <WalletLoader />;
+    }
+
     if (isSystemMaintenance && systemMaintenanceContent) {
         return (
             <div className='wallets-cashier-locked'>
-                <WalletsActionScreen
-                    description={systemMaintenanceContent?.description}
-                    title={systemMaintenanceContent?.title}
+                <ActionScreen
+                    description={systemMaintenanceContent.description}
+                    title={systemMaintenanceContent.title}
                 />
             </div>
         );
@@ -79,9 +97,14 @@ const CashierLocked: React.FC<TCashierLockedProps> = ({ children, module }) => {
     if (isCashierLocked) {
         return (
             <div className='wallets-cashier-locked'>
-                <WalletsActionScreen
+                <ActionScreen
                     description={cashierLockedDescription}
-                    title={<Trans defaults='Your {{currency}} Wallet is temporarily locked.' values={{ currency }} />}
+                    title={
+                        <Localize
+                            i18n_default_text='Your {{currency}} Wallet is temporarily locked.'
+                            values={{ currency }}
+                        />
+                    }
                 />
             </div>
         );

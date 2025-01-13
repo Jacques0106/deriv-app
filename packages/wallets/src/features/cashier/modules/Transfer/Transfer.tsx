@@ -1,6 +1,7 @@
-import React from 'react';
-import { WalletButton, WalletText } from '../../../../components';
+import React, { useEffect } from 'react';
+import { getInitialLanguage } from '@deriv-com/translations';
 import type { THooks } from '../../../../types';
+import { TransferErrorScreen } from '../../screens/TransferErrorScreen';
 import { TransferForm, TransferReceipt } from './components';
 import { TransferProvider, useTransfer } from './provider';
 
@@ -18,26 +19,14 @@ const TransferModule: React.FC<TProps> = ({ accounts }) => {
 
 const Transfer: React.FC = () => {
     const { error, receipt, resetTransfer } = useTransfer();
+    const i18nLanguage = getInitialLanguage();
+    const transferError = error?.error;
 
-    //temporary error handling
-    if (error?.error.message)
-        return (
-            <div
-                style={{
-                    alignItems: 'center',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1.6rem',
-                }}
-            >
-                <WalletText as='p' color='error' size='md'>
-                    {error?.error.message}
-                </WalletText>
-                <WalletButton onClick={() => resetTransfer()} variant='contained'>
-                    Reset error
-                </WalletButton>
-            </div>
-        );
+    useEffect(() => {
+        resetTransfer();
+    }, [i18nLanguage, resetTransfer]);
+
+    if (transferError) return <TransferErrorScreen error={transferError} resetError={resetTransfer} />;
 
     if (receipt) return <TransferReceipt />;
 

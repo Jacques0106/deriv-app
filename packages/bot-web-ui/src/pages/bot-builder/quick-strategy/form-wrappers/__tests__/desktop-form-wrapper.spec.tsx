@@ -7,12 +7,13 @@ import { mock_ws } from 'Utils/mock';
 import RootStore from 'Stores/root-store';
 import { DBotStoreProvider, mockDBotStore } from 'Stores/useDBotStore';
 import DesktopFormWrapper from '../desktop-form-wrapper';
+import { FORM_TABS, STRATEGIES } from '../../config';
+import { quick_strategy_content } from '../../../../tutorials/constants';
 
-jest.mock('@deriv/bot-skeleton/src/scratch/blockly', () => jest.fn());
 jest.mock('@deriv/bot-skeleton/src/scratch/dbot', () => jest.fn());
-jest.mock('@deriv/bot-skeleton/src/scratch/hooks/block_svg', () => jest.fn());
 
 jest.mock('../../../../../xml/martingale.xml', () => '');
+jest.mock('../../../../../xml/martingale_max-stake.xml', () => '');
 
 jest.mock('@deriv/bot-skeleton', () => ({
     ...jest.requireActual('@deriv/bot-skeleton'),
@@ -29,8 +30,13 @@ jest.mock('@deriv/bot-skeleton', () => ({
 }));
 
 window.Blockly = {
+    utils: {
+        xml: {
+            textToDom: jest.fn(),
+            domToText: jest.fn(),
+        },
+    },
     Xml: {
-        textToDom: jest.fn(),
         domToText: jest.fn(),
     },
 };
@@ -39,7 +45,23 @@ const onClickClose = jest.fn();
 
 describe('<DesktopFormWrapper />', () => {
     let wrapper: ({ children }: { children: JSX.Element }) => JSX.Element, mock_DBot_store: RootStore | undefined;
-    const mock_onSubmit = jest.fn();
+    const mock_onSubmit = jest.fn(() =>
+        Promise.resolve({
+            symbol: '1HZ100V',
+            durationtype: 't',
+            stake: '1',
+            loss: '1',
+            profit: '1',
+            size: '1',
+            duration: 1,
+            unit: '1',
+            max_stake: 10,
+            boolean_max_stake: false,
+            last_digit_prediction: 1,
+            tradetype: 'callput',
+            type: 'CALL',
+        })
+    );
 
     beforeEach(() => {
         const mock_store = mockStore({});
@@ -60,7 +82,13 @@ describe('<DesktopFormWrapper />', () => {
 
     it('renders the DesktopFormWrapper component', () => {
         const { container } = render(
-            <DesktopFormWrapper onClickClose={onClickClose}>
+            <DesktopFormWrapper
+                onClickClose={onClickClose}
+                current_step={0}
+                setCurrentStep={jest.fn}
+                selected_trade_type='trade_type'
+                setSelectedTradeType={jest.fn}
+            >
                 <div>test</div>
             </DesktopFormWrapper>,
             {
@@ -71,9 +99,15 @@ describe('<DesktopFormWrapper />', () => {
         expect(container).toBeInTheDocument();
     });
 
-    it('should close the form', () => {
+    it('should close the form', async () => {
         render(
-            <DesktopFormWrapper onClickClose={onClickClose}>
+            <DesktopFormWrapper
+                onClickClose={onClickClose}
+                current_step={0}
+                setCurrentStep={jest.fn}
+                selected_trade_type='trade_type'
+                setSelectedTradeType={jest.fn}
+            >
                 <div>test</div>
             </DesktopFormWrapper>,
             {
@@ -83,30 +117,46 @@ describe('<DesktopFormWrapper />', () => {
         expect(mock_DBot_store?.quick_strategy.is_open).toBeTruthy();
 
         const close_button = screen.getByTestId('qs-desktop-close-button');
-        userEvent.click(close_button);
+        await userEvent.click(close_button);
+        await userEvent.type(close_button, '{enter}');
+        await userEvent.keyboard('{Enter}');
         expect(onClickClose).toBeCalled();
     });
 
-    it('should change the selected strategy', () => {
-        mock_DBot_store?.quick_strategy.setSelectedStrategy('MARTINGALE');
+    it('should change qs modal view on strategy click', async () => {
+        mock_DBot_store?.quick_strategy.setSelectedStrategy(quick_strategy_content[0].qs_name);
         render(
-            <DesktopFormWrapper onClickClose={onClickClose}>
+            <DesktopFormWrapper
+                onClickClose={onClickClose}
+                current_step={1}
+                setCurrentStep={jest.fn}
+                selected_trade_type='trade_type'
+                setSelectedTradeType={jest.fn}
+            >
                 <div>test</div>
             </DesktopFormWrapper>,
             {
                 wrapper,
             }
         );
-        expect(mock_DBot_store?.quick_strategy.selected_strategy).toBe('MARTINGALE');
+        expect(mock_DBot_store?.quick_strategy.selected_strategy).toBe(quick_strategy_content[0].qs_name);
 
-        const strategy = screen.getByText('D’Alembert');
-        userEvent.click(strategy);
-        expect(mock_DBot_store?.quick_strategy.selected_strategy).toBe('D_ALEMBERT');
+        const strategy = screen.getByText(STRATEGIES.MARTINGALE.label);
+        await userEvent.click(strategy);
+
+        const run_button = screen.getByText('Run');
+        expect(run_button).toBeInTheDocument();
     });
 
-    it('should submit the form on edit', async () => {
+    it('should submit the form on click of load', async () => {
         render(
-            <DesktopFormWrapper onClickClose={onClickClose}>
+            <DesktopFormWrapper
+                onClickClose={onClickClose}
+                current_step={1}
+                setCurrentStep={jest.fn}
+                selected_trade_type='trade_type'
+                setSelectedTradeType={jest.fn}
+            >
                 <div>test</div>
             </DesktopFormWrapper>,
             {
@@ -114,14 +164,20 @@ describe('<DesktopFormWrapper />', () => {
             }
         );
         expect(mock_DBot_store?.quick_strategy.is_open).toBeTruthy();
-        const edit_button = screen.getByText('Edit');
-        userEvent.click(edit_button);
+        const edit_button = screen.getByText('Load');
+        await userEvent.click(edit_button);
         await waitFor(() => expect(mock_onSubmit).toBeCalled());
     });
 
-    it('should submit the form', async () => {
+    it('should submit the form on click of run', async () => {
         render(
-            <DesktopFormWrapper onClickClose={onClickClose}>
+            <DesktopFormWrapper
+                onClickClose={onClickClose}
+                current_step={1}
+                setCurrentStep={jest.fn}
+                selected_trade_type='trade_type'
+                setSelectedTradeType={jest.fn}
+            >
                 <div>
                     <textarea />
                 </div>
@@ -132,7 +188,7 @@ describe('<DesktopFormWrapper />', () => {
         );
         expect(mock_DBot_store?.quick_strategy.is_open).toBeTruthy();
         const submit_button = screen.getByRole('button', { name: 'Run' });
-        userEvent.click(submit_button);
+        await userEvent.click(submit_button);
         await waitFor(() => expect(mock_onSubmit).toBeCalled());
     });
 });

@@ -19,12 +19,14 @@ import {
     getLocalizedBasis,
     TTradeTypesCategories,
     TRADE_TYPES,
+    isDtraderV2MobileEnabled,
+    isDtraderV2DesktopEnabled,
 } from '@deriv/shared';
 import ServerTime from '_common/base/server_time';
 import { localize } from '@deriv/translations';
 import { isSessionAvailable } from './start-date';
 import { ContractsFor, ContractsForSymbolResponse, TradingTimes, TradingTimesResponse } from '@deriv/api-types';
-import { TTradeStore } from '../../../../Types/common-prop.type';
+import { TConfig, TTradeStore } from 'Types';
 
 type TBarriers = Record<
     keyof TTradeStore['duration_min_max'],
@@ -36,17 +38,7 @@ type TBarriers = Record<
 > & {
     count: number;
 };
-type TConfig = ReturnType<typeof getContractTypesConfig>[string]['config'] & {
-    has_spot?: boolean;
-    durations?: ReturnType<typeof buildDurationConfig>;
-    trade_types?: { [key: string]: string };
-    barriers?: ReturnType<typeof buildBarriersConfig>;
-    forward_starting_dates?: ReturnType<typeof buildForwardStartingConfig>;
-    growth_rate_range?: number[];
-    multiplier_range?: number[];
-    cancellation_range?: string[];
-    barrier_choices?: string[];
-};
+
 type TNonAvailableContractsList = Record<'contract_category' | 'contract_display_name' | 'contract_type', string>[];
 type TTextValueStrings = {
     text: string;
@@ -130,6 +122,7 @@ export const ContractType = (() => {
                 config.durations = config.hide_duration ? undefined : buildDurationConfig(contract, config.durations);
                 config.trade_types = buildTradeTypesConfig(contract, config.trade_types);
                 config.barriers = buildBarriersConfig(contract, config.barriers);
+                config.barrier_category = contract.barrier_category as TConfig['barrier_category'];
                 config.barrier_choices = contract.barrier_choices as TConfig['barrier_choices'];
                 config.forward_starting_dates = buildForwardStartingConfig(contract, config.forward_starting_dates);
                 config.growth_rate_range = contract.growth_rate_range as TConfig['growth_rate_range'];
@@ -192,6 +185,8 @@ export const ContractType = (() => {
             short_barriers,
             long_barriers,
             strike_price_choices,
+            v2_params_initial_values,
+            root_store,
         } = store;
 
         if (!contract_type) return {};
@@ -206,7 +201,15 @@ export const ContractType = (() => {
                 break;
             case 'Call':
             case 'Put':
-                stored_barriers_data = strike_price_choices;
+                stored_barriers_data =
+                    v2_params_initial_values?.strike &&
+                    (isDtraderV2MobileEnabled(root_store?.ui.is_mobile) ||
+                        isDtraderV2DesktopEnabled(root_store?.ui.is_desktop))
+                        ? ({
+                              ...strike_price_choices,
+                              barrier: v2_params_initial_values.strike,
+                          } as TTradeStore['strike_price_choices'])
+                        : strike_price_choices;
                 break;
             default:
                 stored_barriers_data = {};
@@ -253,7 +256,7 @@ export const ContractType = (() => {
             .reduce<string[]>((k, l) => [...k, ...(list[l].categories as TTextValueStrings[]).map(ct => ct.value)], [])
             .filter(
                 type =>
-                    !unsupported_contract_types_list.includes(type as typeof unsupported_contract_types_list[number])
+                    !unsupported_contract_types_list.includes(type as (typeof unsupported_contract_types_list)[number])
             );
         const sortedList = getSortedTradeTypes(filteredList);
 
@@ -263,7 +266,8 @@ export const ContractType = (() => {
     };
 
     const getComponents = (c_type: string) => {
-        const check = ['duration', 'amount', ...contract_types[c_type].components].filter(
+        if (!contract_types) return {};
+        const check = ['duration', 'amount', ...(contract_types[c_type]?.components ?? [])].filter(
             component =>
                 !(
                     component === 'duration' &&
@@ -401,7 +405,7 @@ export const ContractType = (() => {
     };
 
     const buildMoment = (date: string | number | null, time?: string | null) => {
-        const [hour, minute] = isTimeValid(time ?? '') ? time?.split(':') ?? [] : [0, 0];
+        const [hour, minute] = isTimeValid(time ?? '') ? (time?.split(':') ?? []) : [0, 0];
         return toMoment(date || ServerTime.get())
             .hour(+hour)
             .minute(+minute);
@@ -446,6 +450,24 @@ export const ContractType = (() => {
         }
 
         return trading_events[date][underlying as string];
+    };
+
+    const getTradingDays = async (date: string, underlying: string | null = null) => {
+        if (!date || !underlying) return null;
+
+        const response: TradingTimesResponse = await WS.tradingTimes(date);
+        const trading_times = response.trading_times as TradingTimes;
+
+        if (!getPropertyValue(response, ['trading_times', 'markets'])) return null;
+
+        const symbol_data = trading_times.markets.flatMap(
+            market =>
+                market.submarkets?.flatMap(
+                    submarket => submarket.symbols?.find(symbol => symbol.symbol === underlying) || []
+                ) || []
+        )[0];
+
+        return symbol_data?.trading_days || null;
     };
 
     const getTradingTimes = async (
@@ -641,6 +663,10 @@ export const ContractType = (() => {
             [],
     });
 
+    const getBarrierCategory = (contract_type: string) => ({
+        barrier_category: getPropertyValue(available_contract_types, [contract_type, 'config', 'barrier_category']),
+    });
+
     const getBarrierChoices = (contract_type: string, stored_barrier_choices = [] as string[]) => ({
         barrier_choices: stored_barrier_choices.length
             ? stored_barrier_choices
@@ -696,6 +722,7 @@ export const ContractType = (() => {
 
     return {
         buildContractTypesConfig,
+        getBarrierCategory,
         getBarriers,
         getContractType,
         getContractValues,
@@ -710,6 +737,7 @@ export const ContractType = (() => {
         getStartTime,
         getStartType,
         getTradingEvents,
+        getTradingDays,
         getTradingTimes,
         getContractCategories: () => ({
             contract_types_list: available_categories,

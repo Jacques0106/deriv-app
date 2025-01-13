@@ -1,3 +1,4 @@
+import { Analytics } from '@deriv-com/analytics';
 import { getPlatformSettings } from '../brand';
 import { routes } from '../routes';
 
@@ -19,7 +20,6 @@ export const platform_name = Object.freeze({
     DXtrade: getPlatformSettings('dxtrade').name,
     DMT5: getPlatformSettings('mt5').name,
     SmartTrader: getPlatformSettings('smarttrader').name,
-    BinaryBot: getPlatformSettings('bbot').name,
     DerivGO: getPlatformSettings('go').name,
 });
 
@@ -44,6 +44,10 @@ export const isDXtrade = () =>
 export const isNavigationFromDerivGO = () => window.sessionStorage.getItem('config.platform') === 'derivgo';
 
 export const isNavigationFromP2P = () => window.sessionStorage.getItem('config.platform') === 'dp2p';
+
+export const isNavigationFromP2PV2 = () => window.sessionStorage.getItem('config.platform') === 'p2p-v2';
+
+export const isNavigationFromTradersHubOS = () => window.sessionStorage.getItem('config.platform') === 'tradershub_os';
 
 export const getPathname = () => {
     if (isBot()) return platform_name.DBot;
@@ -86,7 +90,6 @@ export const getActivePlatform = (routing_history: TRoutingHistory) => {
     if (isMT5() || isNavigationFromPlatform(routing_history, routes.mt5)) return platform_name.DMT5;
     if (isDXtrade() || isNavigationFromPlatform(routing_history, routes.dxtrade)) return platform_name.DXtrade;
     if (isNavigationFromExternalPlatform(routing_history, routes.smarttrader)) return platform_name.SmartTrader;
-    if (isNavigationFromExternalPlatform(routing_history, routes.binarybot)) return platform_name.BinaryBot;
     return platform_name.DTrader;
 };
 
@@ -99,9 +102,10 @@ export const getPlatformRedirect = (routing_history: TRoutingHistory) => {
         return { name: platform_name.DXtrade, route: routes.dxtrade };
     if (isNavigationFromExternalPlatform(routing_history, routes.smarttrader))
         return { name: platform_name.SmartTrader, route: routes.smarttrader };
+    if (isNavigationFromP2PV2()) return { name: 'P2P', ref: 'p2p_v2', route: routes.cashier_p2p };
+    if (isNavigationFromExternalPlatform(routing_history, routes.cashier_p2p))
+        return { name: 'P2P', route: routes.cashier_p2p };
     if (isNavigationFromP2P()) return { name: 'P2P', route: routes.cashier_p2p, ref: 'p2p' };
-    if (isNavigationFromExternalPlatform(routing_history, routes.binarybot))
-        return { name: platform_name.BinaryBot, route: routes.binarybot };
     return { name: platform_name.DTrader, route: routes.trade };
 };
 
@@ -149,7 +153,7 @@ export const isNavigationFromPlatform = (
 
 export const isNavigationFromExternalPlatform = (routing_history: TRoutingHistory, platform_route: string) => {
     /*
-     *  Check if the client is navigating from external platform(SmartTrader or BinaryBot)
+     *  Check if the client is navigating from external platform(SmartTrader)
      *  and has not visited Dtrader after it.
      */
 
@@ -163,4 +167,29 @@ export const isNavigationFromExternalPlatform = (routing_history: TRoutingHistor
     }
 
     return false;
+};
+
+export const isDtraderV2MobileEnabled = (is_mobile: boolean) => {
+    const dtrader_v2_enabled_gb = Analytics?.getFeatureValue('dtrader_v2_enabled', false);
+    const is_dtrader_v2_mobile =
+        JSON.parse(localStorage.getItem('FeatureFlagsStore') ?? '{}')?.data?.dtrader_v2_mobile || dtrader_v2_enabled_gb;
+
+    return (
+        is_dtrader_v2_mobile &&
+        is_mobile &&
+        (window.location.pathname.startsWith(routes.trade) || window.location.pathname.startsWith('/contract/'))
+    );
+};
+
+export const isDtraderV2DesktopEnabled = (is_desktop: boolean) => {
+    const dtrader_v2_enabled_desktop_gb = Analytics?.getFeatureValue('dtrader_v2_enabled_desktop', false);
+    const is_dtrader_v2_desktop =
+        JSON.parse(localStorage.getItem('FeatureFlagsStore') ?? '{}')?.data?.dtrader_v2_desktop ||
+        dtrader_v2_enabled_desktop_gb;
+
+    return (
+        is_dtrader_v2_desktop &&
+        is_desktop &&
+        (window.location.pathname.startsWith(routes.trade) || window.location.pathname.startsWith('/contract/'))
+    );
 };

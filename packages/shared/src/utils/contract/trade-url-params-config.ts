@@ -1,5 +1,6 @@
 import { ActiveSymbols } from '@deriv/api-types';
 import { TTextValueStrings, TTradeTypesCategories } from '../constants/contract';
+import { routes } from '../routes';
 
 type TGetTradeURLParamsArgs = {
     active_symbols?: ActiveSymbols;
@@ -9,7 +10,7 @@ type TGetTradeURLParamsArgs = {
 type TTradeUrlParams = {
     contractType?: string;
     chartType?: string;
-    granularity?: number;
+    granularity?: number | null;
     symbol?: string;
 };
 
@@ -67,7 +68,10 @@ export const getTradeURLParams = ({ active_symbols = [], contract_types_list = {
                 contract_types_list[key]?.categories || [];
             return [...acc, ...categories.map(contract => (contract as TTextValueStrings).value)];
         }, []);
-        const isTradeTypeValid = contractList.includes(trade_type ?? '');
+
+        const isTradeTypeValid =
+            (contractList.length === 0 && trade_type !== '') ||
+            (contractList.length > 0 && contractList.includes(trade_type ?? ''));
 
         if (validInterval) result.granularity = Number(validInterval.value);
         if (validChartType) result.chartType = chartTypeParam;
@@ -92,7 +96,7 @@ export const setTradeURLParams = ({ contractType, symbol, chartType, granularity
         );
     symbol && searchParams.set(TRADE_URL_PARAMS.SYMBOL, symbol);
     contractType && searchParams.set(TRADE_URL_PARAMS.TRADE_TYPE, contractType);
-    if (searchParams.toString()) {
+    if (searchParams.toString() && window.location.pathname === routes.trade) {
         const newQuery = `${window.location.pathname}?${searchParams.toString()}`;
         window.history.replaceState({}, document.title, newQuery);
     }

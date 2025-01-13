@@ -1,35 +1,47 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
-import { LabelPairedChevronRightCaptionRegularIcon } from '@deriv/quill-icons';
+import {
+    LabelPairedChevronLeftCaptionRegularIcon,
+    LabelPairedChevronRightCaptionRegularIcon,
+} from '@deriv/quill-icons';
+import { Localize } from '@deriv-com/translations';
+import { Text } from '@deriv-com/ui';
 import { TradingAccountCard } from '../../../../../../components';
-import { WalletText } from '../../../../../../components/Base';
 import { useModal } from '../../../../../../components/ModalProvider';
+import useIsRtl from '../../../../../../hooks/useIsRtl';
 import { PlatformDetails } from '../../../../constants';
 import { DxtradeEnterPasswordModal } from '../../../../modals';
-import './AvailableDxtradeAccountsList.scss';
 
 const AvailableDxtradeAccountsList: React.FC = () => {
     const { show } = useModal();
-    const { t } = useTranslation();
+    const isRtl = useIsRtl();
 
     return (
-        <TradingAccountCard
-            leading={<div className='wallets-available-dxtrade__icon'>{PlatformDetails.dxtrade.icon}</div>}
-            onClick={() => show(<DxtradeEnterPasswordModal />)}
-            trailing={
-                <div className='wallets-available-dxtrade__icon'>
-                    <LabelPairedChevronRightCaptionRegularIcon width={16} />
-                </div>
-            }
-        >
-            <div className='wallets-available-dxtrade__details'>
-                <p className='wallets-available-dxtrade__details-title'>
-                    <WalletText size='sm'>{t('Deriv X')}</WalletText>
-                </p>
-                <WalletText size='xs'>
-                    {t('This account offers CFDs on a highly customisable CFD trading platform.')}
-                </WalletText>
-            </div>
+        <TradingAccountCard onClick={() => show(<DxtradeEnterPasswordModal />)}>
+            <TradingAccountCard.Icon data-testid='dt_icon_dxtrade'>
+                {PlatformDetails.dxtrade.icon}
+            </TradingAccountCard.Icon>
+            <TradingAccountCard.Section>
+                <TradingAccountCard.Content>
+                    <p className='wallets-available-dxtrade__details-title'>
+                        <Text align='start' size='sm'>
+                            Deriv X
+                        </Text>
+                    </p>
+                    <Text align='start' size='xs'>
+                        <Localize
+                            components={[<strong key={0} />]}
+                            i18n_default_text='CFDs on financial and derived instruments, <0>powered by TradingView</0>.'
+                        />
+                    </Text>
+                </TradingAccountCard.Content>
+                <TradingAccountCard.Button>
+                    {isRtl ? (
+                        <LabelPairedChevronLeftCaptionRegularIcon width={16} />
+                    ) : (
+                        <LabelPairedChevronRightCaptionRegularIcon width={16} />
+                    )}
+                </TradingAccountCard.Button>
+            </TradingAccountCard.Section>
         </TradingAccountCard>
     );
 };

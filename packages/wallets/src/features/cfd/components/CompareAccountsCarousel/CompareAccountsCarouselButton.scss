@@ -15,19 +15,15 @@
     box-shadow: 0px 0px 24px rgba(0, 0, 0, 0.08), 0px 24px 24px rgba(0, 0, 0, 0.08);
 
     &--prev {
-        left: 1.6rem;
+        inset-inline-start: 1.6rem;
     }
 
     &--next {
-        right: 1.6rem;
+        inset-inline-end: 1.6rem;
     }
 
     &:disabled {
         opacity: 0.3;
-        display: none;
-    }
-
-    @include mobile {
         display: none;
     }
 }

@@ -1,9 +1,8 @@
-import { action, computed, makeObservable, observable, reaction } from 'mobx';
-import { setColors } from '@deriv/bot-skeleton';
+import DOMPurify from 'dompurify';
+import { action, makeObservable, observable, reaction } from 'mobx';
 import { TStores } from '@deriv/stores/types';
 import { botNotification } from 'Components/bot-notification/bot-notification';
 import { notification_message, NOTIFICATION_TYPE } from 'Components/bot-notification/bot-notification-utils';
-import { clearInjectionDiv } from 'Constants/load-modal';
 import * as strategy_description from '../constants/quick-strategies';
 import { TDescriptionItem } from '../pages/bot-builder/quick-strategy/types';
 import {
@@ -87,7 +86,6 @@ export default class DashboardStore implements IDashboardStore {
             is_preview_on_popup: observable,
             is_tour_dialog_visible: observable,
             is_web_socket_intialised: observable,
-            is_dark_mode: computed,
             tutorials_combined_content: observable,
             onCloseDialog: action.bound,
             onCloseTour: action.bound,
@@ -124,7 +122,6 @@ export default class DashboardStore implements IDashboardStore {
         });
         this.root_store = root_store;
         this.core = core;
-        const removeHTMLTagsFromString = (param = '') => param.replace(/<.*?>/g, '');
 
         const getUserGuideContent = [...user_guide_content].map(
             item => `${item.search_id}# ${item.content.toLowerCase()}`
@@ -135,12 +132,15 @@ export default class DashboardStore implements IDashboardStore {
         const getFaqContent = faq_content.map(item => {
             return `${item.search_id}# ${item.title.toLowerCase()} ${item.description
                 .map(inner_item => {
-                    const itemWithoutHTML = removeHTMLTagsFromString(inner_item.content);
+                    const itemWithoutHTML = DOMPurify.sanitize(inner_item.content, {
+                        ALLOWED_TAGS: [], //kept empty to remove all tags
+                    });
                     return itemWithoutHTML?.toLowerCase();
                 })
                 .join(' ')}`;
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const getQSDescriptionContent = (strategy: any) => {
             if (!strategy) return [];
             const content: string[] = [];
@@ -166,37 +166,6 @@ export default class DashboardStore implements IDashboardStore {
             ...getQuickStrategyContent,
         ];
 
-        const {
-            load_modal: { previewRecentStrategy, current_workspace_id },
-        } = this.root_store;
-
-        const refreshBotBuilderTheme = () => {
-            Blockly.derivWorkspace.asyncClear();
-            Blockly.Xml.domToWorkspace(
-                Blockly.Xml.textToDom(Blockly.derivWorkspace.strategy_to_load),
-                Blockly.derivWorkspace
-            );
-        };
-
-        const setCurrentXML = () => {
-            const xml = Blockly?.Xml.workspaceToDom(Blockly?.derivWorkspace);
-            const current_xml = Blockly?.Xml.domToText(xml);
-            if (Blockly) Blockly.derivWorkspace.strategy_to_load = current_xml;
-        };
-
-        reaction(
-            () => this.is_dark_mode,
-            () => {
-                if (Blockly) setCurrentXML();
-                setColors(this.is_dark_mode);
-                if (this.active_tab === 1) {
-                    refreshBotBuilderTheme();
-                } else {
-                    refreshBotBuilderTheme();
-                    previewRecentStrategy(current_workspace_id);
-                }
-            }
-        );
         reaction(
             () => this.is_preview_on_popup,
             async is_preview_on_popup => {
@@ -354,7 +323,11 @@ export default class DashboardStore implements IDashboardStore {
 
     setFileLoaded = (has_file_loaded: boolean): void => {
         this.has_file_loaded = has_file_loaded;
-        clearInjectionDiv('store', document.getElementById('load-strategy__blockly-container'));
+        const el_ref = document.getElementById('load-strategy__blockly-container');
+        if (!el_ref) {
+            // eslint-disable-next-line no-console
+            console.warn('Could not find preview workspace element.');
+        }
     };
 
     onCloseDialog = (): void => {
@@ -363,6 +336,7 @@ export default class DashboardStore implements IDashboardStore {
 
     setActiveTab = (active_tab: number): void => {
         this.active_tab = active_tab;
+        localStorage.setItem('active_tab', active_tab.toString());
     };
 
     setActiveTabTutorial = (active_tab_tutorials: number): void => {
@@ -376,6 +350,9 @@ export default class DashboardStore implements IDashboardStore {
     showVideoDialog = (dialog_option: TDialogOptions): void => {
         const { url, type = '' } = dialog_option;
         const dialog_type = ['google', 'url'];
+        this.faq_search_value = '';
+        this.setActiveTabTutorial(0);
+        this.resetTutorialTabContent();
         if (dialog_type.includes(type)) {
             if (type === 'url') {
                 this.dialog_options = {
@@ -393,7 +370,7 @@ export default class DashboardStore implements IDashboardStore {
     };
 
     onZoomInOutClick = (is_zoom_in: boolean): void => {
-        const workspace = Blockly.mainWorkspace;
+        const workspace = Blockly.getMainWorkspace();
         const metrics = workspace.getMetrics();
         const addition = is_zoom_in ? 1 : -1;
 

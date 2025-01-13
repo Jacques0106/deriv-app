@@ -1,6 +1,6 @@
 import React from 'react';
-import { ModalWrapper, WalletButton, WalletText } from '../../../../components/Base';
-import useDevice from '../../../../hooks/useDevice';
+import { Button, Text, useDevice } from '@deriv-com/ui';
+import { ModalWrapper } from '../../../../components/Base';
 import './WalletActionModal.scss';
 
 type TWalletActionModal = {
@@ -9,7 +9,7 @@ type TWalletActionModal = {
         onClick: VoidFunction;
         text: string;
     }[];
-    description?: string;
+    description?: JSX.Element | string;
     hideCloseButton?: React.ComponentProps<typeof ModalWrapper>['hideCloseButton'];
     title: string;
 };
@@ -20,29 +20,34 @@ const WalletActionModal: React.FC<TWalletActionModal> = ({
     hideCloseButton = false,
     title,
 }) => {
-    const { isMobile } = useDevice();
+    const { isDesktop } = useDevice();
 
     return (
         <ModalWrapper hideCloseButton={hideCloseButton}>
             <div className='wallets-action-modal'>
-                <WalletText lineHeight={isMobile ? 'md' : 'xl'} weight='bold'>
+                <Text align='start' lineHeight={isDesktop ? 'xl' : 'md'} weight='bold'>
                     {title}
-                </WalletText>
-                <WalletText lineHeight={isMobile ? 'sm' : 'lg'} size='sm'>
+                </Text>
+                <Text align='start' lineHeight={isDesktop ? 'lg' : 'sm'} size='sm'>
                     {description}
-                </WalletText>
-                <div className='wallets-action-modal__buttons-container'>
-                    {actionButtonsOptions.map(action => (
-                        <WalletButton
-                            key={action.text}
-                            onClick={action.onClick}
-                            size='lg'
-                            variant={action.isPrimary ? 'contained' : 'outlined'}
-                        >
-                            {action.text}
-                        </WalletButton>
-                    ))}
-                </div>
+                </Text>
+                {!!actionButtonsOptions.length && (
+                    <div className='wallets-action-modal__buttons-container'>
+                        {actionButtonsOptions.map(action => (
+                            <Button
+                                borderWidth='sm'
+                                color={action.isPrimary ? 'primary' : 'black'}
+                                key={action.text}
+                                onClick={action.onClick}
+                                size='lg'
+                                textSize='md'
+                                variant={action.isPrimary ? 'contained' : 'outlined'}
+                            >
+                                {action.text}
+                            </Button>
+                        ))}
+                    </div>
+                )}
             </div>
         </ModalWrapper>
     );

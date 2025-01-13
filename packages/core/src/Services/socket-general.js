@@ -103,6 +103,11 @@ const BinarySocketGeneral = (() => {
                     gtm_store.eventHandler(response.get_settings);
                 }
                 break;
+            case 'phone_settings':
+                if (response.phone_settings) {
+                    client_store.setPhoneSettings(response.phone_settings);
+                }
+                break;
             case 'set_account_currency':
                 WS.forgetAll('balance').then(subscribeBalances);
                 break;
@@ -148,7 +153,7 @@ const BinarySocketGeneral = (() => {
     };
 
     const setBalanceActiveAccount = flow(function* (obj_balance) {
-        yield BinarySocket.wait('website_status');
+        yield BinarySocket?.wait('website_status');
         client_store.setBalanceActiveAccount(obj_balance);
     });
 
@@ -224,6 +229,7 @@ const BinarySocketGeneral = (() => {
                         'portfolio',
                         'proposal_open_contract',
                         'change_email',
+                        'phone_number_challenge',
                     ].includes(msg_type)
                 ) {
                     return;
@@ -235,7 +241,7 @@ const BinarySocketGeneral = (() => {
                 if (active_platform === 'DBot') return;
 
                 client_store.logout().then(() => {
-                    let redirect_to = routes.trade;
+                    let redirect_to = routes.traders_hub;
                     const action = getActionFromUrl();
                     if (action === 'system_email_change') {
                         return;
@@ -271,11 +277,13 @@ const BinarySocketGeneral = (() => {
 
     const subscribeBalances = () => {
         WS.subscribeBalanceAll(ResponseHandlers.balanceOtherAccounts);
-        WS.subscribeBalanceActiveAccount(ResponseHandlers.balanceActiveAccount, client_store.loginid);
+        if (client_store.currency)
+            WS.subscribeBalanceActiveAccount(ResponseHandlers.balanceActiveAccount, client_store.loginid);
     };
 
     const authorizeAccount = response => {
         client_store.responseAuthorize(response);
+        WS.getPhoneSettings();
         subscribeBalances();
         WS.storage.getSettings();
         WS.getAccountStatus();

@@ -19,9 +19,9 @@
         display: flex;
         flex-direction: column;
         height: 6rem;
-        justify-content: space-around;
-        width: 160px;
+        width: 134px;
         z-index: 2;
+        gap: 1rem;
 
         & .identifier {
             border-radius: 50%;
@@ -29,6 +29,7 @@
             width: 24px;
             background-color: var(--text-less-prominent);
             border: 1px solid var(--text-less-prominent);
+            margin-top: 4px;
 
             &--active {
                 background-color: var(--brand-red-coral) !important;
@@ -56,7 +57,7 @@
         &--after {
             border-top: 2px solid var(--brand-red-coral);
             transition: width 0.3s ease;
-            @include desktop {
+            @include desktop-screen {
                 bottom: 0;
                 content: '';
                 left: 0;
@@ -64,7 +65,7 @@
                 position: absolute; /* positioning must be absolute here, and relative positioning must be applied to the parent */
                 top: 1.7rem;
             }
-            @include mobile {
+            @include mobile-or-tablet-screen {
                 position: absolute;
                 top: 0;
             }

@@ -1,6 +1,7 @@
 import { localize } from '@deriv/translations';
 import { config } from '../constants/config';
 import ApiHelpers from '../services/api/api-helpers';
+import { convertStrategyToIsDbot } from '../utils';
 
 /* eslint-disable no-underscore-dangle */
 export default class BlockConversion {
@@ -356,8 +357,8 @@ export default class BlockConversion {
         // For old "market" blocks, move everything in "Trade options" except "DURATION"
         // to "Run once at start". Legacy "market" blocks had no such thing as "Run once at start"
         // not moving everything would kill Martingale strategies as they'd be reinitialised each run.
-        const trade_definition_block = this.workspace.getTradeDefinitionBlock();
-        const has_initialization_block = trade_definition_block.getBlocksInStatement('INITIALIZATION').length > 0;
+        const trade_definition_block = this.workspace?.getTradeDefinitionBlock();
+        const has_initialization_block = trade_definition_block?.getBlocksInStatement('INITIALIZATION').length > 0;
         if (trade_definition_block) {
             trade_definition_block.getBlocksInStatement('SUBMARKET').forEach(block => {
                 if (
@@ -412,7 +413,7 @@ export default class BlockConversion {
                 showIncompatibleStrategyDialog();
             }
             Blockly.Events.enable();
-            return Blockly.Xml.textToDom('<xml />');
+            return Blockly.utils.xml.textToDom('<xml />');
         }
 
         const variable_nodes = [];
@@ -505,18 +506,14 @@ export default class BlockConversion {
 
         this.workspace.getAllBlocks(true).forEach(block => {
             block.initSvg();
-            block.render();
+            block.renderEfficiently();
         });
 
         this.workspace.cleanUp();
 
         const converted_xml = Blockly.Xml.workspaceToDom(this.workspace);
 
-        if (strategy_node.hasAttribute('collection') && strategy_node.getAttribute('collection') === 'true') {
-            converted_xml.setAttribute('collection', 'true');
-        }
-
-        converted_xml.setAttribute('is_dbot', 'true');
+        convertStrategyToIsDbot(converted_xml);
 
         this.workspace = null;
 
@@ -531,7 +528,8 @@ export default class BlockConversion {
         const is_old_block = Object.keys(conversions).includes(block_type);
         let block = null;
 
-        const is_collapsed = el_block.getAttribute('collapsed') && el_block.getAttribute('collapsed') === 'true';
+        const is_collapsed =
+            (el_block.getAttribute('collapsed') && el_block.getAttribute('collapsed') === 'true') || false;
         const is_immovable = el_block.getAttribute('movable') && el_block.getAttribute('movable') === 'false';
         const is_undeletable = el_block.getAttribute('deletable') && el_block.getAttribute('deletable') === 'false';
         const is_disabled = el_block.getAttribute('disabled') && el_block.getAttribute('disabled') === 'true';
@@ -651,15 +649,6 @@ export default class BlockConversion {
                             block.nextConnection.connect(sibling_block.previousConnection);
                         });
                     }
-                    break;
-                }
-                case 'comment': {
-                    const is_minimised = el_block_child.getAttribute('pinned') !== 'true';
-                    const comment_text = el_block_child.innerText;
-
-                    block.comment = new Blockly.ScratchBlockComment(block, comment_text, null, 0, 0, is_minimised);
-                    block.comment.iconXY_ = { x: 0, y: 0 };
-                    block.comment.setVisible(true); // Scratch comments are always visible.
                     break;
                 }
                 default:

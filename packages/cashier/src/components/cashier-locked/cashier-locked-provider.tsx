@@ -2,6 +2,7 @@ import React from 'react';
 import { History } from 'history';
 import { Localize, localize } from '@deriv/translations';
 import { formatDate, routes } from '@deriv/shared';
+import { Chat } from '@deriv/utils';
 
 type TProps = {
     cashier_validation: string[] | undefined;
@@ -16,6 +17,9 @@ type TProps = {
     is_withdrawal_locked: boolean;
     is_identity_verification_needed: boolean;
     is_pending_verification: boolean;
+    is_duplicate_dob_phone: boolean;
+    is_account_to_be_closed_by_residence: boolean;
+    account_time_of_closure?: number;
 };
 
 const getMessage = ({
@@ -31,6 +35,9 @@ const getMessage = ({
     is_withdrawal_locked,
     is_identity_verification_needed,
     is_pending_verification,
+    is_duplicate_dob_phone,
+    is_account_to_be_closed_by_residence,
+    account_time_of_closure,
 }: TProps) => {
     const no_residence = cashier_validation?.includes('no_residence');
     const unwelcome_status = cashier_validation?.includes('unwelcome_status');
@@ -49,9 +56,23 @@ const getMessage = ({
     const ask_tin_information = cashier_validation?.includes('ASK_TIN_INFORMATION');
     const ask_self_exclusion_max_turnover_set = cashier_validation?.includes('ASK_SELF_EXCLUSION_MAX_TURNOVER_SET');
     const ask_fix_details = cashier_validation?.includes('ASK_FIX_DETAILS');
-    const ask_uk_funds_protection = cashier_validation?.includes('ASK_UK_FUNDS_PROTECTION');
     const pa_commision_withdrawal_limit = cashier_validation?.includes('PACommisionWithdrawalLimit');
     const pathname = history.location.pathname;
+
+    if (is_account_to_be_closed_by_residence && pathname === routes.cashier_deposit) {
+        return {
+            icon: 'IcCashierNoBalance',
+            title: localize('Deposits disabled'),
+            description: (
+                <Localize
+                    i18n_default_text='Due to business changes, client accounts in your country are to be closed. Withdraw any remaining funds by {{date}}.'
+                    values={{
+                        date: formatDate(account_time_of_closure, 'DD MMM YYYY'),
+                    }}
+                />
+            ),
+        };
+    }
 
     if (is_system_maintenance) {
         if (is_crypto && is_withdrawal_locked)
@@ -106,13 +127,7 @@ const getMessage = ({
                 description: (
                     <Localize
                         i18n_default_text='Your cashier is currently locked. Please contact us via <0>live chat</0> to find out how to unlock it.'
-                        components={[
-                            <span
-                                key={0}
-                                className='link link--orange'
-                                onClick={() => window.LC_API.open_chat_window()}
-                            />,
-                        ]}
+                        components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
                     />
                 ),
             };
@@ -123,13 +138,7 @@ const getMessage = ({
                 description: (
                     <Localize
                         i18n_default_text='Your account is temporarily disabled. Please contact us via <0>live chat</0> to enable deposits and withdrawals again.'
-                        components={[
-                            <span
-                                key={0}
-                                className='link link--orange'
-                                onClick={() => window.LC_API.open_chat_window()}
-                            />,
-                        ]}
+                        components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
                     />
                 ),
             };
@@ -292,19 +301,6 @@ const getMessage = ({
                     />
                 ),
             };
-        if (ask_uk_funds_protection)
-            return {
-                icon: 'IcCashierLocked',
-                title: localize('Cashier is locked'),
-                description: (
-                    <Localize
-                        i18n_default_text='Your cashier is locked. See <0>how we protect your funds</0> before you proceed.'
-                        components={[
-                            <a key={0} className='link' rel='noopener noreferrer' href={'/cashier/deposit'} />,
-                        ]}
-                    />
-                ),
-            };
         if (ask_self_exclusion_max_turnover_set)
             return {
                 icon: 'IcCashierLocked',
@@ -334,6 +330,18 @@ const getMessage = ({
     }
 
     if (is_deposit_locked) {
+        if (is_duplicate_dob_phone) {
+            return {
+                icon: 'IcAccountError',
+                title: localize('Account already exists'),
+                description: (
+                    <Localize
+                        i18n_default_text="Your details match an existing account. You can't <0/>make deposits or trade with a new account. <0/>Need help? Reach out via live chat."
+                        components={[<br key={0} />]}
+                    />
+                ),
+            };
+        }
         if (ask_fix_details)
             return {
                 icon: 'IcCashierDepositLock',
@@ -355,13 +363,7 @@ const getMessage = ({
                     <Localize
                         i18n_default_text='You have chosen to exclude yourself from trading on our website until {{exclude_until}}. If you are unable to place a trade or deposit after your self-exclusion period, please contact us via <0>live chat</0>.'
                         values={{ exclude_until: formatDate(excluded_until, 'DD MMM, YYYY') }}
-                        components={[
-                            <span
-                                key={0}
-                                className='link link--orange'
-                                onClick={() => window.LC_API.open_chat_window()}
-                            />,
-                        ]}
+                        components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
                     />
                 ),
             };
@@ -372,13 +374,7 @@ const getMessage = ({
                 description: (
                     <Localize
                         i18n_default_text='Please contact us via <0>live chat</0>.'
-                        components={[
-                            <span
-                                key={0}
-                                className='link link--orange'
-                                onClick={() => window.LC_API.open_chat_window()}
-                            />,
-                        ]}
+                        components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
                     />
                 ),
             };
@@ -448,13 +444,7 @@ const getMessage = ({
                 description: (
                     <Localize
                         i18n_default_text='Unfortunately, you can only make deposits. Please contact us via <0>live chat</0> to enable withdrawals.'
-                        components={[
-                            <span
-                                key={0}
-                                className='link link--orange'
-                                onClick={() => window.LC_API.open_chat_window()}
-                            />,
-                        ]}
+                        components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
                     />
                 ),
             };
@@ -465,13 +455,7 @@ const getMessage = ({
                 description: (
                     <Localize
                         i18n_default_text='Unfortunately, you can only make deposits. Please contact us via <0>live chat</0> to enable withdrawals.'
-                        components={[
-                            <span
-                                key={0}
-                                className='link link--orange'
-                                onClick={() => window.LC_API.open_chat_window()}
-                            />,
-                        ]}
+                        components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
                     />
                 ),
             };
@@ -482,13 +466,7 @@ const getMessage = ({
                 description: (
                     <Localize
                         i18n_default_text='You can only make deposits. Please contact us via <0>live chat</0> for more information.'
-                        components={[
-                            <span
-                                key={0}
-                                className='link link--orange'
-                                onClick={() => window.LC_API.open_chat_window()}
-                            />,
-                        ]}
+                        components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
                     />
                 ),
             };
@@ -508,9 +486,7 @@ const getMessage = ({
         description: (
             <Localize
                 i18n_default_text='Your cashier is currently locked. Please contact us via <0>live chat</0> to find out how to unlock it.'
-                components={[
-                    <span key={0} className='link link--orange' onClick={() => window.LC_API.open_chat_window()} />,
-                ]}
+                components={[<span key={0} className='link link--orange' onClick={Chat.open} />]}
             />
         ),
     };

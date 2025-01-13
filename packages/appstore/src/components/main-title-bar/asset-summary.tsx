@@ -1,19 +1,42 @@
 import React from 'react';
 import { Text, Popover } from '@deriv/components';
 import { localize } from '@deriv/translations';
-import { isMobile } from '@deriv/shared';
+import { useDevice } from '@deriv-com/ui';
 import BalanceText from 'Components/elements/text/balance-text';
 import { observer, useStore } from '@deriv/stores';
 import './asset-summary.scss';
 import TotalAssetsLoader from 'Components/pre-loader/total-assets-loader';
-import { useTotalAccountBalance, useCFDAccounts, usePlatformAccounts, useExchangeRate } from '@deriv/hooks';
+import {
+    useTotalAccountBalance,
+    useCFDAccounts,
+    usePlatformAccounts,
+    useTotalAssetCurrency,
+    useExchangeRate,
+} from '@deriv/hooks';
+import { isRatesLoaded } from '../../helpers';
 
 const AssetSummary = observer(() => {
-    const { exchange_rates } = useExchangeRate();
+    const { isDesktop } = useDevice();
+    const {
+        traders_hub,
+        client,
+        common,
+        modules,
+        gtm: { pushDataLayer },
+    } = useStore();
 
-    const { traders_hub, client, common, modules } = useStore();
     const { selected_account_type, is_eu_user, no_CR_account, no_MF_account } = traders_hub;
-    const { is_logging_in, is_switching, default_currency, is_landing_company_loaded, is_mt5_allowed } = client;
+    const {
+        is_logging_in,
+        is_switching,
+        default_currency,
+        is_landing_company_loaded,
+        is_mt5_allowed,
+        is_populating_account_list,
+        is_populating_mt5_account_list,
+        is_populating_dxtrade_account_list,
+        is_populating_ctrader_account_list,
+    } = client;
     const { account_transfer, general_store } = modules.cashier;
     const { is_transfer_confirm } = account_transfer;
     const { is_loading } = general_store;
@@ -21,9 +44,17 @@ const AssetSummary = observer(() => {
     const { real: platform_real_accounts, demo: platform_demo_account } = usePlatformAccounts();
     const { real: cfd_real_accounts, demo: cfd_demo_accounts } = useCFDAccounts();
 
+    const is_still_waiting_for_loading_accounts =
+        is_populating_account_list ||
+        is_populating_mt5_account_list ||
+        is_populating_dxtrade_account_list ||
+        is_populating_ctrader_account_list;
+
     const platform_real_balance = useTotalAccountBalance(platform_real_accounts);
     const cfd_real_balance = useTotalAccountBalance(cfd_real_accounts);
     const cfd_demo_balance = useTotalAccountBalance(cfd_demo_accounts);
+    const total_assets_real_currency = useTotalAssetCurrency();
+    const { exchange_rates } = useExchangeRate();
 
     const is_real = selected_account_type === 'real';
 
@@ -41,9 +72,20 @@ const AssetSummary = observer(() => {
     const should_show_loader =
         ((is_switching || is_logging_in) && (eu_account || cr_account)) ||
         !is_landing_company_loaded ||
-        !exchange_rates ||
         is_loading ||
-        is_transfer_confirm;
+        is_transfer_confirm ||
+        is_still_waiting_for_loading_accounts ||
+        !isRatesLoaded(is_real, total_assets_real_currency, platform_real_accounts, cfd_real_accounts, exchange_rates);
+
+    React.useEffect(() => {
+        if (!should_show_loader && is_real) {
+            if (real_total_balance == 0) {
+                pushDataLayer({ event: 'balance', value: false });
+            } else if (real_total_balance > 0) {
+                pushDataLayer({ event: 'balance', value: true });
+            }
+        }
+    }, [should_show_loader, is_real, pushDataLayer, real_total_balance]);
 
     if (should_show_loader) {
         return (
@@ -59,13 +101,13 @@ const AssetSummary = observer(() => {
         <div className='asset-summary'>
             {has_active_related_deriv_account || selected_account_type === 'demo' ? (
                 <React.Fragment>
-                    {!isMobile() ? (
+                    {isDesktop ? (
                         <Text align='right' key={`asset-summary--key-${current_language}`} size='xs' line_height='s'>
                             {localize('Total assets')}
                         </Text>
                     ) : null}
                     <Popover
-                        alignment={isMobile() ? 'top' : 'left'}
+                        alignment={isDesktop ? 'left' : 'top'}
                         message={
                             is_eu_user ? eu_mt5_allowed_total_assets : localize('Total assets in all your accounts')
                         }

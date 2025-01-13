@@ -1,17 +1,17 @@
 import React from 'react';
-import { WalletText } from '../../../../components';
-import InstrumentsIcons from '../../../../public/images/tradingInstruments';
+import { Text, useDevice } from '@deriv-com/ui';
+import getInstrumentsIcons from '../../../../public/images/tradingInstruments';
 import './InstrumentsIconWithLabel.scss';
 
 type TInstrumentsIcon = {
     highlighted: boolean;
-    icon: keyof typeof InstrumentsIcons;
-    isAsterisk?: boolean;
+    icon: keyof ReturnType<typeof getInstrumentsIcons>;
     text: string;
 };
 
-const InstrumentsIconWithLabel = ({ highlighted, icon, isAsterisk, text }: TInstrumentsIcon) => {
-    const InstrumentIcon = InstrumentsIcons[icon];
+const InstrumentsIconWithLabel = ({ highlighted, icon, text }: TInstrumentsIcon) => {
+    const { isDesktop, isTablet } = useDevice();
+
     return (
         <div
             className='wallets-compare-accounts-instrument-icon'
@@ -20,13 +20,18 @@ const InstrumentsIconWithLabel = ({ highlighted, icon, isAsterisk, text }: TInst
                 opacity: highlighted ? '' : '0.2',
             }}
         >
-            <InstrumentIcon height={24} width={24} />
+            {getInstrumentsIcons(!isDesktop)[icon]}
             <div className='wallets-compare-accounts-trading-instruments__text'>
-                <WalletText align='left' as='p' lineHeight='xs' size='xs' weight='bold'>
+                <Text
+                    align='start'
+                    as='p'
+                    lineHeight='xs'
+                    size={isTablet ? '2xs' : 'xs'}
+                    weight={isDesktop ? 'bold' : 'normal'}
+                >
                     {text}
-                </WalletText>
+                </Text>
             </div>
-            {isAsterisk && <span className='wallets-compare-accounts-trading-instruments__span'>*</span>}
         </div>
     );
 };

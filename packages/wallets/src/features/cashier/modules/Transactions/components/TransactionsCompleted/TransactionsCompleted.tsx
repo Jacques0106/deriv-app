@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect } from 'react';
-import moment from 'moment';
 import { useActiveWalletAccount, useAllAccountsList, useInfiniteTransactions } from '@deriv/api-v2';
 import { TSocketRequestPayload } from '@deriv/api-v2/types';
-import { Loader } from '../../../../../../components';
-import { WalletText } from '../../../../../../components/Base';
+import { Text } from '@deriv-com/ui';
+import { FormatUtils } from '@deriv-com/utils';
+import { WalletLoader } from '../../../../../../components';
 import { useCashierScroll } from '../../../../context';
 import { TransactionsCompletedRow } from '../TransactionsCompletedRow';
 import { TransactionsNoDataState } from '../TransactionsNoDataState';
@@ -45,15 +45,15 @@ const TransactionsCompleted: React.FC<TProps> = ({ filter }) => {
     );
 
     useEffect(() => {
-        if (fetchMoreOnBottomReached) setOnCashierScroll(() => fetchMoreOnBottomReached);
+        if (Number(transactions?.length) > 0) setOnCashierScroll(() => fetchMoreOnBottomReached);
         return () => setOnCashierScroll(null);
-    }, [fetchMoreOnBottomReached, setOnCashierScroll]);
+    }, [fetchMoreOnBottomReached, setOnCashierScroll, transactions?.length]);
 
     useEffect(() => {
         setFilter(filter);
     }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (!wallet || (!transactions && (isFetching || isLoading))) return <Loader />;
+    if (!wallet || (!transactions && (isFetching || isLoading))) return <WalletLoader />;
 
     if (!transactions) return <TransactionsNoDataState />;
 
@@ -61,7 +61,13 @@ const TransactionsCompleted: React.FC<TProps> = ({ filter }) => {
         <TransactionsTable
             columns={[
                 {
-                    accessorFn: row => row.transaction_time && moment.unix(row.transaction_time).format('DD MMM YYYY'),
+                    accessorFn: row =>
+                        row.transaction_time &&
+                        FormatUtils.getFormattedDateString(row.transaction_time, {
+                            dateOptions: { day: '2-digit', month: 'short', year: 'numeric' },
+                            format: 'DD MMM YYYY',
+                            unix: true,
+                        }),
                     accessorKey: 'date',
                     header: 'Date',
                 },
@@ -70,10 +76,14 @@ const TransactionsCompleted: React.FC<TProps> = ({ filter }) => {
             groupBy={['date']}
             rowGroupRender={transaction => (
                 <div className='wallets-transactions-completed__group-title'>
-                    <WalletText color='primary' size='2xs'>
+                    <Text color='primary' size='2xs'>
                         {transaction.transaction_time &&
-                            moment.unix(transaction.transaction_time).format('DD MMM YYYY')}
-                    </WalletText>
+                            FormatUtils.getFormattedDateString(transaction.transaction_time, {
+                                dateOptions: { day: '2-digit', month: 'short', year: 'numeric' },
+                                format: 'DD MMM YYYY',
+                                unix: true,
+                            })}
+                    </Text>
                 </div>
             )}
             rowRender={transaction => (

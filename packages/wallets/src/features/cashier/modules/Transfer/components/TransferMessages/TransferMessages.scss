@@ -2,11 +2,13 @@
     min-height: 2rem;
     padding-inline: 0.8rem;
 
-    @include mobile {
+    @include mobile-or-tablet-screen {
         padding-inline: 0;
     }
 
     &__link {
+        display: flex;
+        width: max-content;
         text-decoration: none;
         color: inherit;
     }
@@ -15,6 +17,6 @@
         display: flex;
         align-items: center;
         padding-block: 0.8rem;
-        margin-left: 0.8rem;
+        margin-inline-start: 0.8rem;
     }
 }

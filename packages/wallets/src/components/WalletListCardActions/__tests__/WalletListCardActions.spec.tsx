@@ -2,8 +2,8 @@ import React, { PropsWithChildren } from 'react';
 import { createMemoryHistory } from 'history';
 import { Router } from 'react-router-dom';
 import { useActiveWalletAccount } from '@deriv/api-v2';
+import { useDevice } from '@deriv-com/ui';
 import { render, screen } from '@testing-library/react';
-import useDevice from '../../../hooks/useDevice';
 import WalletListCardActions from '../WalletListCardActions';
 
 jest.mock('@deriv/api-v2', () => ({
@@ -19,15 +19,17 @@ jest.mock('@deriv/api-v2', () => ({
     })),
 }));
 
-jest.mock('.../../../hooks/useDevice');
-const mockedUseDevice = useDevice as jest.MockedFunction<typeof useDevice>;
+jest.mock('@deriv-com/ui', () => ({
+    ...jest.requireActual('@deriv-com/ui'),
+    useDevice: jest.fn(() => ({})),
+}));
 
 const history = createMemoryHistory();
 const wrapper = ({ children }: PropsWithChildren) => <Router history={history}>{children}</Router>;
 
 describe('WalletListCardActions', () => {
     beforeEach(() => {
-        mockedUseDevice.mockReturnValue({ isDesktop: true, isMobile: false, isTablet: false });
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: true });
     });
 
     afterEach(() => {
@@ -90,11 +92,11 @@ describe('WalletListCardActions', () => {
 
         render(<WalletListCardActions />, { wrapper });
         screen.getByRole('button', { name: 'deposit' }).click();
-        expect(history.location.pathname).toBe('/wallets/cashier/deposit');
+        expect(history.location.pathname).toBe('/wallet/deposit');
     });
 
     it('should render the actions for mobile', () => {
-        mockedUseDevice.mockReturnValue({ isDesktop: false, isMobile: true, isTablet: false });
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: false, isMobile: true });
         const { container } = render(<WalletListCardActions />, {
             wrapper,
         });
@@ -104,30 +106,30 @@ describe('WalletListCardActions', () => {
     });
 
     it('should switch account and redirect to the correct page when clicking on one of the actions and wallet is inactive for mobile', () => {
-        mockedUseDevice.mockReturnValue({ isDesktop: false, isMobile: true, isTablet: false });
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: false, isMobile: true });
         render(<WalletListCardActions />, {
             wrapper,
         });
         screen.getByRole('button', { name: 'deposit' }).click();
-        expect(history.location.pathname).toBe('/wallets/cashier/deposit');
+        expect(history.location.pathname).toBe('/wallet/deposit');
     });
 
     it('should redirect to cashier page when clicking on deposit', () => {
         render(<WalletListCardActions />, { wrapper });
         screen.getByRole('button', { name: 'deposit' }).click();
-        expect(history.location.pathname).toBe('/wallets/cashier/deposit');
+        expect(history.location.pathname).toBe('/wallet/deposit');
     });
 
     it('should redirect to cashier page when clicking on withdraw', () => {
         render(<WalletListCardActions />, { wrapper });
-        screen.getByRole('button', { name: 'withdraw' }).click();
-        expect(history.location.pathname).toBe('/wallets/cashier/withdraw');
+        screen.getByRole('button', { name: 'withdrawal' }).click();
+        expect(history.location.pathname).toBe('/wallet/withdrawal');
     });
 
     it('should redirect to cashier page when clicking on transfer', () => {
         render(<WalletListCardActions />, { wrapper });
-        screen.getByRole('button', { name: 'transfer' }).click();
-        expect(history.location.pathname).toBe('/wallets/cashier/transfer');
+        screen.getByRole('button', { name: 'account-transfer' }).click();
+        expect(history.location.pathname).toBe('/wallet/account-transfer');
     });
 
     it('should redirect to cashier page when clicking on reset balance', () => {
@@ -144,6 +146,56 @@ describe('WalletListCardActions', () => {
 
         render(<WalletListCardActions />, { wrapper });
         screen.getByRole('button', { name: 'reset-balance' }).click();
-        expect(history.location.pathname).toBe('/wallets/cashier/reset-balance');
+        expect(history.location.pathname).toBe('/wallet/reset-balance');
+    });
+
+    it('passes `accountsActiveTabIndex` in history state, when we redirect the user to the new page in mobile view for REAL wallet', () => {
+        const realWalletButtons = ['deposit', 'withdrawal', 'account-transfer'];
+        (useActiveWalletAccount as jest.Mock).mockReturnValue({
+            data: {
+                currency: 'USD',
+                display_login: 'CRW123456',
+                email: '',
+                is_active: true,
+                is_virtual: false,
+                loginid: 'CRW123456',
+            },
+        });
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: false, isMobile: true });
+
+        render(<WalletListCardActions accountsActiveTabIndex={1} />, {
+            wrapper,
+        });
+
+        realWalletButtons.forEach(button => {
+            screen.getByRole('button', { name: button }).click();
+            expect(history.location.pathname).toBe(`/wallet/${button}`);
+            expect(history.location.state).toStrictEqual({ accountsActiveTabIndex: 1 });
+        });
+    });
+
+    it('passes `accountsActiveTabIndex` in history state, when we redirect the user to the new page in mobile view for DEMO wallet', () => {
+        const demoWalletButtons = ['reset-balance', 'account-transfer'];
+        (useActiveWalletAccount as jest.Mock).mockReturnValue({
+            data: {
+                currency: 'USD',
+                display_login: 'VRW123456',
+                email: '',
+                is_active: true,
+                is_virtual: true,
+                loginid: 'VRW123456',
+            },
+        });
+        (useDevice as jest.Mock).mockReturnValue({ isDesktop: false, isMobile: true });
+
+        render(<WalletListCardActions accountsActiveTabIndex={1} />, {
+            wrapper,
+        });
+
+        demoWalletButtons.forEach(button => {
+            screen.getByRole('button', { name: button }).click();
+            expect(history.location.pathname).toBe(`/wallet/${button}`);
+            expect(history.location.state).toStrictEqual({ accountsActiveTabIndex: 1 });
+        });
     });
 });

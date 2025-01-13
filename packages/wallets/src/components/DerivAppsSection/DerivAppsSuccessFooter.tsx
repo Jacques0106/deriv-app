@@ -1,7 +1,7 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
-import useDevice from '../../hooks/useDevice';
-import { WalletButton } from '../Base';
+import { Localize } from '@deriv-com/translations';
+import { Button, useDevice } from '@deriv-com/ui';
 import { useModal } from '../ModalProvider';
 import './DerivAppsSuccessFooter.scss';
 
@@ -12,19 +12,28 @@ const DerivAppsSuccessFooter = () => {
 
     return (
         <div className='wallets-deriv-apps-success-footer'>
-            <WalletButton isFullWidth={!isDesktop} onClick={hide} size='lg' variant='outlined'>
-                Maybe later
-            </WalletButton>
-            <WalletButton
+            <Button
+                borderWidth='sm'
+                color='black'
+                isFullWidth={!isDesktop}
+                onClick={hide}
+                size='lg'
+                textSize='sm'
+                variant='outlined'
+            >
+                <Localize i18n_default_text='Maybe later' />
+            </Button>
+            <Button
                 isFullWidth={!isDesktop}
                 onClick={() => {
-                    history.push('/wallets/cashier/transfer');
+                    history.push('/wallet/account-transfer');
                     hide();
                 }}
                 size='lg'
+                textSize='sm'
             >
-                Transfer funds
-            </WalletButton>
+                <Localize i18n_default_text='Transfer funds' />
+            </Button>
         </div>
     );
 };

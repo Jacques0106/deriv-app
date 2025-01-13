@@ -14,12 +14,23 @@ type TQSInput = {
     disabled?: boolean;
     min?: number;
     max?: number;
+    has_currency_unit?: boolean;
 };
 
 const QSInput: React.FC<TQSInput> = observer(
-    ({ name, onChange, type = 'text', attached = false, disabled = false, min, max }: TQSInput) => {
+    ({
+        name,
+        onChange,
+        type = 'text',
+        attached = false,
+        disabled = false,
+        min,
+        max,
+        has_currency_unit = false,
+    }: TQSInput) => {
         const {
-            ui: { is_mobile },
+            ui: { is_desktop },
+            client: { currency },
         } = useStore();
         const { quick_strategy } = useDBotStore();
         const { loss_threshold_warning_data } = quick_strategy;
@@ -27,6 +38,27 @@ const QSInput: React.FC<TQSInput> = observer(
         const [has_focus, setFocus] = React.useState(false);
         const { setFieldValue, setFieldTouched } = useFormikContext();
         const is_number = type === 'number';
+        const max_value = Number.MAX_SAFE_INTEGER;
+        const input_ref = React.useRef<HTMLInputElement>(null);
+
+        React.useEffect(() => {
+            const handleWheel = (event: WheelEvent) => {
+                if (document.activeElement === input_ref.current) {
+                    event.preventDefault();
+                }
+            };
+
+            const el_input = input_ref.current;
+            if (el_input) {
+                el_input.addEventListener('wheel', handleWheel, { passive: false });
+            }
+
+            return () => {
+                if (el_input) {
+                    el_input.removeEventListener('wheel', handleWheel);
+                }
+            };
+        }, []);
 
         const handleButtonInputChange = (e: MouseEvent<HTMLButtonElement>, value: string) => {
             e?.preventDefault();
@@ -37,7 +69,14 @@ const QSInput: React.FC<TQSInput> = observer(
 
         const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
             const input_value = e.target.value;
-            const value = is_number ? Number(input_value) : input_value;
+            let value: number | string = 0;
+            const max_characters = 12;
+            if (max_characters && input_value.length >= max_characters) {
+                value = input_value.slice(0, max_characters);
+                value = is_number ? Number(value) : value;
+            } else {
+                value = is_number ? Number(input_value) : input_value;
+            }
             onChange(name, value);
         };
 
@@ -46,6 +85,7 @@ const QSInput: React.FC<TQSInput> = observer(
                 {({ field, meta }: FieldProps) => {
                     const { error } = meta;
                     const has_error = error;
+                    const is_exclusive_field = has_currency_unit;
                     return (
                         <div
                             className={classNames('qs__form__field qs__form__field__input', {
@@ -54,21 +94,21 @@ const QSInput: React.FC<TQSInput> = observer(
                             })}
                         >
                             <div
-                                data-testid='qs-input-container'
+                                data-testid='dt_qs_input_container'
                                 onMouseEnter={() => setFocus(true)}
                                 onMouseLeave={() => setFocus(false)}
                             >
                                 <Popover
                                     alignment='bottom'
                                     message={error}
-                                    is_open={is_mobile ? !!error : !!error && has_focus}
+                                    is_open={!is_desktop ? !!error : !!error && has_focus}
                                     zIndex='9999'
                                     classNameBubble='qs__warning-bubble'
                                     has_error
                                     should_disable_pointer_events
                                 >
                                     <Input
-                                        data_testId='qs-input'
+                                        data_testId={`dt_qs_${name}`}
                                         className={classNames(
                                             'qs__input',
                                             { error: has_error },
@@ -79,7 +119,7 @@ const QSInput: React.FC<TQSInput> = observer(
                                             is_number ? (
                                                 <button
                                                     disabled={disabled || (!!min && field.value <= min)}
-                                                    data-testid='qs-input-decrease'
+                                                    data-testid='dt_qs_input_decrease'
                                                     onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                                         const value = Number(field.value) - 1;
                                                         handleButtonInputChange(
@@ -95,8 +135,12 @@ const QSInput: React.FC<TQSInput> = observer(
                                         trailing_icon={
                                             is_number ? (
                                                 <button
-                                                    disabled={disabled || (!!max && field.value >= max)}
-                                                    data-testid='qs-input-increase'
+                                                    disabled={
+                                                        disabled ||
+                                                        field.value == max_value ||
+                                                        (!!max && field.value >= max)
+                                                    }
+                                                    data-testid='dt_qs_input_increase'
                                                     onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                                         const value = Number(field.value) + 1;
                                                         handleButtonInputChange(
@@ -112,6 +156,11 @@ const QSInput: React.FC<TQSInput> = observer(
                                         {...field}
                                         disabled={disabled}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleOnChange(e)}
+                                        placeholder={is_exclusive_field ? '0' : ''}
+                                        bottom_label={is_exclusive_field ? currency : ''}
+                                        max_characters={2}
+                                        maxLength={2}
+                                        ref={input_ref}
                                     />
                                 </Popover>
                             </div>

@@ -1,8 +1,7 @@
-import React from 'react';
 import { CFD_PLATFORMS, getCFDAccount, getCFDAccountDisplay, getCFDPlatformLabel, getMT5Icon } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
-import { Localize } from '@deriv/translations';
-import { TCFDPlatform, TDetailsOfDerivXAccount, TDetailsOfMT5Account } from 'Types';
+import { Localize } from '@deriv-com/translations';
+import { TCFDPlatform, TDetailsOfDerivXAccount, TDetailsOfMT5Account } from '../../../../Types';
 import ClosingAccountPendingWrapper from './closing-account-pending-wrapper';
 import ClosingAccountPendingContent from './closing-account-pending-content';
 
@@ -11,7 +10,7 @@ type TClosingAccountPendingPositionsProps = {
     open_positions: Array<TDetailsOfMT5Account | TDetailsOfDerivXAccount>; //ctrader
 };
 
-type TShortcode = Parameters<typeof getCFDAccountDisplay>[0]['shortcode'];
+type TShortcode = Exclude<TDetailsOfMT5Account['landing_company_short'], 'seychelles'>;
 
 const ClosingAccountPendingPositions = observer(
     ({ platform, open_positions }: TClosingAccountPendingPositionsProps) => {
@@ -36,6 +35,7 @@ const ClosingAccountPendingPositions = observer(
                                 return `IcMt5-${getMT5Icon({
                                     market_type: account.market_type,
                                     is_eu: is_eu_user,
+                                    product: account.product,
                                 })}`;
                             case CFD_PLATFORMS.DXTRADE:
                                 return `IcDxtrade-${getCFDAccount({
@@ -64,6 +64,7 @@ const ClosingAccountPendingPositions = observer(
                                         ? (account.landing_company_short as TShortcode)
                                         : undefined,
                                     is_eu: is_eu_user,
+                                    product: account.product,
                                 }) ?? ''
                             }
                             value={

@@ -1,13 +1,14 @@
 import React from 'react';
+import dayjs from 'dayjs';
 import { action, computed, makeObservable, observable, reaction } from 'mobx';
 
-import { StaticUrl } from '@deriv/components';
+import { StaticUrl, Text } from '@deriv/components';
 import {
     checkServerMaintenance,
-    daysSince,
     extractInfoFromShortcode,
     formatDate,
     formatMoney,
+    getDateFromTimestamp,
     getEndTime,
     getMarketName,
     getPathname,
@@ -21,12 +22,14 @@ import {
     isHighLow,
     isMobile,
     isMultiplierContract,
-    isTurbosContract,
     LocalStore,
     routes,
+    shouldShowPhoneVerificationNotification,
     unique,
 } from '@deriv/shared';
 import { Localize, localize } from '@deriv/translations';
+import { Analytics } from '@deriv-com/analytics';
+import { Chat } from '@deriv/utils';
 
 import { BinaryLink } from 'App/Components/Routes';
 import { WS } from 'Services';
@@ -51,6 +54,7 @@ export default class NotificationStore extends BaseStore {
     push_notifications = [];
     client_notifications = {};
     should_show_popups = true;
+    should_show_passkey_notification = false;
     trade_notifications = [];
     p2p_advertiser_info = {};
     p2p_order_props = {};
@@ -92,12 +96,14 @@ export default class NotificationStore extends BaseStore {
             setP2POrderProps: action.bound,
             setP2PRedirectTo: action.bound,
             setShouldShowPopups: action.bound,
+            should_show_passkey_notification: observable,
             should_show_popups: observable,
             showCompletedOrderNotification: action.bound,
             toggleNotificationsModal: action.bound,
             trade_notifications: observable,
             unmarkNotificationMessage: action.bound,
             updateNotifications: action.bound,
+            handleCurrencyRemovalNotification: action.bound,
         });
 
         reaction(
@@ -117,6 +123,7 @@ export default class NotificationStore extends BaseStore {
                 root_store.client.is_eu,
                 root_store.client.has_enabled_two_fa,
                 root_store.client.has_changed_two_fa,
+                root_store.client.should_show_passkey_notification,
                 this.p2p_order_props.order_id,
             ],
             () => {
@@ -201,16 +208,17 @@ export default class NotificationStore extends BaseStore {
         } = contract_info;
         const id = `${contract_id}_${status}`;
         if (this.trade_notifications.some(({ id: notification_id }) => notification_id === id)) return;
-        const contract_main_title = getTradeTypeName(contract_type, isHighLow({ shortcode }), false, true);
+        const contract_main_title = getTradeTypeName(contract_type, {
+            isHighLow: isHighLow({ shortcode }),
+            showMainTitle: true,
+        });
         this.trade_notifications.push({
             id,
             buy_price,
             contract_id,
-            contract_type: `${contract_main_title} ${getTradeTypeName(
-                contract_type,
-                isHighLow({ shortcode }),
-                isTurbosContract(contract_type)
-            )}`.trim(),
+            contract_type: `${contract_main_title} ${getTradeTypeName(contract_type, {
+                isHighLow: isHighLow({ shortcode }),
+            })}`.trim(),
             currency,
             profit: isMultiplierContract(contract_type) && !isNaN(profit) ? getTotalProfit(contract_info) : profit,
             status,
@@ -224,15 +232,19 @@ export default class NotificationStore extends BaseStore {
     }
 
     addVerificationNotifications(identity, document, has_restricted_mt5_account, has_mt5_account_with_rejected_poa) {
-        if (identity.status === 'verified') {
+        const status = this.root_store.client.account_status.status;
+        if (identity.status === 'verified' && !status.includes('allow_poi_resubmission')) {
             //identity
             this.addNotificationMessage(this.client_notifications.poi_verified);
-        } else if (!['none', 'pending', 'expired'].includes(identity.status)) {
+        } else if (
+            !['none', 'pending', 'expired'].includes(identity.status) ||
+            status.includes('allow_poi_resubmission')
+        ) {
             this.addNotificationMessage(this.client_notifications.poi_failed);
         }
 
         // document
-        if (document.status === 'verified') {
+        if (document.status === 'verified' && !status.includes('allow_poa_resubmission')) {
             this.addNotificationMessage(this.client_notifications.poa_verified);
         } else if (has_restricted_mt5_account) {
             if (document.status === 'pending') {
@@ -242,7 +254,10 @@ export default class NotificationStore extends BaseStore {
             }
         } else if (has_mt5_account_with_rejected_poa) {
             this.addNotificationMessage(this.client_notifications.poa_rejected_for_mt5);
-        } else if (!['none', 'pending', 'expired'].includes(document.status)) {
+        } else if (
+            !['none', 'pending', 'expired'].includes(document.status) ||
+            status.includes('allow_poa_resubmission')
+        ) {
             this.addNotificationMessage(this.client_notifications.poa_failed);
         }
     }
@@ -302,22 +317,25 @@ export default class NotificationStore extends BaseStore {
     }
 
     async handleClientNotifications() {
+        const current_time = dayjs();
         const {
+            account_list,
             account_settings,
             account_status,
-            account_open_date,
             accounts,
             isAccountOfType,
             is_eu,
             is_identity_verification_needed,
             is_logged_in,
-            is_tnc_needed,
+            is_virtual,
+            is_phone_number_verification_enabled,
             landing_company_shortcode,
             loginid,
             obj_total_balance,
             website_status,
             has_enabled_two_fa,
             has_changed_two_fa,
+            has_wallet,
             is_poi_dob_mismatch,
             is_financial_assessment_needed,
             is_financial_information_incomplete,
@@ -326,21 +344,33 @@ export default class NotificationStore extends BaseStore {
             is_proof_of_ownership_enabled,
             is_p2p_enabled,
             is_poa_expired,
+            currency,
+            is_country_code_dropdown_enabled,
+            phone_settings,
         } = this.root_store.client;
+        const carriers_supported = phone_settings?.carriers && phone_settings?.carriers.length > 0;
         const { upgradable_daily_limits } = this.p2p_advertiser_info || {};
         const { max_daily_buy, max_daily_sell } = upgradable_daily_limits || {};
         const { is_10k_withdrawal_limit_reached } = this.root_store.modules.cashier.withdraw;
         const { current_language, selected_contract_type } = this.root_store.common;
         const malta_account = landing_company_shortcode === 'maltainvest';
         const cr_account = landing_company_shortcode === 'svg';
-        const is_website_up = website_status.site_status === 'up';
-        const has_trustpilot = LocalStore.getObject('notification_messages')[loginid]?.includes(
-            this.client_notifications.trustpilot?.key
+        const marked_notifications = LocalStore.getObject('marked_notifications');
+        const has_trustpilot = Array.isArray(marked_notifications)
+            ? marked_notifications.includes(this.client_notifications?.trustpilot?.key)
+            : false;
+        const is_next_email_attempt_timer_running = shouldShowPhoneVerificationNotification(
+            account_settings?.phone_number_verification?.next_email_attempt,
+            current_time
         );
-        const has_flutter_chart_notification = LocalStore.getObject('notification_messages')[loginid]?.includes(
-            this.client_notifications.flutter_chart?.key
-        );
-
+        const show_phone_number_verification_notification =
+            !(window.location.pathname === routes.phone_verification) &&
+            !account_settings?.phone_number_verification?.verified &&
+            account_settings?.phone &&
+            !is_next_email_attempt_timer_running &&
+            !is_virtual &&
+            is_phone_number_verification_enabled &&
+            (is_country_code_dropdown_enabled ? carriers_supported : true);
         let has_missing_required_field;
 
         const is_server_down = checkServerMaintenance(website_status);
@@ -357,6 +387,7 @@ export default class NotificationStore extends BaseStore {
                 authentication: { document, identity, income, needs_verification, ownership } = {},
                 status,
                 cashier_validation,
+                account_closure = [],
             } = account_status;
 
             const {
@@ -370,9 +401,15 @@ export default class NotificationStore extends BaseStore {
             } = getStatusValidations(status || []);
 
             this.handlePOAAddressMismatchNotifications();
-            if (!has_flutter_chart_notification) {
-                this.addNotificationMessage(this.client_notifications.flutter_chart);
+
+            const account_currency_closure_status = account_closure.find(
+                closure_type => closure_type.type === 'currency'
+            );
+
+            if (account_currency_closure_status) {
+                this.handleCurrencyRemovalNotification(account_currency_closure_status, currency);
             }
+
             if (status?.includes('mt5_additional_kyc_required'))
                 this.addNotificationMessage(this.client_notifications.additional_kyc_info);
 
@@ -380,6 +417,12 @@ export default class NotificationStore extends BaseStore {
                 this.addNotificationMessage(this.client_notifications.two_f_a);
             } else {
                 this.removeNotificationByKey({ key: this.client_notifications.two_f_a?.key });
+            }
+
+            if (show_phone_number_verification_notification) {
+                this.addNotificationMessage(this.client_notifications.phone_number_verification);
+            } else {
+                this.removeNotificationByKey({ key: this.client_notifications.phone_number_verification });
             }
 
             if (malta_account && is_financial_information_incomplete) {
@@ -410,6 +453,24 @@ export default class NotificationStore extends BaseStore {
                 this.addNotificationMessage(this.client_notifications.has_changed_two_fa);
             }
 
+            if (this.root_store.client.should_show_passkey_notification) {
+                this.addNotificationMessage(this.client_notifications.enable_passkey);
+            } else {
+                this.removeNotificationByKey({ key: this.client_notifications.enable_passkey });
+            }
+
+            if (this.root_store.client.is_account_to_be_closed_by_residence) {
+                this.addNotificationMessage(this.client_notifications.notify_account_is_to_be_closed_by_residence);
+            } else {
+                this.removeNotificationByKey({
+                    key: this.client_notifications.notify_account_is_to_be_closed_by_residence,
+                });
+            }
+
+            if (!has_trustpilot && this.root_store.client.should_show_trustpilot_notification) {
+                this.addNotificationMessage(this.client_notifications.trustpilot);
+            }
+
             const client = accounts[loginid];
             if (client && !client.is_virtual) {
                 if (isEmptyObject(account_status)) return;
@@ -432,9 +493,7 @@ export default class NotificationStore extends BaseStore {
                     ASK_FIX_DETAILS,
                     ASK_SELF_EXCLUSION_MAX_TURNOVER_SET,
                     ASK_TIN_INFORMATION,
-                    ASK_UK_FUNDS_PROTECTION,
                 } = cashier_validation ? getCashierValidations(cashier_validation) : {};
-
                 const needs_poa =
                     is_10k_withdrawal_limit_reached &&
                     (needs_verification.includes('document') || document?.status !== 'verified');
@@ -455,6 +514,7 @@ export default class NotificationStore extends BaseStore {
                 const svg_needs_poi =
                     cr_account && status.includes('allow_document_upload') && identity?.status === 'none';
                 const svg_poi_expired = cr_account && identity?.status === 'expired';
+                const has_tusdt_account = account_list.some(account => account.title === 'tUSDT');
 
                 this.addVerificationNotifications(
                     identity,
@@ -462,6 +522,9 @@ export default class NotificationStore extends BaseStore {
                     has_restricted_mt5_account,
                     has_mt5_account_with_rejected_poa
                 );
+
+                if (account_settings?.tnc_update_notification_start_date)
+                    this.addNotificationMessage(this.client_notifications.reaccept_tnc);
 
                 if (needs_poa) this.addNotificationMessage(this.client_notifications.needs_poa);
                 if (needs_poi) this.addNotificationMessage(this.client_notifications.needs_poi);
@@ -503,15 +566,13 @@ export default class NotificationStore extends BaseStore {
                         this.addNotificationMessage(this.client_notifications.risk);
                     } else if (isAccountOfType('financial') && ASK_TIN_INFORMATION) {
                         this.addNotificationMessage(this.client_notifications.tax);
-                    } else if (ASK_UK_FUNDS_PROTECTION) {
-                        this.addNotificationMessage(this.client_notifications.ask_uk_funds_protection);
                     } else if (ASK_SELF_EXCLUSION_MAX_TURNOVER_SET) {
                         this.addNotificationMessage(this.client_notifications.max_turnover_limit_not_set);
                     } else if (ASK_FIX_DETAILS) {
                         this.addNotificationMessage(
                             this.client_notifications.required_fields(withdrawal_locked, deposit_locked)
                         );
-                    } else {
+                    } else if (!has_wallet) {
                         this.addNotificationMessage(this.client_notifications.cashier_locked);
                     }
                 } else {
@@ -539,6 +600,7 @@ export default class NotificationStore extends BaseStore {
                     }
                 }
 
+                if (has_tusdt_account) this.addNotificationMessage(this.client_notifications.has_tusdt_account);
                 if (mt5_withdrawal_locked) this.addNotificationMessage(this.client_notifications.mt5_withdrawal_locked);
                 if (document_needs_action) this.addNotificationMessage(this.client_notifications.document_needs_action);
                 if (is_p2p_enabled) {
@@ -578,13 +640,6 @@ export default class NotificationStore extends BaseStore {
                 } else {
                     this.removeNotificationMessageByKey({ key: this.client_notifications.dp2p?.key });
                 }
-                if (is_website_up && !has_trustpilot && daysSince(account_open_date) > 7) {
-                    this.addNotificationMessage(this.client_notifications.trustpilot);
-                }
-                if (is_tnc_needed) {
-                    this.addNotificationMessage(this.client_notifications.tnc);
-                }
-
                 has_missing_required_field = hasMissingRequiredField(account_settings, client, isAccountOfType);
                 if (has_missing_required_field) {
                     this.addNotificationMessage(
@@ -607,13 +662,6 @@ export default class NotificationStore extends BaseStore {
                 } else if (svg_poi_expired) {
                     this.addNotificationMessage(this.client_notifications.svg_poi_expired);
                 }
-            }
-            if (
-                client &&
-                this.root_store.client.mt5_login_list.length > 0 &&
-                (this.root_store.client.mt5_login_list.find(login => login)?.white_label?.notification ?? true)
-            ) {
-                this.addNotificationMessage(this.client_notifications.mt5_notification);
             }
         }
 
@@ -754,12 +802,14 @@ export default class NotificationStore extends BaseStore {
 
     setClientNotifications(client_data = {}) {
         const { ui } = this.root_store;
-        const { has_enabled_two_fa, setTwoFAChangedStatus, logout } = this.root_store.client;
-        const { setMT5NotificationModal } = this.root_store.traders_hub;
+        const { has_enabled_two_fa, setTwoFAChangedStatus, logout, email, is_cr_account, account_settings } =
+            this.root_store.client;
         const two_fa_status = has_enabled_two_fa ? localize('enabled') : localize('disabled');
 
         const platform_name_trader = getPlatformSettings('trader').name;
         const platform_name_go = getPlatformSettings('go').name;
+
+        const next_prompt_date = account_settings?.tnc_update_notification_start_date;
 
         const notifications = {
             ask_financial_risk_approval: {
@@ -769,16 +819,6 @@ export default class NotificationStore extends BaseStore {
                 action: {
                     route: routes.financial_assessment,
                     text: localize('Click here'),
-                },
-                type: 'warning',
-            },
-            ask_uk_funds_protection: {
-                key: 'ask_uk_funds_protection',
-                header: localize('Your cashier is locked'),
-                message: localize('See how we protect your funds to unlock the cashier.'),
-                action: {
-                    route: routes.cashier_deposit,
-                    text: localize('Find out more'),
                 },
                 type: 'warning',
             },
@@ -800,7 +840,7 @@ export default class NotificationStore extends BaseStore {
                 message: localize('Please contact us via live chat to unlock it.'),
                 action: {
                     onClick: () => {
-                        window.LC_API.open_chat_window();
+                        Chat.open();
                     },
                     text: localize('Go to live chat'),
                 },
@@ -815,7 +855,10 @@ export default class NotificationStore extends BaseStore {
                 action: {
                     onClick: () => {
                         window.open('https://www.trustpilot.com/evaluate/deriv.com', '_blank');
-                        this.removeNotificationByKey({ key: this.client_notifications.trustpilot.key });
+                        this.markNotificationMessage({ key: this.client_notifications.trustpilot.key });
+                        this.removeNotificationByKey({
+                            key: this.client_notifications.trustpilot.key,
+                        });
                         this.removeNotificationMessage({
                             key: this.client_notifications.trustpilot.key,
                             should_show_again: false,
@@ -930,17 +973,16 @@ export default class NotificationStore extends BaseStore {
                 img_alt: 'Deriv P2P',
                 type: 'news',
             },
-            flutter_chart: {
-                key: 'flutter_chart',
-                header: localize('Trade Smarter with Deriv Trader Chart v2.0:'),
-                message: localize('Get real-time data, advanced charting tools, and customisable views.'),
+            enable_passkey: {
                 action: {
-                    onClick: () => {
-                        window.open('https://blog.deriv.com/posts/new-charts-on-the-deriv-trader-app/', '_blank');
-                    },
-                    text: localize('Learn more'),
+                    route: routes.passkeys,
+                    text: localize('Enable passkey'),
                 },
+                key: 'enable_passkey',
+                header: localize('Level up your security'),
+                message: localize('Strengthen your account’s security today with the latest passkeys feature.'),
                 type: 'announce',
+                should_show_again: true,
             },
             identity: {
                 key: 'identity',
@@ -1055,7 +1097,7 @@ export default class NotificationStore extends BaseStore {
                 message: localize('Please contact us via live chat to enable withdrawals.'),
                 action: {
                     onClick: () => {
-                        window.LC_API.open_chat_window();
+                        Chat.open();
                     },
                     text: localize('Go to live chat'),
                 },
@@ -1077,6 +1119,22 @@ export default class NotificationStore extends BaseStore {
                 header: localize('Password updated.'),
                 message: <Localize i18n_default_text='Please log in with your updated password.' />,
                 type: 'info',
+            },
+            phone_number_verification: {
+                key: 'phone_number_verification',
+                header: localize('Complete phone verification'),
+                message: <Localize i18n_default_text='Secure your Deriv account by verifying your phone number.' />,
+                type: 'warning',
+                action: {
+                    onClick: () => {
+                        if (this.is_notifications_visible) this.toggleNotificationsModal();
+                        WS.verifyEmail(email, 'phone_number_verification');
+                        localStorage.setItem('routes_from_notification_to_pnv', window.location.pathname);
+                    },
+                    route: routes.phone_verification,
+                    text: localize('Verify now'),
+                },
+                should_show_again: true,
             },
             poa_rejected_for_mt5: {
                 action: {
@@ -1196,6 +1254,26 @@ export default class NotificationStore extends BaseStore {
                     },
                 };
             },
+            reaccept_tnc: {
+                key: 'reaccept_tnc',
+                header: localize('Important update: Terms and conditions'),
+                message: (
+                    <Localize
+                        i18n_default_text="We've updated our <0>terms and conditions</0>. To continue trading, you must review and accept the updated terms. You'll be prompted to accept them starting [<1>{{next_prompt_date}}</1>]."
+                        components={[
+                            <StaticUrl
+                                key={0}
+                                className='link'
+                                href='terms-and-conditions'
+                                is_eu_url={!is_cr_account}
+                            />,
+                            <Text key={1} size='xs' weight='bold' />,
+                        ]}
+                        values={{ next_prompt_date: formatDate(next_prompt_date, 'DD MMM YYYY') }}
+                    />
+                ),
+                type: 'announce',
+            },
             reset_virtual_balance: {
                 key: 'reset_virtual_balance',
                 header: localize('Reset your balance'),
@@ -1236,7 +1314,7 @@ export default class NotificationStore extends BaseStore {
                     ),
                     action: {
                         onClick: () => {
-                            window.LC_API.open_chat_window();
+                            Chat.open();
                         },
                         text: localize('Go to live chat'),
                     },
@@ -1349,7 +1427,7 @@ export default class NotificationStore extends BaseStore {
                 message: localize('Please contact us via live chat.'),
                 action: {
                     onClick: () => {
-                        window.LC_API.open_chat_window();
+                        Chat.open();
                     },
                     text: localize('Go to live chat'),
                 },
@@ -1361,7 +1439,7 @@ export default class NotificationStore extends BaseStore {
                 message: localize('Please contact us via live chat to enable withdrawals.'),
                 action: {
                     onClick: () => {
-                        window.LC_API.open_chat_window();
+                        Chat.open();
                     },
                     text: localize('Go to live chat'),
                 },
@@ -1536,23 +1614,11 @@ export default class NotificationStore extends BaseStore {
                 ),
                 action: {
                     onClick: async () => {
-                        window.LC_API.open_chat_window();
+                        Chat.open();
                     },
                     text: localize('Go to LiveChat'),
                 },
                 type: 'danger',
-            },
-            mt5_notification: {
-                key: 'mt5_notification',
-                header: localize('Changes to your Deriv MT5 login'),
-                message: localize('We are going to update the login process for your Deriv MT5 account.'),
-                action: {
-                    text: localize('Learn more'),
-                    onClick: () => {
-                        setMT5NotificationModal(true);
-                    },
-                },
-                type: 'warning',
             },
             additional_kyc_info: {
                 key: 'additional_kyc_info',
@@ -1564,11 +1630,38 @@ export default class NotificationStore extends BaseStore {
                     text: localize('Update now'),
                     onClick: () => {
                         if (this.is_notifications_visible) this.toggleNotificationsModal();
-                        ui.toggleAdditionalKycInfoModal();
+                        ui.setFieldRefToFocus('account-opening-reason');
                         this.markNotificationMessage({ key: 'additional_kyc_info' });
                     },
+                    route: routes.personal_details,
                 },
                 type: 'warning',
+            },
+            notify_account_is_to_be_closed_by_residence: {
+                action: {
+                    route: routes.cashier_withdrawal,
+                    text: localize('Withdraw funds'),
+                },
+                header: localize('Deposits and trading disabled'),
+                key: 'notify_account_is_to_be_closed_by_residence',
+                message: (
+                    <Localize
+                        i18n_default_text='Due to business changes, client accounts in your country are to be closed. Withdraw your funds by {{date}}.'
+                        values={{
+                            date: formatDate(this.root_store.client.account_time_of_closure, 'DD MMM YYYY'),
+                        }}
+                    />
+                ),
+                should_show_again: true,
+                type: 'warning',
+            },
+            has_tusdt_account: {
+                key: 'has_tusdt_account',
+                header: localize('Attention: tUSDT deposit address change'),
+                message: (
+                    <Localize i18n_default_text='Verify the address on the Deposit page before each deposit to avoid losing funds. Occasionally, the address could be updated.' />
+                ),
+                type: 'announce',
             },
         };
 
@@ -1588,6 +1681,12 @@ export default class NotificationStore extends BaseStore {
     }
 
     toggleNotificationsModal() {
+        Analytics.trackEvent('ce_notification_form', {
+            action: this.is_notifications_visible ? 'close' : 'open',
+            form_name: 'ce_notification_form',
+            notification_num: this.notifications.length,
+        });
+
         this.is_notifications_visible = !this.is_notifications_visible;
     }
 
@@ -1648,6 +1747,52 @@ export default class NotificationStore extends BaseStore {
             type: 'danger',
             should_show_again: true,
             platform: 'Account',
+        });
+    };
+
+    handleCurrencyRemovalNotification = (account_currency_closure_status, currency) => {
+        const is_funded_account = account_currency_closure_status.status_codes.includes('funded_account');
+        const is_non_funded_account = account_currency_closure_status.status_codes.includes('non_funded_account');
+
+        if (!is_funded_account && !is_non_funded_account) return;
+
+        const notification_header = is_funded_account
+            ? localize('Withdraw your funds')
+            : localize('Change your currency');
+
+        const time_of_closure = getDateFromTimestamp(account_currency_closure_status.time_of_closure);
+
+        const notification_message = is_funded_account ? (
+            <Localize
+                i18n_default_text="{{currency}} accounts won't be available after {{time_of_closure}}."
+                values={{ time_of_closure, currency }}
+            />
+        ) : (
+            <Localize
+                i18n_default_text="{{currency}} accounts won't be available after {{time_of_closure}}. Choose a new account currency."
+                values={{ time_of_closure, currency }}
+            />
+        );
+
+        const notification_button_action = is_funded_account
+            ? {
+                  route: routes.cashier_withdrawal,
+                  text: <Localize i18n_default_text='Withdraw {{currency}}' values={{ currency }} />,
+              }
+            : {
+                  text: localize('Contact live chat'),
+                  onClick: () => {
+                      Chat.open();
+                  },
+              };
+
+        this.addNotificationMessage({
+            key: 'account_currency_closure',
+            header: notification_header,
+            message: notification_message,
+            action: notification_button_action,
+            type: 'warning',
+            should_show_again: true,
         });
     };
 }

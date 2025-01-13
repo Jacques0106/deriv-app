@@ -4,18 +4,21 @@
     display: flex;
     justify-content: center;
 
-    @include mobile {
+    @include mobile-or-tablet-screen {
         animation: popup 0.2s;
-    }
-
-    @include mobile {
         width: calc(100vw - 3.2rem);
     }
 
     &__close-icon {
         position: absolute;
         top: 2.4rem;
-        right: 2rem;
+        inset-inline-end: 2rem;
         cursor: pointer;
+    }
+
+    &--fullscreen {
+        height: calc(var(--wallets-vh, 1vh) * 100);
+        width: 100vw;
+        border-radius: 0;
     }
 }

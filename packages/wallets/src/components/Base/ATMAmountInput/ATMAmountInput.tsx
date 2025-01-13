@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import classnames from 'classnames';
 import unFormatLocaleString from '@deriv/utils/src/unFormatLocaleString';
+import { Text } from '@deriv-com/ui';
 import useInputATMFormatter from '../../../hooks/useInputATMFormatter';
-import { WalletText } from '../..';
 import './ATMAmountInput.scss';
 
 type TProps = {
     currency?: string;
     disabled?: boolean;
     fractionDigits?: number;
+    isError?: boolean;
     label: string;
-    locale?: Intl.LocalesArgument;
     maxDigits?: number;
     onBlur?: VoidFunction;
     onChange?: (value: number) => void;
@@ -21,8 +22,8 @@ const WalletTransferFormInputField: React.FC<TProps> = ({
     currency,
     disabled,
     fractionDigits = 0,
+    isError,
     label,
-    locale,
     maxDigits,
     onBlur,
     onChange,
@@ -34,17 +35,19 @@ const WalletTransferFormInputField: React.FC<TProps> = ({
 
     const {
         onChange: formatOnChange,
+        onKeyDown,
+        onKeyUp,
         onPaste: formatOnPaste,
         value: formattedValue,
     } = useInputATMFormatter(inputRef, value, {
         fractionDigits,
-        locale,
+        locale: 'en-US',
         maxDigits,
     });
 
     useEffect(() => {
-        onChange?.(Number(unFormatLocaleString(formattedValue, locale)));
-    }, [formattedValue, locale, onChange]);
+        onChange?.(Number(unFormatLocaleString(formattedValue, 'en-US')));
+    }, [formattedValue, onChange]);
 
     const onFocusHandler = useCallback(() => {
         setIsFocused(true);
@@ -58,27 +61,35 @@ const WalletTransferFormInputField: React.FC<TProps> = ({
 
     return (
         <div className='wallets-atm-amount-input'>
-            <WalletText size='sm'>{label}</WalletText>
+            <Text align='start' className='wallets-atm-amount-input__label' size='sm'>
+                {label}
+            </Text>
             <div className='wallets-atm-amount-input__input-container'>
-                <WalletText size='lg' weight='bold'>
+                <Text align='start' size='lg' weight='bold'>
                     <input
-                        className='wallets-atm-amount-input__input'
+                        className={classnames('wallets-atm-amount-input__input', {
+                            'wallets-atm-amount-input__input--error': isError,
+                        })}
                         disabled={disabled || isFocused}
                         readOnly
                         value={`${formattedValue} ${currency ?? ''}`}
                     />
                     <input
-                        className='wallets-atm-amount-input__input'
+                        className={classnames('wallets-atm-amount-input__input', {
+                            'wallets-atm-amount-input__input--error': isError,
+                        })}
                         disabled={disabled}
                         onBlur={onBlurHandler}
                         onChange={formatOnChange}
                         onFocus={onFocusHandler}
+                        onKeyDown={onKeyDown}
+                        onKeyUp={onKeyUp}
                         onPaste={formatOnPaste}
                         ref={inputRef}
                         type='tel'
                         value={formattedValue}
                     />
-                </WalletText>
+                </Text>
             </div>
         </div>
     );

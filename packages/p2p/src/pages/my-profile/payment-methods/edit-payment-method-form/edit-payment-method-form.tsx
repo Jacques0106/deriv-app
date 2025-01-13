@@ -1,10 +1,11 @@
 import React from 'react';
 import classNames from 'classnames';
 import { Field, Form, FormikValues } from 'formik';
-import { Button, DesktopWrapper, Input, Loading, Text } from '@deriv/components';
+import { Button, Input, Loading, Text } from '@deriv/components';
 import { useP2PAdvertiserPaymentMethods } from '@deriv/hooks';
 import { isEmptyObject } from '@deriv/shared';
-import { observer, useStore } from '@deriv/stores';
+import { observer } from '@deriv/stores';
+import { useDevice } from '@deriv-com/ui';
 import { useStores } from 'Stores';
 import { Localize, localize } from 'Components/i18next';
 import { useModalManagerContext } from 'Components/modal-manager/modal-manager-context';
@@ -14,14 +15,13 @@ import { TPaymentMethod } from 'Types/my-profile.types';
 
 const EditPaymentMethodForm = () => {
     const { general_store, my_profile_store } = useStores();
-    const {
-        ui: { is_desktop, is_mobile },
-    } = useStore();
+    const { isDesktop } = useDevice();
     const { showModal } = useModalManagerContext();
     const { mutation, update } = useP2PAdvertiserPaymentMethods();
-    const { error: mutation_error, status: mutation_status } = mutation;
+    const { error: mutation_error, reset, status: mutation_status } = mutation;
     const {
         payment_method_to_edit,
+        setAddPaymentMethodErrorMessage,
         setPaymentMethodToEdit,
         setSelectedPaymentMethod,
         setSelectedPaymentMethodDisplayName,
@@ -55,12 +55,14 @@ const EditPaymentMethodForm = () => {
 
     React.useEffect(() => {
         if (mutation_status === 'success') {
-            my_profile_store.setShouldShowEditPaymentMethodForm(false);
+            setShouldShowEditPaymentMethodForm(false);
         } else if (mutation_status === 'error') {
-            my_profile_store.setAddPaymentMethodErrorMessage(mutation_error.message);
+            setAddPaymentMethodErrorMessage(mutation_error.message);
             showModal({ key: 'AddPaymentMethodErrorModal', props: {} });
+            general_store.formik_ref.setSubmitting(false);
+            reset();
         }
-    }, [mutation_error, mutation_status]);
+    }, [mutation_error, mutation_status, reset]);
 
     if (isEmptyObject(payment_method_to_edit)) {
         return <Loading is_fullscreen={false} />;
@@ -76,7 +78,7 @@ const EditPaymentMethodForm = () => {
             {({ dirty, handleChange, isSubmitting, errors }: FormikValues) => {
                 return (
                     <React.Fragment>
-                        <DesktopWrapper>
+                        {isDesktop && (
                             <PageReturn
                                 onClick={() => {
                                     if (dirty) {
@@ -90,7 +92,7 @@ const EditPaymentMethodForm = () => {
                                 }}
                                 page_title={localize('Edit payment method')}
                             />
-                        </DesktopWrapper>
+                        )}
                         <Form className='edit-payment-method-form__form'>
                             <div className='edit-payment-method-form__form-wrapper'>
                                 <Field name='choose_payment_method'>
@@ -151,9 +153,9 @@ const EditPaymentMethodForm = () => {
                             <div
                                 className={classNames('edit-payment-method-form__buttons', {
                                     'edit-payment-method-form__buttons--separated-footer':
-                                        general_store.active_index === 3 && is_mobile,
+                                        general_store.active_index === 3 && !isDesktop,
                                     'edit-payment-method-form__buttons--separated-footer-profile':
-                                        general_store.active_index === 3 && is_desktop,
+                                        general_store.active_index === 3 && isDesktop,
                                 })}
                             >
                                 <Button

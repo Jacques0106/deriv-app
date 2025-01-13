@@ -1,60 +1,48 @@
 import React from 'react';
 import { Formik, FormikErrors, FormikHelpers, FormikValues } from 'formik';
-import { Loading, Button, Text, ThemedScrollbars, FormSubmitButton, Modal, HintBox } from '@deriv/components';
+import { useDevice } from '@deriv-com/ui';
+import { Loading } from '@deriv/components';
 import { useFileUploader } from '@deriv/hooks';
 import { validAddress, validPostCode, validLetterSymbol, validLength, getLocation, WS } from '@deriv/shared';
 import { observer, useStore } from '@deriv/stores';
-import { Localize, localize } from '@deriv/translations';
-import FilesDescription from '../../../Components/file-uploader-container/files-descriptions';
-import FormFooter from '../../../Components/form-footer';
-import FormBody from '../../../Components/form-body';
-import FormBodySection from '../../../Components/form-body-section';
-import FormSubHeader from '../../../Components/form-sub-header';
 import LoadErrorMessage from '../../../Components/load-error-message';
 import LeaveConfirm from '../../../Components/leave-confirm';
-import FileUploaderContainer from '../../../Components/file-uploader-container';
-import CommonMistakeExamples from '../../../Components/poa/common-mistakes/common-mistake-examples';
-import PersonalDetailsForm from '../../../Components/forms/personal-details-form.jsx';
 import { isServerError, validate } from '../../../Helpers/utils';
-import { getFileUploaderDescriptions } from '../../../Constants/file-uploader';
+import { API_ERROR_CODES } from '../../../Constants/api-error-codes';
+import { DocumentUploadRequest } from '@deriv/api-types';
+import POADesktopLayout from './poa-desktop-layout';
+import { TPOAFormState } from '../../../Types';
+import { useTranslations } from '@deriv-com/translations';
+import POAMobileLayout from './poa-mobile-layout';
+import { getSupportedProofOfAddressDocuments } from '../../../Constants/file-uploader';
 
 type TProofOfAddressForm = {
-    className?: string;
+    className: string;
     is_resubmit: boolean;
-    is_for_cfd_modal?: boolean;
-    onCancel?: () => void;
-    onSubmit: (needs_poi: boolean) => void;
-    onSubmitForCFDModal: (index: number, values: FormikValues) => void;
-    step_index: number;
+    is_for_cfd_modal: boolean;
+    onCancel: () => void;
+    onSubmit: (needs_poi: boolean, has_submitted_duplicate_poa?: boolean) => void;
+    onSubmitForCFDModal: (values: FormikValues, has_submitted_duplicate_poa?: boolean) => void;
 };
 
 type TFormInitialValues = Record<
     'address_line_1' | 'address_line_2' | 'address_city' | 'address_state' | 'address_postcode',
     string
->;
-
-type TFormState = Record<'is_btn_loading' | 'is_submit_success' | 'should_allow_submit' | 'should_show_form', boolean>;
+> & {
+    document_type?: string;
+};
 
 const ProofOfAddressForm = observer(
-    ({
-        is_resubmit,
-        is_for_cfd_modal,
-        onSubmit,
-        onSubmitForCFDModal,
-        step_index,
-        className,
-    }: Partial<TProofOfAddressForm>) => {
-        const { client, notifications, ui } = useStore();
-        const { account_settings, fetchResidenceList, fetchStatesList, getChangeableFields, states_list, is_eu } =
-            client;
+    ({ is_resubmit, is_for_cfd_modal, onSubmit, onSubmitForCFDModal, className }: Partial<TProofOfAddressForm>) => {
+        const { isMobile, isDesktop } = useDevice();
+        const { client, notifications } = useStore();
+        const { account_settings, fetchResidenceList, fetchStatesList, states_list } = client;
         const {
             addNotificationMessageByKey: addNotificationByKey,
             removeNotificationMessage,
             removeNotificationByKey,
         } = notifications;
-        const { is_mobile } = ui;
         const [document_files, setDocumentFiles] = React.useState<File[]>([]);
-        const [file_selection_error, setFileSelectionError] = React.useState<string | null>(null);
         const [is_loading, setIsLoading] = React.useState(true);
         const [form_values, setFormValues] = React.useState<TFormInitialValues>({
             address_line_1: '',
@@ -64,7 +52,7 @@ const ProofOfAddressForm = observer(
             address_postcode: '',
         });
         const [api_initial_load_error, setAPIInitialLoadError] = React.useState(null);
-        const [form_state, setFormState] = React.useState<TFormState>({
+        const [form_state, setFormState] = React.useState<TPOAFormState>({
             is_btn_loading: false,
             is_submit_success: false,
             should_allow_submit: true,
@@ -73,12 +61,11 @@ const ProofOfAddressForm = observer(
 
         const [should_scroll_to_top, setShouldScrollToTop] = React.useState(false);
 
-        const poa_uploader_files_descriptions = React.useMemo(() => getFileUploaderDescriptions('poa', is_eu), []);
-
         const { upload } = useFileUploader();
+        const { localize } = useTranslations();
 
         React.useEffect(() => {
-            fetchResidenceList?.().then(() => {
+            fetchResidenceList?.().then(async () => {
                 Promise.all([fetchStatesList(), WS.wait('get_settings')]).then(() => {
                     setFormValues({
                         address_line_1: account_settings.address_line_1 ?? '',
@@ -106,13 +93,7 @@ const ProofOfAddressForm = observer(
             }
         }, [should_scroll_to_top]);
 
-        const changeable_fields = getChangeableFields();
-
         const validateFields = (values: TFormInitialValues) => {
-            (Object.entries(values) as ObjectEntries<TFormInitialValues>).forEach(
-                ([key, value]) => (values[key] = value.trim())
-            );
-
             setFormState({ ...form_state, ...{ should_allow_submit: false } });
             const errors: FormikErrors<TFormInitialValues> = {};
             const validateValues = validate(errors, values);
@@ -156,6 +137,10 @@ const ProofOfAddressForm = observer(
                 }
             }
 
+            if (!values.document_type) {
+                errors.document_type = localize('Document type is required.');
+            }
+
             return errors;
         };
 
@@ -173,6 +158,7 @@ const ProofOfAddressForm = observer(
             if (values.address_state && states_list.length) {
                 settings_values.address_state = getLocation(states_list, values.address_state, 'value') || '';
             }
+            delete settings_values?.document_type;
 
             const data = await WS.setSettings(settings_values);
 
@@ -204,11 +190,27 @@ const ProofOfAddressForm = observer(
 
             // upload files
             try {
-                const api_response = await upload(document_files);
+                // This is required as AutoComplate displays only the selected value
+                const selected_doc_type = getSupportedProofOfAddressDocuments().find(
+                    doc => doc.text === values.document_type
+                );
+                const api_response = await upload(document_files, {
+                    document_type: selected_doc_type?.value as DocumentUploadRequest['document_type'],
+                });
+
                 if (api_response?.warning) {
-                    setStatus({ msg: api_response?.message });
                     setFormState({ ...form_state, ...{ is_btn_loading: false } });
-                    setShouldScrollToTop(true);
+
+                    if (api_response.warning === API_ERROR_CODES.DUPLICATE_DOCUMENT) {
+                        if (is_for_cfd_modal) {
+                            onSubmitForCFDModal?.(values, true);
+                        } else {
+                            onSubmit?.(false, true);
+                        }
+                    } else {
+                        setStatus({ msg: api_response?.message });
+                        setShouldScrollToTop(true);
+                    }
                     return;
                 }
 
@@ -241,15 +243,13 @@ const ProofOfAddressForm = observer(
             } catch (error) {
                 if (isServerError(error)) {
                     setStatus({ msg: error.message });
+                    setSubmitting(false);
                     setFormState({ ...form_state, ...{ is_btn_loading: false } });
                     setShouldScrollToTop(true);
                 }
-            } finally {
-                setSubmitting(false);
-                setFormState({ ...form_state, ...{ is_btn_loading: false } });
             }
-            if (is_for_cfd_modal && typeof step_index !== 'undefined') {
-                onSubmitForCFDModal?.(step_index, values);
+            if (is_for_cfd_modal) {
+                onSubmitForCFDModal?.(values);
             }
         };
 
@@ -261,6 +261,7 @@ const ProofOfAddressForm = observer(
             address_city,
             address_state,
             address_postcode,
+            document_type: '',
         };
 
         if (api_initial_load_error) return <LoadErrorMessage error_message={api_initial_load_error} />;
@@ -274,104 +275,45 @@ const ProofOfAddressForm = observer(
             form_initial_values.address_state = '';
         }
         const setOffset = (status: { msg: string }) => {
-            const mobile_scroll_offset = status?.msg ? '200px' : '154px';
-            return is_mobile && !is_for_cfd_modal ? mobile_scroll_offset : '80px';
+            const mobile_scroll_offset = status?.msg ? '200px' : '166px';
+            return !isDesktop && !is_for_cfd_modal ? mobile_scroll_offset : '94px';
         };
 
         return (
             <Formik
                 initialValues={form_initial_values}
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
                 onSubmit={onSubmitValues}
                 validate={validateFields}
                 enableReinitialize
+                validateOnMount
             >
-                {({ status, handleSubmit, isSubmitting, isValid }) => (
-                    <>
-                        <LeaveConfirm onDirty={is_mobile ? showForm : undefined} />
-                        {form_state.should_show_form && (
-                            <form noValidate className='account-form account-form_poa' onSubmit={handleSubmit}>
-                                <ThemedScrollbars
-                                    height='572px'
-                                    is_bypassed={!is_for_cfd_modal || is_mobile}
+                {() => (
+                    <React.Fragment>
+                        <LeaveConfirm onDirty={!isDesktop ? showForm : undefined} />
+                        {form_state.should_show_form &&
+                            (isMobile ? (
+                                <POAMobileLayout
+                                    setOffset={setOffset}
+                                    is_for_cfd_modal={is_for_cfd_modal}
+                                    is_resubmit={is_resubmit}
+                                    setDocumentFiles={setDocumentFiles}
+                                    document_files={document_files}
+                                    form_state={form_state}
+                                />
+                            ) : (
+                                <POADesktopLayout
                                     className={className}
-                                >
-                                    <FormBody scroll_offset={setOffset(status)}>
-                                        {(status?.msg || is_resubmit) && (
-                                            <HintBox
-                                                className='account-form_poa-submit-error'
-                                                icon='IcAlertDanger'
-                                                message={
-                                                    <Text as='p' size={is_mobile ? 'xxxs' : 'xs'}>
-                                                        {!status?.msg && is_resubmit && (
-                                                            <Localize i18n_default_text='We were unable to verify your address with the details you provided. Please check and resubmit or choose a different document type.' />
-                                                        )}
-                                                        {status?.msg}
-                                                    </Text>
-                                                }
-                                                is_danger
-                                                id='dt_poa_submit-error'
-                                            />
-                                        )}
-                                        <FormSubHeader title={localize('Address')} title_text_size='s' />
-                                        <PersonalDetailsForm
-                                            is_qualified_for_poa
-                                            editable_fields={changeable_fields}
-                                            states_list={states_list}
-                                        />
-                                        <FormSubHeader title={localize('Document submission')} title_text_size='s' />
-                                        <FormBodySection>
-                                            <FileUploaderContainer
-                                                onFileDrop={files => {
-                                                    setDocumentFiles(files);
-                                                }}
-                                                onError={setFileSelectionError}
-                                                files_description={
-                                                    <FilesDescription
-                                                        title={poa_uploader_files_descriptions.title}
-                                                        descriptions={poa_uploader_files_descriptions.descriptions}
-                                                    />
-                                                }
-                                                examples={<CommonMistakeExamples />}
-                                            />
-                                        </FormBodySection>
-                                    </FormBody>
-                                </ThemedScrollbars>
-                                {is_for_cfd_modal ? (
-                                    <Modal.Footer has_separator>
-                                        <FormSubmitButton
-                                            is_disabled={
-                                                isSubmitting ||
-                                                !isValid ||
-                                                (document_files && document_files.length < 1) ||
-                                                !!file_selection_error
-                                            }
-                                            label={localize('Continue')}
-                                            is_absolute={is_mobile}
-                                            is_loading={isSubmitting}
-                                        />
-                                    </Modal.Footer>
-                                ) : (
-                                    <FormFooter className='account-form__footer-poa'>
-                                        <Button
-                                            className='account-form__footer-btn'
-                                            type='submit'
-                                            is_disabled={
-                                                isSubmitting ||
-                                                !isValid ||
-                                                (document_files && document_files.length < 1) ||
-                                                !!file_selection_error
-                                            }
-                                            has_effect
-                                            is_loading={form_state.is_btn_loading}
-                                            is_submit_success={form_state.is_submit_success}
-                                            text={localize('Save and submit')}
-                                            primary
-                                        />
-                                    </FormFooter>
-                                )}
-                            </form>
-                        )}
-                    </>
+                                    setOffset={setOffset}
+                                    is_for_cfd_modal={is_for_cfd_modal}
+                                    is_resubmit={is_resubmit}
+                                    setDocumentFiles={setDocumentFiles}
+                                    document_files={document_files}
+                                    form_state={form_state}
+                                />
+                            ))}
+                    </React.Fragment>
                 )}
             </Formik>
         );

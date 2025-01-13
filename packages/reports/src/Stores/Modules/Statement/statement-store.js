@@ -1,5 +1,5 @@
 import debounce from 'lodash.debounce';
-import { action, computed, observable, runInAction, makeObservable, override } from 'mobx';
+import { action, computed, observable, makeObservable, override } from 'mobx';
 import { filterDisabledPositions, toMoment, WS } from '@deriv/shared';
 
 import { formatStatementTransaction } from './Helpers/format-response';
@@ -11,7 +11,7 @@ const delay_on_scroll_time = 150; // fetch debounce delay on scroll
 
 export default class StatementStore extends BaseStore {
     data = [];
-    is_loading = false;
+    is_loading = true;
     has_loaded_all = false;
     date_from = null;
     date_to = toMoment().startOf('day').add(1, 'd').subtract(1, 's').unix();
@@ -49,7 +49,6 @@ export default class StatementStore extends BaseStore {
             handleDateChange: action.bound,
             handleFilterChange: action.bound,
             handleScroll: action.bound,
-            loadAccountStatistics: action.bound,
             accountSwitcherListener: action.bound,
             networkStatusChangeListener: action.bound,
             onMount: action.bound,
@@ -171,41 +170,23 @@ export default class StatementStore extends BaseStore {
         this.fetchOnScroll(left_to_scroll);
     }
 
-    async loadAccountStatistics() {
-        this.account_statistics = {};
-        const { client } = this.root_store;
-        const is_mx_mlt = client.standpoint.iom || client.standpoint.malta;
-        if (is_mx_mlt) {
-            const response_account_statistics = await WS.accountStatistics();
-            runInAction(() => {
-                if (response_account_statistics.error) {
-                    this.account_statistics = {};
-                    return;
-                }
-
-                this.account_statistics = response_account_statistics.account_statistics;
-            });
-        }
-    }
-
     accountSwitcherListener() {
         return new Promise(resolve => {
             this.clearTable();
             this.clearDateFilter();
-            this.loadAccountStatistics();
             return resolve(this.fetchNextBatch());
         });
     }
 
     networkStatusChangeListener(is_online) {
-        this.is_loading = !is_online;
+        this.is_loading = this.is_loading || !is_online;
     }
 
     async onMount() {
         this.assertHasValidCache(
             this.client_loginid,
             this.clearDateFilter,
-            this.clearTable,
+            this.client_loginid ? this.clearTable : () => null,
             WS.forgetAll.bind(null, 'proposal')
         );
         this.client_loginid = this.root_store.client.loginid;
@@ -213,7 +194,6 @@ export default class StatementStore extends BaseStore {
         this.onNetworkStatusChange(this.networkStatusChangeListener);
         await WS.wait('authorize');
         this.fetchNextBatch(true);
-        this.loadAccountStatistics();
     }
 
     /* DO NOT call clearDateFilter() upon unmounting the component, date filters should stay

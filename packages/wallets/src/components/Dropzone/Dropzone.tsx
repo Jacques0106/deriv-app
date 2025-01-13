@@ -10,26 +10,27 @@ import React, {
 } from 'react';
 import classNames from 'classnames';
 import { useDropzone } from 'react-dropzone';
-import CloseIcon from '../../public/images/close-icon.svg';
-import DropzoneFrame from '../../public/images/dropzone-frame.svg';
-import { IconButton, WalletButton, WalletText } from '../Base';
+import { DerivLightDropzoneFrameIcon, DerivLightIcCloudUploadIcon, LegacyClose2pxIcon } from '@deriv/quill-icons';
+import { useTranslations } from '@deriv-com/translations';
+import { Button, Text, useDevice } from '@deriv-com/ui';
+import { IconButton } from '../Base';
 import './Dropzone.scss';
 
 type TProps = {
     buttonText?: ReactNode;
     defaultFile?: File;
     description?: ReactNode;
-    descriptionColor?: ComponentProps<typeof WalletText>['color'];
-    descriptionSize?: ComponentProps<typeof WalletText>['size'];
+    descriptionColor?: ComponentProps<typeof Text>['color'];
+    descriptionSize?: ComponentProps<typeof Text>['size'];
     fileFormats?: NonNullable<Parameters<typeof useDropzone>[0]>['accept'];
     hasFrame?: boolean;
     hoverMessage?: ReactNode;
     icon: ReactNode;
     maxSize?: NonNullable<Parameters<typeof useDropzone>[0]>['maxSize'];
     noClick?: NonNullable<Parameters<typeof useDropzone>[0]>['noClick'];
-    onFileChange?: (file: File) => void;
+    onFileChange?: (file?: File) => void;
     title?: ReactNode;
-    titleType?: ComponentProps<typeof WalletText>['weight'];
+    titleType?: ComponentProps<typeof Text>['weight'];
 };
 
 type TFile = {
@@ -54,11 +55,24 @@ const Dropzone: React.FC<TProps> = ({
     title = false,
     titleType = 'normal',
 }) => {
+    const { localize } = useTranslations();
+
+    const getFileErrorMessage = (errorCode: string) => {
+        switch (errorCode) {
+            case 'file-too-large':
+                return localize('File size should be 8MB or less');
+            default:
+                return localize('File uploaded is not supported');
+        }
+    };
+
     const [file, setFile] = useState<TFile | null>(
         defaultFile ? { file: defaultFile, name: defaultFile.name, preview: URL.createObjectURL(defaultFile) } : null
     );
+
+    const { isDesktop } = useDevice();
     const [showHoverMessage, setShowHoverMessage] = useState(false);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string>();
     const { getInputProps, getRootProps, open, rootRef } = useDropzone({
         accept: fileFormats,
         maxSize,
@@ -78,21 +92,30 @@ const Dropzone: React.FC<TProps> = ({
             }
         },
         onDropAccepted() {
-            setErrorMessage(null);
+            setErrorMessage(undefined);
         },
         onDropRejected(fileRejections) {
-            setErrorMessage(fileRejections?.[0]?.errors?.[0].message);
+            if (fileRejections?.[0]?.errors?.[0].message) {
+                const message = getFileErrorMessage(fileRejections[0].errors[0].code);
+                setErrorMessage(message);
+            }
         },
     });
 
     useEffect(() => {
-        if (file && onFileChange) {
-            onFileChange(file.file);
+        if (onFileChange) {
+            onFileChange(file?.file);
         }
     }, [file]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const removeFile = useCallback(() => {
+    const removeFile = useCallback((e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
         setFile(null);
+        e.stopPropagation();
+    }, []);
+
+    const resetError = useCallback((e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+        setErrorMessage(undefined);
+        e.stopPropagation();
     }, []);
 
     return (
@@ -105,59 +128,93 @@ const Dropzone: React.FC<TProps> = ({
                 className={classNames(
                     'wallets-dropzone',
                     { 'wallets-dropzone--hover': showHoverMessage },
-                    { 'wallets-dropzone--active': file }
+                    { 'wallets-dropzone--active': file },
+                    { 'wallets-dropzone--error': errorMessage }
                 )}
             >
                 <div className='wallets-dropzone__content'>
-                    {showHoverMessage && <WalletText size='sm'>{hoverMessage}</WalletText>}
-                    {!showHoverMessage && !file && (
+                    {showHoverMessage && <Text size='sm'>{hoverMessage}</Text>}
+                    {!showHoverMessage && !errorMessage && !file && (
                         <div className='wallets-dropzone__placeholder'>
                             <div className='wallets-dropzone__placeholder-icon'>{icon}</div>
                             {title && (
-                                <WalletText align='center' color='primary' size='md' weight={titleType}>
+                                <Text align='center' color='primary' size='md' weight={titleType}>
                                     {title}
-                                </WalletText>
+                                </Text>
                             )}
-                            <WalletText align='center' color={descriptionColor} size={descriptionSize}>
+                            <Text align='center' color={descriptionColor} size={descriptionSize}>
                                 {description}
-                            </WalletText>
+                            </Text>
                             {buttonText && (
                                 <div className='wallets-dropzone__placeholder-text'>
-                                    <WalletButton onClick={open} variant='outlined'>
+                                    <Button
+                                        borderWidth='sm'
+                                        className='wallets-dropzone__button'
+                                        color='black'
+                                        onClick={open}
+                                        textSize={isDesktop ? 'sm' : 'md'}
+                                        variant='outlined'
+                                    >
                                         {buttonText}
-                                    </WalletButton>
+                                    </Button>
                                 </div>
-                            )}
-                            {errorMessage && (
-                                <WalletText align='center' color='red' size='2xs'>
-                                    {errorMessage}
-                                </WalletText>
                             )}
                         </div>
                     )}
                     {!showHoverMessage && file && (
                         <React.Fragment key={file.name}>
-                            <div
-                                className={classNames('wallets-dropzone__thumb', {
-                                    'wallets-dropzone__thumb--has-frame': hasFrame,
-                                })}
-                                style={{ backgroundImage: `url(${file.preview})` }}
-                            >
-                                {hasFrame && <DropzoneFrame />}
-                                <IconButton
-                                    className='wallets-dropzone__remove-file'
-                                    data-testid='dt_remove-button'
-                                    icon={<CloseIcon width={12} />}
-                                    onClick={removeFile}
-                                    size='sm'
-                                />
-                            </div>
+                            {file.file.type.indexOf('pdf') !== -1 ? (
+                                <div className='wallets-dropzone__thumb wallets-dropzone__thumb--pdf'>
+                                    <IconButton
+                                        className='wallets-dropzone__remove-file'
+                                        data-testid='dt_remove-button'
+                                        icon={<LegacyClose2pxIcon iconSize='xs' width={12} />}
+                                        onClick={removeFile}
+                                        size='sm'
+                                    />
+                                    <DerivLightIcCloudUploadIcon height={50} width={50} />
+                                    <Text align='center' size='sm'>
+                                        {file.name.length > 30 ? `${file.name.slice(0, 30)}....pdf` : file.name}
+                                    </Text>
+                                </div>
+                            ) : (
+                                <div
+                                    className={classNames('wallets-dropzone__thumb', {
+                                        'wallets-dropzone__thumb--has-frame': hasFrame,
+                                    })}
+                                    style={{ backgroundImage: `url(${file.preview})` }}
+                                >
+                                    {/* TODO: Change implementation to use quill icons after version update */}
+                                    {hasFrame && <DerivLightDropzoneFrameIcon height='80px' width='130px' />}
+                                    <IconButton
+                                        className='wallets-dropzone__remove-file'
+                                        data-testid='dt_remove-button'
+                                        icon={<LegacyClose2pxIcon iconSize='xs' width={12} />}
+                                        onClick={removeFile}
+                                        size='sm'
+                                    />
+                                </div>
+                            )}
                             {description && (
-                                <WalletText align='center' color={descriptionColor}>
+                                <Text align='center' color={descriptionColor}>
                                     {description}
-                                </WalletText>
+                                </Text>
                             )}
                         </React.Fragment>
+                    )}
+                    {errorMessage && (
+                        <div className='wallets-dropzone__error'>
+                            <IconButton
+                                className='wallets-dropzone__remove-file'
+                                data-testid='dt_remove-button'
+                                icon={<LegacyClose2pxIcon iconSize='xs' width={12} />}
+                                onClick={resetError}
+                                size='sm'
+                            />
+                            <Text align='center' color='red'>
+                                {errorMessage}
+                            </Text>
+                        </div>
                     )}
                 </div>
             </div>

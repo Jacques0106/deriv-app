@@ -1,31 +1,38 @@
 import React from 'react';
-import { Trans } from 'react-i18next';
 import {
     useAccountLimits,
     useAccountStatus,
     useActiveWalletAccount,
-    useAuthentication,
     useCashierValidation,
+    useCryptoConfig,
     useCurrencyConfig,
+    usePOA,
+    usePOI,
 } from '@deriv/api-v2';
-import { Loader, WalletsActionScreen } from '../../../../components';
+import { Localize } from '@deriv-com/translations';
+import { ActionScreen } from '@deriv-com/ui';
+import { WalletLoader } from '../../../../components';
 import getWithdrawalLockedDesc, { getWithdrawalLimitReachedDesc } from './WithdrawalLockedContent';
 import './WithdrawalLocked.scss';
 
 const WithdrawalLocked: React.FC<React.PropsWithChildren> = ({ children }) => {
     const { data: activeWallet } = useActiveWalletAccount();
-    const { data: authentication } = useAuthentication();
+    const { data: poiStatus } = usePOI();
+    const { data: poaStatus } = usePOA();
     const { data: cashierValidation } = useCashierValidation();
     const { data: accountLimits } = useAccountLimits();
-    const { data: status } = useAccountStatus();
+    const { data: accountStatus, isLoading: isAccountStatusLoading } = useAccountStatus();
     const { isLoading: isCurrencyConfigLoading } = useCurrencyConfig();
+    const isCryptoProvider = activeWallet?.currency_config?.platform.cashier.includes('crypto');
+    const { data: cryptoConfig } = useCryptoConfig({
+        enabled: isCryptoProvider,
+    });
 
     const currency = activeWallet?.currency || 'USD';
 
-    const poaNeedsVerification = authentication?.is_poa_needed;
-    const poiNeedsVerification = authentication?.is_poa_needed;
-    const poaStatus = authentication?.poa_status || 'none';
-    const poiStatus = authentication?.poi_status || 'none';
+    const poaNeedsVerification = poaStatus?.poa_needs_verification;
+    const poiNeedsVerification = poiStatus?.poi_needs_verification;
+    const isVerified = poiStatus?.is_verified || poaStatus?.is_verified;
 
     const askAuthenticate = cashierValidation?.ask_authenticate;
     const askFinancialRiskApproval = cashierValidation?.ask_financial_risk_approval;
@@ -34,36 +41,38 @@ const WithdrawalLocked: React.FC<React.PropsWithChildren> = ({ children }) => {
     const noWithdrawalOrTradingStatus = cashierValidation?.no_withdrawal_or_trading_status;
     const withdrawalLockedStatus = cashierValidation?.withdrawal_locked_status;
 
-    const isWithdrawalLocked = status?.is_withdrawal_locked;
+    const isWithdrawalLocked = accountStatus?.is_withdrawal_locked;
 
     const remainder = accountLimits?.remainder;
-    const minimumWithdrawal = activeWallet?.currency_config?.is_crypto
-        ? activeWallet?.currency_config?.minimum_withdrawal
+    const fractionalDigits = activeWallet?.currency_config?.fractional_digits
+        ? 10 ** -activeWallet.currency_config.fractional_digits
         : 0.01;
+    const minimumWithdrawal = isCryptoProvider ? cryptoConfig?.minimum_withdrawal : fractionalDigits;
+
     const withdrawalLimitReached = !!(
         typeof remainder !== 'undefined' &&
         typeof minimumWithdrawal !== 'undefined' &&
         +remainder < minimumWithdrawal
     );
+    const isLoading = isCurrencyConfigLoading || isAccountStatusLoading;
 
-    if (isCurrencyConfigLoading) {
-        return <Loader />;
+    if (isLoading) {
+        return <WalletLoader />;
     }
 
     if (withdrawalLimitReached) {
         return (
             <div className='wallets-withdrawal-locked'>
-                <WalletsActionScreen
+                <ActionScreen
                     description={getWithdrawalLimitReachedDesc({
                         askFinancialRiskApproval,
+                        isVerified,
                         poaNeedsVerification,
-                        poaStatus,
                         poiNeedsVerification,
-                        poiStatus,
                     })}
                     title={
-                        <Trans
-                            defaults='Withdrawals from your {{currency}} Wallet are temporarily locked.'
+                        <Localize
+                            i18n_default_text='Withdrawals from your {{currency}} Wallet are temporarily locked.'
                             values={{ currency }}
                         />
                     }
@@ -75,7 +84,7 @@ const WithdrawalLocked: React.FC<React.PropsWithChildren> = ({ children }) => {
     if (isWithdrawalLocked) {
         return (
             <div className='wallets-withdrawal-locked'>
-                <WalletsActionScreen
+                <ActionScreen
                     description={getWithdrawalLockedDesc({
                         askAuthenticate,
                         askFixDetails,
@@ -84,8 +93,8 @@ const WithdrawalLocked: React.FC<React.PropsWithChildren> = ({ children }) => {
                         withdrawalLockedStatus,
                     })}
                     title={
-                        <Trans
-                            defaults='Withdrawals from your {{currency}} Wallet are temporarily locked.'
+                        <Localize
+                            i18n_default_text='Withdrawals from your {{currency}} Wallet are temporarily locked.'
                             values={{ currency }}
                         />
                     }

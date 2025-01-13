@@ -1,59 +1,44 @@
-import React, { FC, useCallback } from 'react';
-import { Trans } from 'react-i18next';
+import React, { FC } from 'react';
 import { DerivLightIcMt5PasswordUpdatedIcon, DerivLightMt5SuccessPasswordResetIcon } from '@deriv/quill-icons';
-import useDevice from '../../hooks/useDevice';
-import { ModalStepWrapper, WalletButton } from '../Base';
-import { useModal } from '../ModalProvider';
-import { WalletsActionScreen } from '../WalletsActionScreen';
+import { useTranslations } from '@deriv-com/translations';
+import { ActionScreen, Button, useDevice } from '@deriv-com/ui';
+import { ModalStepWrapper } from '../Base';
 
 type WalletSuccessResetMT5PasswordProps = {
     isInvestorPassword?: boolean;
-    onClickSuccess?: () => void;
+    onClick: () => void;
     title: string;
 };
 
 const WalletSuccessResetMT5Password: FC<WalletSuccessResetMT5PasswordProps> = ({
     isInvestorPassword = false,
-    onClickSuccess,
+    onClick,
     title,
 }) => {
-    const { hide } = useModal();
-    const { isDesktop, isMobile } = useDevice();
+    const { isDesktop } = useDevice();
+    const { localize } = useTranslations();
 
-    const handleSuccess = useCallback(() => {
-        onClickSuccess?.();
-        hide();
-    }, [onClickSuccess, hide]);
-
-    const renderFooter = useCallback(() => {
-        return isMobile ? (
-            <WalletButton isFullWidth onClick={handleSuccess} size='lg'>
-                <Trans defaults='Done' />
-            </WalletButton>
-        ) : null;
-    }, [isMobile, handleSuccess]);
-
-    const renderButtons = useCallback(() => {
-        return isDesktop ? (
-            <WalletButton onClick={handleSuccess} size='lg'>
-                <Trans defaults='Done' />
-            </WalletButton>
-        ) : null;
-    }, [isDesktop, handleSuccess]);
+    const renderButtons = (
+        <Button isFullWidth={!isDesktop} onClick={onClick} size='lg' textSize='sm'>
+            {localize('OK')}
+        </Button>
+    );
 
     return (
         <ModalStepWrapper
-            renderFooter={isMobile ? renderFooter : undefined}
-            shouldFixedFooter={isMobile}
-            shouldHideHeader={!isMobile}
-            title={`Manage ${title} password`}
+            renderFooter={isDesktop ? undefined : () => renderButtons}
+            shouldHideFooter={isDesktop}
+            title={isInvestorPassword ? localize('Reset {{title}} password', { title }) : localize('Success')}
         >
             <div className='wallets-reset-mt5-password'>
-                <WalletsActionScreen
+                <ActionScreen
+                    actionButtons={isDesktop ? renderButtons : undefined}
                     description={
                         isInvestorPassword
-                            ? 'Your investor password has been changed.'
-                            : `You have a new ${title} password to log in to your ${title} accounts on the web and mobile apps.`
+                            ? localize('Your investor password has been changed.')
+                            : localize('You can log in to all your {{title}} accounts with your new password.', {
+                                  title,
+                              })
                     }
                     descriptionSize='sm'
                     icon={
@@ -63,8 +48,7 @@ const WalletSuccessResetMT5Password: FC<WalletSuccessResetMT5PasswordProps> = ({
                             <DerivLightMt5SuccessPasswordResetIcon height={100} width={100} />
                         )
                     }
-                    renderButtons={renderButtons}
-                    title={isInvestorPassword ? 'Password saved' : 'Success'}
+                    title={isInvestorPassword ? localize('Password saved') : undefined}
                 />
             </div>
         </ModalStepWrapper>

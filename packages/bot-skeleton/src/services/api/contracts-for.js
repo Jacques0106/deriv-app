@@ -235,7 +235,7 @@ export default class ContractsFor {
     }
 
     async getDurations(symbol, trade_type, convert_day_to_hours = true) {
-        if (trade_type === 'multiplier') {
+        if (trade_type === 'multiplier' || trade_type === 'accumulator') {
             return [];
         }
 
@@ -345,6 +345,10 @@ export default class ContractsFor {
         return prediction_range;
     }
 
+    getAccumulationRange = async () => {
+        return [0.01, 0.02, 0.03, 0.04, 0.05];
+    };
+
     async getMultiplierRange(symbol, trade_type) {
         const contracts = await this.getContractsByTradeType(symbol, trade_type);
         const multiplier_range = [];
@@ -432,10 +436,18 @@ export default class ContractsFor {
 
                 if (!is_disabled && has_durations) {
                     const types = opposites[trade_type.toUpperCase()];
+                    const icons = [];
+                    const names = [];
+
+                    types.forEach(type => {
+                        icons.push(Object.keys(type)[0]);
+                        names.push(Object.values(type)[0]);
+                    });
+
                     dropdown_options.push({
-                        name: types.map(type => type[Object.keys(type)[0]]).join('/'),
+                        name: names.join('/'),
                         value: trade_type,
-                        icon: [Object.keys(types[0])[0], Object.keys(types[1])[0]],
+                        icon: icons,
                     });
                 }
             }
@@ -484,9 +496,16 @@ export default class ContractsFor {
         return trade_type_options;
     };
 
-    async getTradeTypesForQuickStrategy(symbol) {
+    async getTradeTypesForQuickStrategy(symbol, trade_type = '') {
         const trade_type_options = [];
         const filtered_trade_type_categories = [];
+        if (trade_type === 'ACCU') {
+            trade_type_options.push({
+                text: 'Buy',
+                value: 'ACCU',
+            });
+            return trade_type_options;
+        }
         const market = await this.getMarketBySymbol(symbol);
         const submarket = await this.getSubmarketBySymbol(symbol);
         const trade_type_categories = await this.getTradeTypeCategories(market, submarket, symbol);
@@ -605,7 +624,11 @@ export default class ContractsFor {
 
     getContractTypes = trade_type => {
         const { opposites } = config;
-        const categories = opposites[trade_type.toUpperCase()].map(opposite => ({
+        let trade_type_value = trade_type;
+        if (trade_type_value === 'ACCU') {
+            trade_type_value = 'accumulator';
+        }
+        const categories = opposites[trade_type_value.toUpperCase()].map(opposite => ({
             value: Object.keys(opposite)[0],
             text: Object.values(opposite)[0],
         }));

@@ -12,12 +12,17 @@ import de from 'Translations/de.json';
 import fr from 'Translations/fr.json';
 import id from 'Translations/id.json';
 import it from 'Translations/it.json';
+import km from 'Translations/km.json';
 import ko from 'Translations/ko.json';
+import mn from 'Translations/mn.json';
 import pl from 'Translations/pl.json';
 import pt from 'Translations/pt.json';
+import sw from 'Translations/sw.json';
 import ru from 'Translations/ru.json';
+import si from 'Translations/si.json';
 import th from 'Translations/th.json';
 import tr from 'Translations/tr.json';
+import uz from 'Translations/uz.json';
 import vi from 'Translations/vi.json';
 import zh_cn from 'Translations/zh_cn.json';
 import zh_tw from 'Translations/zh_tw.json';
@@ -45,12 +50,17 @@ const i18n_config = {
         FR: { translations: { ...fr } },
         ID: { translations: { ...id } },
         IT: { translations: { ...it } },
+        KM: { translations: { ...km } },
         KO: { translations: { ...ko } },
+        MN: { translations: { ...mn } },
         PL: { translations: { ...pl } },
         PT: { translations: { ...pt } },
+        SW: { translations: { ...sw } },
         RU: { translations: { ...ru } },
+        SI: { translations: { ...si } },
         TH: { translations: { ...th } },
         TR: { translations: { ...tr } },
+        UZ: { translations: { ...uz } },
         VI: { translations: { ...vi } },
         ZH_CN: { translations: { ...zh_cn } },
         ZH_TW: { translations: { ...zh_tw } },

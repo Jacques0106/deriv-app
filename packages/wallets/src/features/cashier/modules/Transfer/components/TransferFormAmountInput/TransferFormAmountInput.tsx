@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFormikContext } from 'formik';
 import { useDebounce } from 'usehooks-ts';
+import { Localize, useTranslations } from '@deriv-com/translations';
+import { Button } from '@deriv-com/ui';
 import { ATMAmountInput, Timer } from '../../../../../../components';
 import useInputDecimalFormatter from '../../../../../../hooks/useInputDecimalFormatter';
 import { useTransfer } from '../../provider';
@@ -18,11 +20,13 @@ const DEBOUNCE_DELAY_MS = 500;
 const TransferFormAmountInput: React.FC<TProps> = ({ fieldName }) => {
     const { setFieldValue, setValues, values } = useFormikContext<TInitialTransferFormValues>();
     const { fromAccount, fromAmount, toAccount, toAmount } = values;
+    const { localize } = useTranslations();
 
     const {
         USDExchangeRates,
+        activeWallet,
         activeWalletExchangeRates,
-        preferredLanguage,
+        hasPlatformStatus,
         refetchAccountLimits,
         refetchExchangeRates,
     } = useTransfer();
@@ -37,15 +41,18 @@ const TransferFormAmountInput: React.FC<TProps> = ({ fieldName }) => {
     const hasFunds = Number(fromAccount?.balance) > 0;
     const isFromAmountField = fieldName === 'fromAmount';
     const isSameCurrency = fromAccount?.currency === toAccount?.currency;
-    const isAmountInputDisabled = !hasFunds || (fieldName === 'toAmount' && !toAccount);
+    const isAmountInputDisabled =
+        !hasFunds || (fieldName === 'toAmount' && !toAccount) || [fromAccount, toAccount].some(hasPlatformStatus);
     const isAmountFieldActive = fieldName === values.activeAmountFieldName;
     const isTimerVisible = !isFromAmountField && toAccount && !isSameCurrency && fromAmount > 0 && toAmount > 0;
+    const prevTimerVisible = useRef(isTimerVisible);
+    const isMaxBtnVisible = isFromAmountField && activeWallet?.account_type === 'crypto';
 
     const amountValue = isFromAmountField ? fromAmount : toAmount;
     const debouncedAmountValue = useDebounce(amountValue, DEBOUNCE_DELAY_MS);
 
-    const toAmountLabel = isSameCurrency || !toAccount ? 'Amount you receive' : 'Estimated amount';
-    const amountLabel = isFromAmountField ? 'Amount you send' : toAmountLabel;
+    const toAmountLabel = isSameCurrency || !toAccount ? localize('Amount you receive') : localize('Estimated amount');
+    const amountLabel = isFromAmountField ? localize('Amount you send') : toAmountLabel;
 
     const currency = isFromAmountField ? fromAccount?.currency : toAccount?.currency;
     const fractionDigits = isFromAmountField
@@ -97,6 +104,19 @@ const TransferFormAmountInput: React.FC<TProps> = ({ fieldName }) => {
             toAccount?.currencyConfig?.fractional_digits,
         ]
     );
+
+    // Refetch exchange rates and limits when the target account (toAccount) changes or the timer becomes visible
+    useEffect(() => {
+        const shouldRefetchExchangeRatesAndLimits =
+            (!isSameCurrency && !isFromAmountField && toAccount?.currency && !prevTimerVisible.current) ||
+            isTimerVisible;
+
+        if (shouldRefetchExchangeRatesAndLimits) {
+            refetchExchangeRatesAndLimits();
+        }
+
+        prevTimerVisible.current = isTimerVisible;
+    }, [isFromAmountField, isSameCurrency, isTimerVisible, refetchExchangeRatesAndLimits, toAccount?.currency]);
 
     useEffect(() => {
         if (debouncedAmountValue && !isSameCurrency) {
@@ -166,14 +186,24 @@ const TransferFormAmountInput: React.FC<TProps> = ({ fieldName }) => {
         setFieldValue,
     ]);
 
+    const onMaxBtnClickHandler = useCallback(
+        async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+            const walletBalance = Number(fromAccount?.balance);
+            e.preventDefault();
+            await setFieldValue('activeAmountFieldName', 'fromAmount');
+            setFieldValue('fromAmount', walletBalance);
+        },
+        [fromAccount?.balance, setFieldValue]
+    );
+
     return (
         <div className='wallets-transfer-form-amount-input'>
             <ATMAmountInput
                 currency={currency}
                 disabled={isAmountInputDisabled}
                 fractionDigits={fractionDigits}
+                isError={values.isError}
                 label={amountLabel}
-                locale={preferredLanguage}
                 maxDigits={maxDigits}
                 onBlur={onBlurHandler}
                 onChange={onChangeHandler}
@@ -182,8 +212,20 @@ const TransferFormAmountInput: React.FC<TProps> = ({ fieldName }) => {
             />
             {isTimerVisible && (
                 <div className='wallets-transfer-form-amount-input__timer'>
-                    <Timer key={toAmount} onComplete={onTimerCompleteHandler} />
+                    <Timer onComplete={onTimerCompleteHandler} />
                 </div>
+            )}
+            {isMaxBtnVisible && (
+                <Button
+                    className='wallets-transfer-form-amount-input__max-btn'
+                    color='black'
+                    disabled={!hasFunds}
+                    onClick={onMaxBtnClickHandler}
+                    size='sm'
+                    variant='outlined'
+                >
+                    <Localize i18n_default_text='Max' />
+                </Button>
             )}
         </div>
     );

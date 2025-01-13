@@ -1,8 +1,9 @@
 import classNames from 'classnames';
 import PropTypes from 'prop-types';
+import { useHistory } from 'react-router-dom';
 import React from 'react';
 import { Button, LinearProgress, Text } from '@deriv/components';
-import { isEmptyObject, PlatformContext } from '@deriv/shared';
+import { isEmptyObject } from '@deriv/shared';
 import CloseButton from './close-button.jsx';
 import NotificationStatusIcons from './notification-status-icons.jsx';
 import NotificationBanner from './notification-banner.jsx';
@@ -13,7 +14,7 @@ import NotificationOrder from './notification-order.jsx';
 
 const Notification = ({ data, removeNotificationMessage }) => {
     const linear_progress_container_ref = React.useRef(null);
-    const { is_appstore } = React.useContext(PlatformContext);
+    const history = useHistory();
 
     const destroy = is_closed_by_user => {
         removeNotificationMessage(data);
@@ -118,7 +119,7 @@ const Notification = ({ data, removeNotificationMessage }) => {
                         <div className='notification__action'>
                             {!isEmptyObject(data.action) && (
                                 <React.Fragment>
-                                    {data.action.route ? (
+                                    {data.action.route && !data.action.onClick ? (
                                         <BinaryLink
                                             className={classNames(
                                                 'dc-btn',
@@ -136,9 +137,13 @@ const Notification = ({ data, removeNotificationMessage }) => {
                                         <Button
                                             className='notification__cta-button'
                                             onClick={() => {
-                                                if (data.timeout)
+                                                if (data.timeout) {
                                                     linear_progress_container_ref.current.removeTimeoutSession();
-                                                data.action.onClick({ is_appstore });
+                                                }
+                                                data.action.onClick();
+                                                if (data.action.route) {
+                                                    history.push(data.action.route);
+                                                }
                                             }}
                                             text={data.action.text}
                                             secondary
@@ -166,7 +171,7 @@ Notification.propTypes = {
         action: PropTypes.shape({
             onClick: PropTypes.func,
             route: PropTypes.string,
-            text: PropTypes.string,
+            text: PropTypes.oneOfType([PropTypes.node, PropTypes.string, PropTypes.object]),
         }),
         cta_btn: PropTypes.object,
         className: PropTypes.string,

@@ -12,7 +12,6 @@ import {
     getPropertyValue,
     isCryptocurrency,
     isEmptyObject,
-    routes,
     validNumber,
 } from '@deriv/shared';
 import { localize } from '@deriv/translations';
@@ -25,7 +24,10 @@ import ErrorStore from './error-store';
 const hasTransferNotAllowedLoginid = (loginid?: string) => loginid?.startsWith('MX');
 
 export default class AccountTransferStore {
-    constructor(public WS: TWebSocket, public root_store: TRootStore) {
+    constructor(
+        public WS: TWebSocket,
+        public root_store: TRootStore
+    ) {
         makeObservable(this, {
             accounts_list: observable,
             error: observable,
@@ -130,7 +132,7 @@ export default class AccountTransferStore {
         const { client, common, modules } = this.root_store;
         const { onMountCommon, setLoading, setOnRemount } = modules.cashier.general_store;
         const { active_accounts, is_logged_in } = client;
-        const { is_from_derivgo } = common;
+        const { is_from_derivgo, is_from_outside_cashier } = common;
 
         setLoading(true);
         setOnRemount(this.onMountAccountTransfer);
@@ -167,7 +169,7 @@ export default class AccountTransferStore {
                 return;
             }
 
-            await this.sortAccountsTransfer(transfer_between_accounts, is_from_derivgo);
+            await this.sortAccountsTransfer(transfer_between_accounts, is_from_derivgo, is_from_outside_cashier);
             this.setTransferFee();
             this.setMinimumFee();
             this.setTransferLimit();
@@ -231,7 +233,7 @@ export default class AccountTransferStore {
     setMinimumFee() {
         const decimals = getDecimalPlaces(this.selected_from.currency || '');
         // we need .toFixed() so that it doesn't display in scientific notation, e.g. 1e-8 for currencies with 8 decimal places
-        this.minimum_fee = (1 / Math.pow(10, decimals)).toFixed(decimals);
+        this.minimum_fee = (1 / 10 ** decimals).toFixed(decimals);
     }
 
     setTransferLimit() {
@@ -264,7 +266,8 @@ export default class AccountTransferStore {
     // Using Partial for type to bypass 'msg_type' and 'echo_req' from response type
     async sortAccountsTransfer(
         response_accounts?: Partial<TransferBetweenAccountsResponse> | null,
-        is_from_derivgo?: boolean
+        is_from_derivgo?: boolean,
+        is_from_outside_cashier?: boolean
     ) {
         const transfer_between_accounts = response_accounts || (await this.WS.authorized.transferBetweenAccounts());
         if (!this.accounts_list.length) {
@@ -356,8 +359,6 @@ export default class AccountTransferStore {
         const arr_accounts: TTransferAccount | TAccount[] = [];
         this.setSelectedTo({}); // set selected to empty each time so we can redetermine its value on reload
 
-        const is_from_outside_cashier = !location.pathname.startsWith(routes.cashier);
-
         accounts?.forEach((account: TTransferAccount) => {
             const cfd_platforms = {
                 mt5: { name: 'Deriv MT5', icon: 'IcMt5' },
@@ -394,6 +395,8 @@ export default class AccountTransferStore {
                           sub_account_type: account.sub_account_type,
                           platform: account.account_type,
                           is_eu: this.root_store.client.is_eu,
+                          product: account.product,
+                          shortcode: account.landing_company_short,
                       })} ${this.root_store.client.is_eu ? '' : non_eu_accounts}`
                     : `${cfd_text_display} ${
                           getCFDAccountDisplay({
@@ -402,6 +405,7 @@ export default class AccountTransferStore {
                               platform: account.account_type,
                               is_eu: this.root_store.client.is_eu,
                               is_transfer_form: true,
+                              product: account.product,
                           }) || ''
                       }`;
             const account_text_display = is_cfd
@@ -514,19 +518,23 @@ export default class AccountTransferStore {
         const accounts = this.accounts_list;
         const selected_from = accounts.find(account => account.value === target.value);
 
+        const platforms = ['is_mt', 'is_ctrader', 'is_dxtrade'] as const;
+
+        const isBetweenCFDsTransfer = platforms.some(from_platform => {
+            return platforms.some(to_platform => selected_from?.[from_platform] && this.selected_to?.[to_platform]);
+        });
+
         // if new value of selected_from is the same as the current selected_to
         // switch the value of selected_from and selected_to
         if (selected_from?.value === this.selected_to.value) {
             this.onChangeTransferTo({ target: { value: this.selected_from.value } });
-        } else if (
-            (selected_from?.is_mt && this.selected_to.is_mt) ||
-            (selected_from?.is_dxtrade && this.selected_to.is_dxtrade) ||
-            (selected_from?.is_dxtrade && this.selected_to.is_mt) ||
-            (selected_from?.is_mt && this.selected_to.is_dxtrade)
-        ) {
-            // not allowed to transfer from MT to MT
-            // not allowed to transfer from Dxtrade to Dxtrade
-            // not allowed to transfer between MT and Dxtrade
+        } else if (isBetweenCFDsTransfer) {
+            // not allowed to transfer from MT5 to MT5
+            // not allowed to transfer from DerivX to DerivX
+            // not allowed to transfer from cTrader to cTrader
+            // not allowed to transfer between MT5 and DerivX and visa versa
+            // not allowed to transfer between DerivX and cTrader and visa versa
+            // not allowed to transfer between MT5 and cTrader and visa versa
             // if new value of selected_from is different from selected_to
             // switch the value of selected_to to current client loginid
             this.onChangeTransferTo({ target: { value: this.root_store.client.loginid } });

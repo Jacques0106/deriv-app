@@ -1,6 +1,7 @@
 import type {
     useAccountLimits,
     useActiveAccount,
+    useActiveLinkedToTradingAccount,
     useActiveTradingAccount,
     useActiveWalletAccount,
     useAllAccountsList,
@@ -8,6 +9,7 @@ import type {
     useAuthentication,
     useAuthorize,
     useAvailableMT5Accounts,
+    useCFDCompareAccounts,
     useCreateMT5Account,
     useCreateOtherCFDAccount,
     useCreateWallet,
@@ -23,11 +25,17 @@ import type {
     useMT5AccountsList,
     usePOA,
     usePOI,
+    useSettings,
     useSortedMT5Accounts,
+    useTradingPlatformStatus,
     useTransactions,
     useTransferBetweenAccounts,
     useWalletAccountsList,
 } from '@deriv/api-v2';
+import { TSocketError, TSocketResponse } from '@deriv/api-v2/types';
+import { IconTypes } from '@deriv/quill-icons';
+import { useTranslations } from '@deriv-com/translations';
+import useWalletsMFAccountStatus from './hooks/useWalletsMFAccountStatus';
 
 // eslint-disable-next-line  @typescript-eslint/no-namespace
 export namespace THooks {
@@ -37,9 +45,11 @@ export namespace THooks {
     export type Authorize = NonNullable<ReturnType<typeof useAuthorize>['data']>;
     export type CreateWallet = NonNullable<ReturnType<typeof useCreateWallet>['data']>;
     export type CreateMT5Account = NonNullable<ReturnType<typeof useCreateMT5Account>['data']>;
+    export type CreateOtherCFDAccount = NonNullable<ReturnType<typeof useCreateOtherCFDAccount>['data']>;
     export type CtraderAccountsList = NonNullable<ReturnType<typeof useCtraderAccountsList>['data']>[number];
     export type DxtradeAccountsList = NonNullable<ReturnType<typeof useDxtradeAccountsList>['data']>[number];
     export type ExchangeRate = NonNullable<ReturnType<typeof useExchangeRateSubscription>['data']>;
+    export type TradingPlatformStatus = NonNullable<ReturnType<typeof useTradingPlatformStatus>['data']>;
     export type MT5AccountsList = NonNullable<ReturnType<typeof useMT5AccountsList>['data']>[number];
     export type SortedMT5Accounts = NonNullable<ReturnType<typeof useSortedMT5Accounts>['data']>[number];
     export type WalletAccountsList = NonNullable<ReturnType<typeof useWalletAccountsList>['data']>[number];
@@ -61,6 +71,10 @@ export namespace THooks {
     export type TransferAccount = NonNullable<
         NonNullable<ReturnType<typeof useTransferBetweenAccounts>['data']>['accounts']
     >[number];
+    export type AccountSettings = NonNullable<ReturnType<typeof useSettings>['data']>;
+    export type DocumentUpload = TSocketError<'document_upload'> & TSocketResponse<'document_upload'>;
+    export type CompareCFDAccounts = NonNullable<ReturnType<typeof useCFDCompareAccounts>['data']>;
+    export type TActiveLinkedToTradingAccount = ReturnType<typeof useActiveLinkedToTradingAccount>['data'];
 }
 // eslint-disable-next-line  @typescript-eslint/no-namespace
 export namespace TPlatforms {
@@ -86,10 +100,6 @@ export namespace TDisplayBalance {
     export type CtraderAccountsList = THooks.CtraderAccountsList['display_balance'];
     export type DxtradeAccountsList = THooks.DxtradeAccountsList['display_balance'];
     export type MT5AccountsList = THooks.MT5AccountsList['display_balance'];
-    export type WalletAccountsList = THooks.WalletAccountsList['display_balance'];
-    export type ActiveWalletAccount = THooks.ActiveWalletAccount['display_balance'];
-    export type AccountsList = THooks.DerivAccountsList['display_balance'];
-    export type ActiveTradingAccount = THooks.ActiveTradingAccount['display_balance'];
 }
 
 export type TGenericSizes = '2xl' | '2xs' | '3xl' | '3xs' | '4xl' | '5xl' | '6xl' | 'lg' | 'md' | 'sm' | 'xl' | 'xs';
@@ -100,3 +110,66 @@ export type TWalletLandingCompanyName =
 export type TMT5LandingCompanyName = THooks.MT5AccountsList['landing_company_short'];
 
 export type TWalletCarouselItem = Omit<THooks.AllWalletAccounts, 'landing_company_name'>;
+
+export type TIconTypes = Record<string, IconTypes>;
+
+export type TCurrencyIconTypes = Record<THooks.WalletAccountsList['wallet_currency_type'], IconTypes>;
+
+export type TProductForMarketDetails =
+    | NonNullable<Exclude<THooks.AvailableMT5Accounts['product'], 'financial' | 'standard'>>
+    | 'gold'
+    | 'stp';
+
+export type TTranslations = ReturnType<typeof useTranslations>;
+
+export type TLanguageType =
+    | 'AR'
+    | 'BN'
+    | 'DE'
+    | 'EN'
+    | 'ES'
+    | 'FR'
+    | 'IT'
+    | 'KM'
+    | 'KO'
+    | 'PL'
+    | 'PT'
+    | 'RU'
+    | 'SI'
+    | 'SW'
+    | 'TH'
+    | 'TR'
+    | 'UZ'
+    | 'VI'
+    | 'ZH_CN'
+    | 'ZH_TW';
+
+export type TProductDetails = { max_leverage: string; min_spread: string };
+/* eslint-disable camelcase */
+/*
+    TODO: Remove these types once API types for client_kyc_status is available for mt5_login_list and trading_platform_available_accounts from BE
+*/
+
+export type TAccountStatuses = 'expired' | 'none' | 'pending' | 'rejected' | 'suspected' | 'verified';
+
+export type TModifiedMT5Account = THooks.SortedMT5Accounts & {
+    client_kyc_status: {
+        poa_status: TAccountStatuses;
+        poi_status: TAccountStatuses;
+        required_tin: 0 | 1;
+        valid_tin: 0 | 1;
+    };
+    licence_number: string;
+    regulatory_authority: string;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ObjectWithKeyInUnion<T, K extends keyof any> = T extends any ? (K extends keyof T ? T : never) : never;
+
+export type TAvailableMT5Account = ObjectWithKeyInUnion<TModifiedMT5Account, 'shortcode'>;
+export type TAddedMT5Account = ObjectWithKeyInUnion<TModifiedMT5Account, 'landing_company_short'>;
+type TUseWalletsMFAccountStatusData = ReturnType<typeof useWalletsMFAccountStatus>['data'];
+export type TWalletsMFAccountStatus = {
+    client_kyc_status: TUseWalletsMFAccountStatusData['client_kyc_status'];
+    is_added: TUseWalletsMFAccountStatusData['is_added'];
+};

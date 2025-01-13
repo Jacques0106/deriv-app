@@ -9,6 +9,7 @@ import {
     STRATEGY_1_3_2_6,
 } from '../../../constants/quick-strategies';
 import { TConfigItem, TStrategies, TValidationItem } from './types';
+import { LocalizeHTMLForSellConditions } from './localize_html';
 
 export const FORM_TABS = [
     {
@@ -41,8 +42,8 @@ const SYMBOL: TConfigItem = {
 
 const LABEL_TRADETYPE: TConfigItem = {
     type: 'label',
-    label: localize('Trade type'),
-    description: localize('Your bot will use this trade type for every run'),
+    label: localize('Contract type'),
+    description: localize('Your bot will use this contract type for every run'),
 };
 
 const TRADETYPE: TConfigItem = {
@@ -63,6 +64,18 @@ const PURCHASE_TYPE: TConfigItem = {
     dependencies: ['symbol', 'tradetype'],
 };
 
+const SELL_CONDITIONS_TYPE_INFO: TConfigItem = {
+    type: 'label',
+    label: localize('Sell conditions'),
+    description: LocalizeHTMLForSellConditions,
+};
+
+// This will trigger the boolean_tick_count value to render the take profit and tick count fields
+const SELL_CONDITIONS_TYPE: TConfigItem = {
+    type: 'sell_conditions',
+    name: 'sell_conditions',
+};
+
 const LABEL_STAKE: TConfigItem = {
     type: 'label',
     label: localize('Initial stake'),
@@ -73,6 +86,7 @@ const STAKE: TConfigItem = {
     type: 'number',
     name: 'stake',
     validation: ['number', 'required', 'ceil', NUMBER_DEFAULT_VALIDATION],
+    has_currency_unit: true,
 };
 
 const LABEL_DURATION: TConfigItem = {
@@ -105,6 +119,22 @@ const PROFIT: TConfigItem = {
     type: 'number',
     name: 'profit',
     validation: ['number', 'required', 'ceil', NUMBER_DEFAULT_VALIDATION],
+    has_currency_unit: true,
+};
+
+const GROWTH_RATE: TConfigItem = {
+    type: 'label',
+    label: localize('Growth rate'),
+    description: localize(
+        'Your stake will grow at the specified growth rate per tick as long as the current spot price remains within the range of the previous spot price.'
+    ),
+};
+
+const GROWTH_RATE_VALUE: TConfigItem = {
+    type: 'growth_rate',
+    name: 'growth_rate',
+    attached: true,
+    validation: ['number', 'required', 'ceil'],
 };
 
 const LABEL_LOSS: TConfigItem = {
@@ -117,12 +147,25 @@ const LOSS: TConfigItem = {
     type: 'number',
     name: 'loss',
     validation: ['number', 'required', 'ceil', NUMBER_DEFAULT_VALIDATION],
+    has_currency_unit: true,
 };
 
 const LABEL_MARTINGALE_SIZE: TConfigItem = {
     type: 'label',
     label: localize('Size'),
     description: localize('The size used to multiply the stake after a losing trade for the next trade.'),
+};
+
+const LABEL_ACCUMULAORTS_UNIT: TConfigItem = {
+    type: 'label',
+    label: localize('Unit'),
+    description: localize('The unit used to multiply the stake after a losing trade for the next trade.'),
+};
+
+const LABEL_ACCUMULAORTS_SIZE: TConfigItem = {
+    type: 'label',
+    label: localize('Size'),
+    description: localize('The size used to multiply the stake after a successful trade for the next trade.'),
 };
 
 const LABEL_REVERSE_MARTINGALE_SIZE: TConfigItem = {
@@ -182,7 +225,27 @@ const MAX_STAKE: TConfigItem = {
     name: 'max_stake',
     validation: ['number', 'required', 'ceil', 'min'],
     should_have: [{ key: 'boolean_max_stake', value: true }],
+    hide_without_should_have: true,
     attached: true,
+    has_currency_unit: true,
+};
+
+const TAKE_PROFIT: TConfigItem = {
+    type: 'number',
+    name: 'take_profit',
+    should_have: [{ key: 'boolean_tick_count', value: false }],
+    hide_without_should_have: true,
+    attached: true,
+    has_currency_unit: true,
+};
+
+const TICK_COUNT = {
+    type: 'number',
+    name: 'tick_count',
+    should_have: [{ key: 'boolean_tick_count', value: true }],
+    hide_without_should_have: true,
+    attached: true,
+    has_currency_unit: false,
 };
 
 const LABEL_LAST_DIGIT_PREDICTION: TConfigItem = {
@@ -206,7 +269,7 @@ export const STRATEGIES: TStrategies = {
     MARTINGALE: {
         name: 'martingale_max-stake',
         label: localize('Martingale'),
-        rs_strategy_type: 'martingale',
+        rs_strategy_name: 'martingale',
         description: MARTINGALE,
         fields: [
             [
@@ -230,7 +293,7 @@ export const STRATEGIES: TStrategies = {
     D_ALEMBERT: {
         name: 'dalembert_max-stake',
         label: localize('D’Alembert'),
-        rs_strategy_type: `d'alembert`,
+        rs_strategy_name: `d'alembert`,
         description: D_ALEMBERT,
         fields: [
             [
@@ -254,7 +317,7 @@ export const STRATEGIES: TStrategies = {
     OSCARS_GRIND: {
         name: 'oscars_grind_max-stake',
         label: localize('Oscar’s Grind'),
-        rs_strategy_type: `oscar's-grind`,
+        rs_strategy_name: `oscar's-grind`,
         description: OSCARS_GRIND,
         fields: [
             [
@@ -278,7 +341,7 @@ export const STRATEGIES: TStrategies = {
     REVERSE_MARTINGALE: {
         name: 'reverse_martingale',
         label: localize('Reverse Martingale'),
-        rs_strategy_type: 'reverse martingale',
+        rs_strategy_name: 'reverse martingale',
         description: REVERSE_MARTINGALE,
         fields: [
             [
@@ -311,7 +374,7 @@ export const STRATEGIES: TStrategies = {
     REVERSE_D_ALEMBERT: {
         name: 'reverse_dalembert',
         label: localize('Reverse D’Alembert'),
-        rs_strategy_type: `reverse d'alembert`,
+        rs_strategy_name: `reverse d'alembert`,
         description: REVERSE_D_ALEMBERT,
         fields: [
             [
@@ -335,7 +398,7 @@ export const STRATEGIES: TStrategies = {
     STRATEGY_1_3_2_6: {
         name: '1_3_2_6',
         label: localize('1-3-2-6'),
-        rs_strategy_type: '1-3-2-6',
+        rs_strategy_name: '1-3-2-6',
         description: STRATEGY_1_3_2_6,
         fields: [
             [
@@ -354,6 +417,190 @@ export const STRATEGIES: TStrategies = {
                 DURATION,
             ],
             [LABEL_PROFIT, PROFIT, LABEL_LOSS, LOSS],
+        ],
+    },
+    ACCUMULATORS_MARTINGALE: {
+        name: 'accumulators_martingale',
+        label: localize('Martingale'),
+        rs_strategy_name: `ACCUMULATORS_MARTINGALE`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_SIZE,
+                SIZE,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
+        ],
+    },
+    ACCUMULATORS_DALEMBERT: {
+        name: 'accumulators_dalembert',
+        label: localize('D’Alembert'),
+        rs_strategy_name: `ACCUMULATORS_DALEMBERT`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_UNIT,
+                UNIT,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
+        ],
+    },
+    ACCUMULATORS_MARTINGALE_ON_STAT_RESET: {
+        name: 'accumulators_martingale_on_stat_reset',
+        label: localize('Martingale on Stat Reset'),
+        rs_strategy_name: `ACCUMULATORS_MARTINGALE_ON_STAT_RESET`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_SIZE,
+                SIZE,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
+        ],
+    },
+    ACCUMULATORS_DALEMBERT_ON_STAT_RESET: {
+        name: 'accumulators_dalembert_on_stat_reset',
+        label: localize("D'Alembert on Stat Reset"),
+        rs_strategy_name: `ACCUMULATORS_DALEMBERT_ON_STAT_RESET`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_UNIT,
+                UNIT,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
+        ],
+    },
+    ACCUMULATORS_REVERSE_MARTINGALE: {
+        name: 'accumulators_reverse_martingale',
+        label: localize('Reverse Martingale'),
+        rs_strategy_name: `ACCUMULATORS_REVERSE_MARTINGALE`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_SIZE,
+                SIZE,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
+        ],
+    },
+    ACCUMULATORS_REVERSE_MARTINGALE_ON_STAT_RESET: {
+        name: 'accumulators_reverse_martingale_on_stat_reset',
+        label: localize('Reverse Martingale on Stat Reset'),
+        rs_strategy_name: `ACCUMULATORS_REVERSE_MARTINGALE_ON_STAT_RESET`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_SIZE,
+                SIZE,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
+        ],
+    },
+    ACCUMULATORS_REVERSE_DALEMBERT: {
+        name: 'accumulators_reverse_dalembert',
+        label: localize("Reverse D'Alembert"),
+        rs_strategy_name: `ACCUMULATORS_REVERSE_DALEMBERT`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_UNIT,
+                UNIT,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
+        ],
+    },
+    ACCUMULATORS_REVERSE_DALEMBERT_ON_STAT_RESET: {
+        name: 'accumulators_reverse_dalembert_on_stat_reset',
+        label: localize("Reverse D'Alembert on Stat Reset"),
+        rs_strategy_name: `ACCUMULATORS_REVERSE_DALEMBERT_ON_STAT_RESET`,
+        description: [],
+        fields: [
+            [LABEL_SYMBOL, SYMBOL, LABEL_STAKE, STAKE, GROWTH_RATE, GROWTH_RATE_VALUE],
+            [
+                LABEL_PROFIT,
+                PROFIT,
+                LABEL_LOSS,
+                LOSS,
+                LABEL_ACCUMULAORTS_UNIT,
+                UNIT,
+                SELL_CONDITIONS_TYPE_INFO,
+                SELL_CONDITIONS_TYPE,
+                TAKE_PROFIT,
+                TICK_COUNT,
+                CHECKBOX_MAX_STAKE,
+                MAX_STAKE,
+            ],
         ],
     },
 };

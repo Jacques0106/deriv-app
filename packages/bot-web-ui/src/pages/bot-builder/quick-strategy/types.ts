@@ -34,7 +34,7 @@ export type TConfigItem = Partial<{
     name: keyof TFormData;
     dependencies: string[];
     label: string;
-    description: string;
+    description: ReactNode;
     attached: boolean;
     hide: string[];
     validation: TValidationItem[];
@@ -44,6 +44,7 @@ export type TConfigItem = Partial<{
         multiple?: Array<string>;
     }[];
     hide_without_should_have: boolean;
+    has_currency_unit: boolean;
 }>;
 
 export type TDescriptionItem = Partial<{
@@ -66,7 +67,7 @@ export type TStrategy = {
     label: string;
     description: TDescriptionItem[];
     fields: TConfigItem[][];
-    rs_strategy_type?: TRsStrategyType;
+    rs_strategy_name?: TRsStrategyName;
 };
 
 export type TStrategies = {
@@ -112,20 +113,27 @@ export type TApiHelpersInstance = {
     };
 };
 
-export type TRsStrategyType =
+export type TRsStrategyName =
     | `d'alembert`
     | `martingale`
     | `oscar's-grind`
     | `reverse martingale`
     | `reverse d'alembert`
-    | `1-3-2-6`;
+    | `1-3-2-6`
+    | `ACCUMULATORS_MARTINGALE`
+    | `ACCUMULATORS_DALEMBERT`
+    | `ACCUMULATORS_MARTINGALE_ON_STAT_RESET`
+    | `ACCUMULATORS_DALEMBERT_ON_STAT_RESET`
+    | `ACCUMULATORS_REVERSE_MARTINGALE`
+    | `ACCUMULATORS_REVERSE_MARTINGALE_ON_STAT_RESET`
+    | `ACCUMULATORS_REVERSE_DALEMBERT`
+    | `ACCUMULATORS_REVERSE_DALEMBERT_ON_STAT_RESET`;
 
 export type TDurationType = 't' | 's' | 'm' | 'h' | 'd';
 
 export type TFormValues = Record<string, string | number | boolean> & {
-    durationtype: TDurationType;
     symbol: string;
     tradetype: string;
     type?: string;
-    duration?: string;
+    stake?: string;
 };
